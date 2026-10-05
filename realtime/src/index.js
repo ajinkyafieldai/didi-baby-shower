@@ -1,4 +1,4 @@
-const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate"]);
+const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate", "photo"]);
 const GROUP_WINDOW_MS = 10_000;
 const GROUP_THRESHOLD = 2;
 const GROUP_BURST_THRESHOLD = 2;
@@ -62,8 +62,9 @@ export class CelebrationRoom {
 
       const sameEffect = recent.filter((entry) => entry.effect === body.effect);
       const uniqueParticipants = new Set(sameEffect.map((entry) => entry.senderId)).size;
-      const groupCelebration = uniqueParticipants >= GROUP_THRESHOLD;
-      const groupBurst = uniqueParticipants >= GROUP_BURST_THRESHOLD;
+      const groupable = body.effect !== "photo";
+      const groupCelebration = groupable && uniqueParticipants >= GROUP_THRESHOLD;
+      const groupBurst = groupable && uniqueParticipants >= GROUP_BURST_THRESHOLD;
 
       const event = {
         type: "effect",
