@@ -435,8 +435,8 @@ function playMeetCelebrationBurst() {
     const piece = document.createElement("span");
     piece.className = "meet-celebration-confetti";
     piece.textContent = confetti[Math.floor(Math.random() * confetti.length)];
-    piece.style.setProperty("--x", `${-115 + Math.random() * 230}px`);
-    piece.style.setProperty("--y", `${-90 - Math.random() * 210}px`);
+    piece.style.setProperty("--x", `${-190 + Math.random() * 380}px`);
+    piece.style.setProperty("--y", `${-130 - Math.random() * 320}px`);
     piece.style.setProperty("--r", `${-160 + Math.random() * 320}deg`);
     piece.style.animationDelay = `${Math.random() * 0.14}s`;
     origin.appendChild(piece);
@@ -447,9 +447,9 @@ function playMeetCelebrationBurst() {
     const balloon = document.createElement("span");
     balloon.className = "meet-celebration-balloon";
     balloon.textContent = balloons[i % balloons.length];
-    balloon.style.setProperty("--x", `${-120 + Math.random() * 240}px`);
-    balloon.style.setProperty("--sway", `${-22 + Math.random() * 44}px`);
-    balloon.style.setProperty("--rise", `${-280 - Math.random() * 230}px`);
+    balloon.style.setProperty("--x", `${-185 + Math.random() * 370}px`);
+    balloon.style.setProperty("--sway", `${-40 + Math.random() * 80}px`);
+    balloon.style.setProperty("--rise", `${-360 - Math.random() * 300}px`);
     balloon.style.animationDelay = `${0.08 + Math.random() * 0.22}s`;
     origin.appendChild(balloon);
   }
