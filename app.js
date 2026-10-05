@@ -229,7 +229,11 @@ syncTimer = window.setInterval(pollEvents, 750);
 
 function clearNormalEffects() {
   Array.from(effectLayer.children).forEach((child) => {
-    if (!child.classList.contains("group-celebration")) {
+    if (
+      !child.classList.contains("group-celebration") &&
+      !child.classList.contains("meet-reaction-balloon") &&
+      !child.classList.contains("meet-celebration")
+    ) {
       child.remove();
     }
   });
@@ -422,34 +426,36 @@ function playMeetCelebrationBurst() {
   const celebration = document.createElement("div");
   celebration.className = "meet-celebration";
 
+  const origin = document.createElement("div");
+  origin.className = "meet-celebration-origin";
+  celebration.appendChild(origin);
+
   const confetti = ["✨", "🎉", "💛", "🩷", "🌸"];
-  for (let i = 0; i < 34; i += 1) {
+  for (let i = 0; i < 28; i += 1) {
     const piece = document.createElement("span");
     piece.className = "meet-celebration-confetti";
     piece.textContent = confetti[Math.floor(Math.random() * confetti.length)];
-    piece.style.left = `${12 + Math.random() * 76}%`;
-    piece.style.setProperty("--drift", `${-48 + Math.random() * 96}px`);
-    piece.style.setProperty("--spin", `${-220 + Math.random() * 440}deg`);
-    piece.style.setProperty("--rise", `${35 + Math.random() * 34}vh`);
-    piece.style.setProperty("--float-time", `${2.8 + Math.random() * 1.2}s`);
-    piece.style.animationDelay = `${Math.random() * 0.5}s`;
-    celebration.appendChild(piece);
+    piece.style.setProperty("--x", `${-115 + Math.random() * 230}px`);
+    piece.style.setProperty("--y", `${-90 - Math.random() * 210}px`);
+    piece.style.setProperty("--r", `${-160 + Math.random() * 320}deg`);
+    piece.style.animationDelay = `${Math.random() * 0.14}s`;
+    origin.appendChild(piece);
   }
 
   const balloons = ["🎈", "🎈", "🎈", "🥳"];
-  for (let i = 0; i < 8; i += 1) {
+  for (let i = 0; i < 9; i += 1) {
     const balloon = document.createElement("span");
     balloon.className = "meet-celebration-balloon";
     balloon.textContent = balloons[i % balloons.length];
-    balloon.style.left = `${10 + Math.random() * 80}%`;
-    balloon.style.setProperty("--sway", `${-30 + Math.random() * 60}px`);
-    balloon.style.setProperty("--rise-time", `${3.2 + Math.random() * 1.2}s`);
-    balloon.style.animationDelay = `${Math.random() * 0.7}s`;
-    celebration.appendChild(balloon);
+    balloon.style.setProperty("--x", `${-120 + Math.random() * 240}px`);
+    balloon.style.setProperty("--sway", `${-22 + Math.random() * 44}px`);
+    balloon.style.setProperty("--rise", `${-280 - Math.random() * 230}px`);
+    balloon.style.animationDelay = `${0.08 + Math.random() * 0.22}s`;
+    origin.appendChild(balloon);
   }
 
   effectLayer.appendChild(celebration);
-  window.setTimeout(() => celebration.remove(), 4600);
+  window.setTimeout(() => celebration.remove(), 3200);
 }
 
 // Expose only the small event-rendering boundary that the realtime layer needs.
