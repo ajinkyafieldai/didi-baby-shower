@@ -848,10 +848,28 @@ button { -webkit-tap-highlight-color: transparent; }
   cursor: pointer;
   backdrop-filter: blur(14px);
   box-shadow: 0 6px 22px rgba(0,0,0,.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px) scale(.88);
+  transition:
+    opacity .35s ease,
+    transform .45s cubic-bezier(.2,.8,.2,1);
+}
+
+.photo-button.is-peeking {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+  animation: photo-sneak 2.8s ease-in-out infinite;
 }
 
 .photo-button:active { transform: scale(.96); }
 .photo-button:disabled { opacity: .68; }
+
+@keyframes photo-sneak {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -4px; }
+}
 
 .photo-moment {
   position: absolute;
