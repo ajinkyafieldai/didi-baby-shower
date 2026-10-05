@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "didi-baby-shower-realtime",
+  "name": "billowing-shadow-fa0a",
   "main": "src/index.js",
   "compatibility_date": "2026-10-05",
   "durable_objects": {
@@ -11,10 +11,10 @@
       }
     ]
   },
-  "exports": {
-    "CelebrationRoom": {
-      "type": "durable-object",
-      "storage": "sqlite"
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["CelebrationRoom"]
     }
-  }
+  ]
 }
