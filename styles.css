@@ -755,3 +755,77 @@ button { -webkit-tap-highlight-color: transparent; }
       scale(1.12);
   }
 }
+
+
+.meet-celebration {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.meet-celebration-confetti {
+  position: absolute;
+  top: -12%;
+  font-size: clamp(18px, 5vw, 34px);
+  will-change: transform, opacity;
+  animation: meet-celebration-confetti-fall var(--fall-time, 3s) cubic-bezier(.18,.7,.28,1) forwards;
+}
+
+.meet-celebration-balloon {
+  position: absolute;
+  bottom: -18%;
+  font-size: clamp(38px, 10vw, 72px);
+  will-change: transform, opacity;
+  filter: drop-shadow(0 8px 14px rgba(0,0,0,.22));
+  animation: meet-celebration-balloon-rise var(--rise-time, 3.4s) cubic-bezier(.18,.68,.2,1) forwards;
+}
+
+.meet-celebration-banner {
+  position: absolute;
+  left: 50%;
+  top: 43%;
+  transform: translate(-50%, -50%);
+  padding: 13px 18px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.94);
+  color: var(--ink);
+  font-weight: 900;
+  font-size: clamp(1rem, 5vw, 1.8rem);
+  white-space: nowrap;
+  box-shadow: 0 12px 42px rgba(0,0,0,.28);
+  animation: meet-celebration-banner 3.8s ease-out both;
+}
+
+@keyframes meet-celebration-confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0,-10vh,0) rotate(0deg) scale(.6);
+  }
+  10% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift, 0),118vh,0) rotate(var(--spin,720deg)) scale(1.1);
+  }
+}
+
+@keyframes meet-celebration-balloon-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0,10vh,0) scale(.72) rotate(-5deg);
+  }
+  12% { opacity: 1; }
+  75% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--sway,0),-125vh,0) scale(1.08) rotate(8deg);
+  }
+}
+
+@keyframes meet-celebration-banner {
+  0% { opacity: 0; transform: translate(-50%,-50%) scale(.55); }
+  14% { opacity: 1; transform: translate(-50%,-50%) scale(1.08); }
+  72% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-50%) scale(1.06); }
+}
