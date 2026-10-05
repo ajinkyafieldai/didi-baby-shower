@@ -1,4 +1,4 @@
-const EFFECTS = new Set(["ovalni", "flowers", "blessings", "supari", "tika", "celebrate"]);
+const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "tika", "celebrate"]);
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
