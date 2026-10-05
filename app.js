@@ -5,6 +5,8 @@ const joinMessage = document.getElementById("join-message");
 const statusText = document.getElementById("status-text");
 const effectLayer = document.getElementById("effect-layer");
 const eventLabel = document.getElementById("event-label");
+const guestNameInput = document.getElementById("guest-name");
+const joinButton = document.getElementById("join-button");
 
 let guestName = "";
 let effectTimer = null;
@@ -20,6 +22,13 @@ const participantId = (() => {
   return id;
 })();
 
+function updateJoinButtonState() {
+  joinButton.disabled = !guestNameInput.value.trim();
+}
+
+guestNameInput.addEventListener("input", updateJoinButtonState);
+updateJoinButtonState();
+
 joinForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -31,15 +40,13 @@ joinForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  const joinButton = document.getElementById("join-button");
-
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     joinMessage.textContent = "This browser cannot access the camera and microphone.";
     return;
   }
 
   joinButton.disabled = true;
-  joinButton.textContent = "Waiting for permission…";
+  joinButton.textContent = "Joining…";
   joinMessage.textContent = "When your browser asks, tap Allow for camera and microphone.";
   statusText.textContent = "Requesting camera & microphone…";
 
@@ -54,7 +61,7 @@ joinForm.addEventListener("submit", async (event) => {
     stream.getTracks().forEach((track) => track.stop());
 
     joinMessage.textContent = "";
-    joinButton.textContent = "Opening family call…";
+    joinButton.textContent = "Joining…";
     statusText.textContent = "Connecting to Zoom…";
 
     frame.src = `/zoom.html?name=${encodeURIComponent(guestName)}`;
@@ -77,7 +84,7 @@ joinForm.addEventListener("submit", async (event) => {
 
     statusText.textContent = "Camera & microphone permission needed";
     joinButton.disabled = false;
-    joinButton.textContent = "Try camera & microphone again";
+    joinButton.textContent = "Join";
   }
 });
 
