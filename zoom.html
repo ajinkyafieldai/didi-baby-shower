@@ -23,6 +23,26 @@
 </head>
 <body>
   <div id="boot-message">Preparing the family video call…</div>
+
+  <script>
+    window.addEventListener("error", function (event) {
+      const el = document.getElementById("boot-message");
+      if (el) el.textContent = "Zoom startup error: " + (event.message || "unknown script error");
+    });
+    window.addEventListener("unhandledrejection", function (event) {
+      const el = document.getElementById("boot-message");
+      const reason = event.reason && (event.reason.message || String(event.reason));
+      if (el) el.textContent = "Zoom startup error: " + (reason || "unhandled promise rejection");
+    });
+  </script>
+
+  <script src="https://source.zoom.us/6.5.0/lib/vendor/react.min.js"></script>
+  <script src="https://source.zoom.us/6.5.0/lib/vendor/react-dom.min.js"></script>
+  <script src="https://source.zoom.us/6.5.0/lib/vendor/react-redux.min.js"></script>
+  <script src="https://source.zoom.us/6.5.0/lib/vendor/redux.min.js"></script>
+  <script src="https://source.zoom.us/6.5.0/lib/vendor/redux-thunk.min.js"></script>
+  <script src="https://source.zoom.us/6.5.0/lib/vendor/lodash.min.js"></script>
+
   <script type="module" src="/zoom.js"></script>
 </body>
 </html>
