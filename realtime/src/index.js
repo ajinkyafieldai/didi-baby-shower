@@ -35,7 +35,7 @@ export class CelebrationRoom {
       }
 
       const previous = await this.ctx.storage.get("latest");
-      const seq = (previous && Number(previous.seq)) ? Number(previous.seq) + 1 : 1;
+      const seq = previous && Number(previous.seq) ? Number(previous.seq) + 1 : 1;
 
       const latest = {
         seq,
@@ -58,6 +58,14 @@ export class CelebrationRoom {
 
 export default {
   async fetch(request, env) {
+    if (!env.REALTIME_SHARED_SECRET) {
+      return json({ error: "Worker secret not configured" }, 503);
+    }
+
+    if (request.headers.get("x-realtime-secret") !== env.REALTIME_SHARED_SECRET) {
+      return json({ error: "Unauthorized" }, 401);
+    }
+
     const id = env.CELEBRATION_ROOM.idFromName("didi-baby-shower");
     return env.CELEBRATION_ROOM.get(id).fetch(request);
   }
