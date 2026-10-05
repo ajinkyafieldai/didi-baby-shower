@@ -85,16 +85,70 @@ window.addEventListener("message", (event) => {
   }
 });
 
+let eventSocket = null;
+let reconnectTimer = null;
+let reconnectDelay = 1000;
+
+function connectEvents() {
+  clearTimeout(reconnectTimer);
+
+  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  const socket = new WebSocket(`${protocol}//${location.host}/api/events`);
+  eventSocket = socket;
+
+  socket.addEventListener("open", () => {
+    reconnectDelay = 1000;
+    statusText.textContent = stage.classList.contains("in-call")
+      ? "Live"
+      : "Ready to join";
+  });
+
+  socket.addEventListener("message", (event) => {
+    try {
+      const message = JSON.parse(event.data);
+      if (message.type === "effect" && message.effect) {
+        playEffect(message.effect, message.sender || "Someone");
+      }
+    } catch (error) {
+      console.error("Invalid celebration event", error);
+    }
+  });
+
+  socket.addEventListener("close", () => {
+    if (eventSocket === socket) {
+      eventSocket = null;
+    }
+
+    reconnectTimer = window.setTimeout(connectEvents, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 2, 10000);
+  });
+
+  socket.addEventListener("error", () => {
+    socket.close();
+  });
+}
+
+function sendEffect(effect) {
+  if (!eventSocket || eventSocket.readyState !== WebSocket.OPEN) {
+    playEffect(effect, guestName || "Someone");
+    statusText.textContent = "Celebration sync reconnecting…";
+    return;
+  }
+
+  eventSocket.send(JSON.stringify({
+    type: "effect",
+    effect,
+    sender: guestName || "Someone"
+  }));
+}
+
 document.querySelectorAll("[data-effect]").forEach((button) => {
   button.addEventListener("click", () => {
-    const effect = button.dataset.effect;
-    playEffect(effect, guestName || "Someone");
-
-    // Intentionally local for the first deployment.
-    // The shared Cloudflare event channel will call playEffect() on every
-    // connected browser using the same event payload.
+    sendEffect(button.dataset.effect);
   });
 });
+
+connectEvents();
 
 function playEffect(effect, sender) {
   clearTimeout(effectTimer);
