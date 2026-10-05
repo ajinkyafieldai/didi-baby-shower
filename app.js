@@ -307,6 +307,10 @@ function playEffect(effect, sender) {
     smudge.className = "tika-smudge applied-smudge";
     mark.appendChild(smudge);
     markLayer.appendChild(mark);
+
+    window.setTimeout(() => {
+      mark.remove();
+    }, 5000);
   }
 
   if (effect === "oti") {
