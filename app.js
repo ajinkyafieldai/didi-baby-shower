@@ -31,9 +31,7 @@ function schedulePhotoPeek(initial = false) {
   if (!photoButton || !stage.classList.contains("in-call")) return;
 
   window.clearTimeout(photoPeekTimer);
-  const delay = initial
-    ? 9000 + Math.random() * 9000
-    : 18000 + Math.random() * 22000;
+  const delay = initial ? 5000 : 15000;
 
   photoPeekTimer = window.setTimeout(() => {
     if (!stage.classList.contains("in-call") || photoButton.disabled) {
@@ -41,16 +39,11 @@ function schedulePhotoPeek(initial = false) {
       return;
     }
 
-    const width = photoButton.offsetWidth || 76;
-    const height = photoButton.offsetHeight || 42;
     const margin = 14;
-    const maxX = Math.max(margin, stage.clientWidth - width - margin);
-    const maxY = Math.max(margin, stage.clientHeight - height - margin);
-
-    photoButton.style.left = `${margin + Math.random() * Math.max(0, maxX - margin)}px`;
-    photoButton.style.top = `${margin + Math.random() * Math.max(0, maxY - margin)}px`;
-    photoButton.style.right = "auto";
-    photoButton.style.bottom = "auto";
+    photoButton.style.left = "auto";
+    photoButton.style.top = "auto";
+    photoButton.style.right = `${margin}px`;
+    photoButton.style.bottom = `${margin}px`;
     photoButton.classList.add("is-peeking");
     photoButton.setAttribute("aria-hidden", "false");
 
@@ -58,7 +51,7 @@ function schedulePhotoPeek(initial = false) {
     photoHideTimer = window.setTimeout(() => {
       hidePhotoButton();
       schedulePhotoPeek();
-    }, 7000);
+    }, 8000);
   }, delay);
 }
 
