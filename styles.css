@@ -265,8 +265,7 @@ button { -webkit-tap-highlight-color: transparent; }
   animation: petal-fall var(--fall, 3s) ease-in forwards;
 }
 
-.blessing-burst,
-.ritual-burst,
+.ashirwad-burst,
 .celebration-burst {
   position: absolute;
   inset: 0;
@@ -333,4 +332,68 @@ button { -webkit-tap-highlight-color: transparent; }
 .primary-button:disabled {
   opacity: .65;
   cursor: wait;
+}
+
+
+.supari-circle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(30vw, 140px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 35% 30%, #b9784f 0%, #915533 35%, #6b3a22 70%, #4c2718 100%);
+  box-shadow: 0 0 0 10px rgba(185,120,79,.14), 0 10px 30px rgba(0,0,0,.28);
+  animation: supari-pop 2.8s ease-out both;
+}
+
+.tika-drop {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  width: 22px;
+  height: 90px;
+  transform: translateX(-50%);
+  animation: tika-fall 2.4s ease-out both;
+}
+
+.tika-drop::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 12px;
+  height: 70px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff6a6a 0%, #d31717 100%);
+  box-shadow: 0 0 20px rgba(211,23,23,.35);
+}
+
+.tika-drop::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -12px;
+  width: 28px;
+  height: 28px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, #ff6a6a 0%, #d31717 70%, #9d0f0f 100%);
+  box-shadow: 0 0 0 10px rgba(211,23,23,.10), 0 0 24px rgba(211,23,23,.35);
+}
+
+@keyframes supari-pop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.45) rotate(-18deg); }
+  18% { opacity: 1; transform: translate(-50%, -50%) scale(1.05) rotate(5deg); }
+  70% { opacity: 1; transform: translate(-50%, -50%) scale(.98); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15) rotate(8deg); }
+}
+
+@keyframes tika-fall {
+  0% { opacity: 0; transform: translate(-50%, -60px) scale(.7); }
+  20% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  70% { opacity: 1; transform: translate(-50%, 90px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, 110px) scale(1.05); }
 }
