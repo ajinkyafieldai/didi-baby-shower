@@ -204,19 +204,13 @@ button { -webkit-tap-highlight-color: transparent; }
   position: relative;
   z-index: 10;
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(64px, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   padding: 7px 8px max(7px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
   background: rgba(255,250,247,.94);
   backdrop-filter: blur(18px);
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
 }
-
-.ritual-dock::-webkit-scrollbar { display: none; }
 
 .ritual-button {
   min-height: 54px;
@@ -309,11 +303,8 @@ button { -webkit-tap-highlight-color: transparent; }
   }
 
   .ritual-dock {
-    grid-auto-flow: row;
-    grid-auto-columns: auto;
     grid-template-columns: 1fr;
     grid-template-rows: repeat(8, 1fr);
-    overflow: visible;
     border-top: 0;
     border-left: 1px solid var(--line);
     padding: 12px;
