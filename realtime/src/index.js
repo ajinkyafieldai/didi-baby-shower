@@ -1,6 +1,6 @@
 const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate"]);
 const GROUP_WINDOW_MS = 10_000;
-const GROUP_THRESHOLD = 2;
+const GROUP_THRESHOLD = 4;
 const GROUP_COOLDOWN_MS = 10_000;
 
 function json(data, status = 200) {
@@ -20,8 +20,18 @@ export class CelebrationRoom {
 
   async fetch(request) {
     if (request.method === "GET") {
+      const url = new URL(request.url);
+      const since = Math.max(0, Number(url.searchParams.get("since") || 0));
       const latest = await this.ctx.storage.get("latest");
-      return json(latest || { seq: 0, event: null });
+      const storedEvents = await this.ctx.storage.get("events");
+      const events = Array.isArray(storedEvents)
+        ? storedEvents.filter((event) => Number(event.seq || 0) > since)
+        : [];
+
+      return json({
+        seq: latest && Number(latest.seq) ? Number(latest.seq) : 0,
+        events
+      });
     }
 
     if (request.method === "POST") {
@@ -56,20 +66,25 @@ export class CelebrationRoom {
         uniqueParticipants >= GROUP_THRESHOLD &&
         now - lastGroupAt >= GROUP_COOLDOWN_MS;
 
-      const latest = {
+      const event = {
+        type: "effect",
+        effect: body.effect,
+        sender,
+        senderId,
+        id: crypto.randomUUID(),
+        at: now,
         seq,
-        event: {
-          type: "effect",
-          effect: body.effect,
-          sender,
-          senderId,
-          id: crypto.randomUUID(),
-          at: now,
-          groupCelebration
-        }
+        groupCelebration
       };
 
+      const latest = { seq, event };
+      const storedEvents = await this.ctx.storage.get("events");
+      const events = Array.isArray(storedEvents) ? storedEvents : [];
+      events.push(event);
+      const trimmedEvents = events.slice(-80);
+
       await this.ctx.storage.put("latest", latest);
+      await this.ctx.storage.put("events", trimmedEvents);
       await this.ctx.storage.put("recentCelebrations", recent);
       if (groupCelebration) {
         await this.ctx.storage.put("lastGroupAt", now);
