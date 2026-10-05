@@ -16,49 +16,15 @@ let effectTimer = null;
 let groupEffectTimer = null;
 let audioContext = null;
 let photoCaptureStream = null;
-let photoPeekTimer = null;
-let photoHideTimer = null;
-let photoPeekStarted = false;
 
-function hidePhotoButton() {
+function showPhotoButton() {
   if (!photoButton) return;
-  photoButton.classList.remove("is-peeking");
-  photoButton.setAttribute("aria-hidden", "true");
-  window.clearTimeout(photoHideTimer);
-}
-
-function schedulePhotoPeek(initial = false) {
-  if (!photoButton || !stage.classList.contains("in-call")) return;
-
-  window.clearTimeout(photoPeekTimer);
-  const delay = initial ? 5000 : 15000;
-
-  photoPeekTimer = window.setTimeout(() => {
-    if (!stage.classList.contains("in-call") || photoButton.disabled) {
-      schedulePhotoPeek();
-      return;
-    }
-
-    const margin = 14;
-    photoButton.style.left = "auto";
-    photoButton.style.top = "auto";
-    photoButton.style.right = `${margin}px`;
-    photoButton.style.bottom = `${margin}px`;
-    photoButton.classList.add("is-peeking");
-    photoButton.setAttribute("aria-hidden", "false");
-
-    window.clearTimeout(photoHideTimer);
-    photoHideTimer = window.setTimeout(() => {
-      hidePhotoButton();
-      schedulePhotoPeek();
-    }, 8000);
-  }, delay);
-}
-
-function startPhotoPeek() {
-  if (photoPeekStarted) return;
-  photoPeekStarted = true;
-  schedulePhotoPeek(true);
+  photoButton.classList.add("is-peeking");
+  photoButton.setAttribute("aria-hidden", "false");
+  photoButton.style.left = "auto";
+  photoButton.style.top = "auto";
+  photoButton.style.right = "14px";
+  photoButton.style.bottom = "14px";
 }
 
 async function ensurePhotoCapture() {
@@ -289,7 +255,7 @@ window.addEventListener("message", (event) => {
     statusText.textContent = message.text || "Zoom";
     callStatus.classList.toggle("compact", message.text === "Live");
     if (message.text === "Live") {
-      startPhotoPeek();
+      showPhotoButton();
     }
   }
 
@@ -414,8 +380,6 @@ document.querySelectorAll("[data-effect]").forEach((button) => {
     button.classList.add("is-sent");
 
     if (effect === "photo") {
-      hidePhotoButton();
-      window.clearTimeout(photoPeekTimer);
       try {
         statusText.textContent = "Select this browser tab in the share window to save the family photo…";
         await ensurePhotoCapture();
@@ -427,7 +391,6 @@ document.querySelectorAll("[data-effect]").forEach((button) => {
         window.setTimeout(() => eventLabel.classList.remove("visible"), 4000);
         button.disabled = false;
         button.classList.remove("is-sent");
-        schedulePhotoPeek();
         return;
       }
     }
@@ -438,7 +401,7 @@ document.querySelectorAll("[data-effect]").forEach((button) => {
       button.disabled = false;
       button.classList.remove("is-sent");
       if (effect === "photo") {
-        schedulePhotoPeek();
+        showPhotoButton();
       }
     }, effect === "photo" ? 4200 : 700);
   });
@@ -746,3 +709,6 @@ function playMeetCelebrationBurst() {
 
 // Expose only the small event-rendering boundary that the realtime layer needs.
 window.babyShower = { playEffect, playGroupCelebration };
+
+
+showPhotoButton();
