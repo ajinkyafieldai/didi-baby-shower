@@ -107,6 +107,7 @@ window.addEventListener("message", (event) => {
 });
 
 let lastEventSeq = 0;
+let eventsInitialized = false;
 let syncTimer = null;
 let syncBusy = false;
 
@@ -126,24 +127,32 @@ async function pollEvents() {
     }
 
     const data = await response.json();
-    const events = Array.isArray(data.events)
-      ? data.events
-      : (data.event ? [data.event] : []);
 
-    events
-      .filter((event) => event && event.type === "effect" && Number(event.seq || 0) > lastEventSeq)
-      .sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0))
-      .forEach((event, index) => {
-        window.setTimeout(() => {
-          playEffect(event.effect, event.sender || "Someone");
-          if (event.groupCelebration) {
-            playGroupCelebration();
-          }
-        }, index * 450);
-      });
+    if (!eventsInitialized) {
+      if (typeof data.seq === "number") {
+        lastEventSeq = data.seq;
+      }
+      eventsInitialized = true;
+    } else {
+      const events = Array.isArray(data.events)
+        ? data.events
+        : (data.event ? [data.event] : []);
 
-    if (typeof data.seq === "number") {
-      lastEventSeq = Math.max(lastEventSeq, data.seq);
+      events
+        .filter((event) => event && event.type === "effect" && Number(event.seq || 0) > lastEventSeq)
+        .sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0))
+        .forEach((event, index) => {
+          window.setTimeout(() => {
+            playEffect(event.effect, event.sender || "Someone");
+            if (event.groupCelebration) {
+              playGroupCelebration();
+            }
+          }, index * 450);
+        });
+
+      if (typeof data.seq === "number") {
+        lastEventSeq = Math.max(lastEventSeq, data.seq);
+      }
     }
 
     if (!stage.classList.contains("in-call")) {
@@ -210,32 +219,20 @@ document.querySelectorAll("[data-effect]").forEach((button) => {
   });
 });
 
-let lastVideoTapAt = 0;
-stage.addEventListener("pointerup", (event) => {
-  if (!stage.classList.contains("in-call")) return;
-  if (event.target.closest && event.target.closest(".ritual-dock")) return;
-
-  const now = Date.now();
-  if (now - lastVideoTapAt < 360) {
-    const heart = document.createElement("div");
-    heart.className = "video-heart";
-    heart.textContent = "❤️";
-    heart.style.left = `${Math.min(92, Math.max(8, (event.clientX / window.innerWidth) * 100))}%`;
-    heart.style.top = `${Math.min(88, Math.max(12, (event.clientY / window.innerHeight) * 100))}%`;
-    effectLayer.appendChild(heart);
-    window.setTimeout(() => heart.remove(), 1800);
-    lastVideoTapAt = 0;
-    return;
-  }
-  lastVideoTapAt = now;
-});
-
 pollEvents();
 syncTimer = window.setInterval(pollEvents, 750);
 
+function clearNormalEffects() {
+  Array.from(effectLayer.children).forEach((child) => {
+    if (!child.classList.contains("group-celebration")) {
+      child.remove();
+    }
+  });
+}
+
 function playEffect(effect, sender) {
   clearTimeout(effectTimer);
-  effectLayer.replaceChildren();
+  clearNormalEffects();
 
   const names = {
     ovalni: "Ovalni",
@@ -328,13 +325,14 @@ function playEffect(effect, sender) {
   }
 
   effectTimer = window.setTimeout(() => {
-    effectLayer.replaceChildren();
+    clearNormalEffects();
     eventLabel.classList.remove("visible");
   }, 3600);
 }
 
 function playGroupCelebration() {
   clearTimeout(groupEffectTimer);
+  effectLayer.querySelectorAll(".group-celebration").forEach((node) => node.remove());
 
   const group = document.createElement("div");
   group.className = "group-celebration";
