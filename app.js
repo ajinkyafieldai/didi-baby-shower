@@ -118,7 +118,7 @@ async function pollEvents() {
     }
   } catch (error) {
     console.error("Celebration sync poll failed", error);
-    statusText.textContent = "Celebration sync offline";
+    statusText.textContent = "Celebration sync offline (" + (error.message || "error") + ")";
   } finally {
     syncBusy = false;
   }
@@ -150,7 +150,7 @@ async function sendEffect(effect) {
     playEffect(effect, guestName || "Someone");
   } catch (error) {
     console.error("Celebration sync send failed", error);
-    statusText.textContent = "Celebration sync offline";
+    statusText.textContent = "Celebration sync offline (" + (error.message || "error") + ")";
     playEffect(effect, guestName || "Someone");
   }
 }
