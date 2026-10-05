@@ -422,38 +422,34 @@ function playMeetCelebrationBurst() {
   const celebration = document.createElement("div");
   celebration.className = "meet-celebration";
 
-  const confetti = ["🎉", "✨", "🎊", "💛", "🩷", "💐"];
-  for (let i = 0; i < 86; i += 1) {
+  const confetti = ["✨", "🎉", "💛", "🩷", "🌸"];
+  for (let i = 0; i < 34; i += 1) {
     const piece = document.createElement("span");
     piece.className = "meet-celebration-confetti";
     piece.textContent = confetti[Math.floor(Math.random() * confetti.length)];
-    piece.style.left = `${Math.random() * 100}%`;
-    piece.style.setProperty("--drift", `${-110 + Math.random() * 220}px`);
-    piece.style.setProperty("--spin", `${-540 + Math.random() * 1080}deg`);
-    piece.style.setProperty("--fall-time", `${2.2 + Math.random() * 1.8}s`);
-    piece.style.animationDelay = `${Math.random() * 0.55}s`;
+    piece.style.left = `${12 + Math.random() * 76}%`;
+    piece.style.setProperty("--drift", `${-48 + Math.random() * 96}px`);
+    piece.style.setProperty("--spin", `${-220 + Math.random() * 440}deg`);
+    piece.style.setProperty("--rise", `${35 + Math.random() * 34}vh`);
+    piece.style.setProperty("--float-time", `${2.8 + Math.random() * 1.2}s`);
+    piece.style.animationDelay = `${Math.random() * 0.5}s`;
     celebration.appendChild(piece);
   }
 
   const balloons = ["🎈", "🎈", "🎈", "🥳"];
-  for (let i = 0; i < 14; i += 1) {
+  for (let i = 0; i < 8; i += 1) {
     const balloon = document.createElement("span");
     balloon.className = "meet-celebration-balloon";
     balloon.textContent = balloons[i % balloons.length];
-    balloon.style.left = `${4 + Math.random() * 92}%`;
-    balloon.style.setProperty("--sway", `${-55 + Math.random() * 110}px`);
-    balloon.style.setProperty("--rise-time", `${2.7 + Math.random() * 1.4}s`);
-    balloon.style.animationDelay = `${Math.random() * 0.45}s`;
+    balloon.style.left = `${10 + Math.random() * 80}%`;
+    balloon.style.setProperty("--sway", `${-30 + Math.random() * 60}px`);
+    balloon.style.setProperty("--rise-time", `${3.2 + Math.random() * 1.2}s`);
+    balloon.style.animationDelay = `${Math.random() * 0.7}s`;
     celebration.appendChild(balloon);
   }
 
-  const banner = document.createElement("div");
-  banner.className = "meet-celebration-banner";
-  banner.textContent = "Family celebration! 🎉";
-  celebration.appendChild(banner);
-
   effectLayer.appendChild(celebration);
-  window.setTimeout(() => celebration.remove(), 4700);
+  window.setTimeout(() => celebration.remove(), 4600);
 }
 
 // Expose only the small event-rendering boundary that the realtime layer needs.
