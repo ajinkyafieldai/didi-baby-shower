@@ -16,6 +16,7 @@ let effectTimer = null;
 let groupEffectTimer = null;
 let audioContext = null;
 let photoCaptureStream = null;
+const zoomCaptureRequests = new Map();
 
 function showPhotoButton() {
   if (!photoButton) return;
@@ -25,6 +26,58 @@ function showPhotoButton() {
   photoButton.style.top = "auto";
   photoButton.style.right = "14px";
   photoButton.style.bottom = "14px";
+}
+
+function requestZoomPhoto() {
+  return new Promise((resolve, reject) => {
+    if (!frame.contentWindow) {
+      reject(new Error("Zoom frame is not ready."));
+      return;
+    }
+
+    const requestId = crypto.randomUUID();
+    const timeout = window.setTimeout(() => {
+      zoomCaptureRequests.delete(requestId);
+      reject(new Error("Zoom photo capture timed out."));
+    }, 3500);
+
+    zoomCaptureRequests.set(requestId, { resolve, reject, timeout });
+    frame.contentWindow.postMessage({
+      type: "zoom-capture-request",
+      requestId
+    }, location.origin);
+  });
+}
+
+async function saveFamilyPhotoBlob(blob) {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const filename = `baby-shower-${stamp}.jpg`;
+
+  const localUrl = URL.createObjectURL(blob);
+  const download = document.createElement("a");
+  download.href = localUrl;
+  download.download = filename;
+  download.style.display = "none";
+  document.body.appendChild(download);
+  download.click();
+  download.remove();
+  window.setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+
+  const response = await fetch("/api/photos", {
+    method: "POST",
+    headers: {
+      "Content-Type": "image/jpeg",
+      "X-Photo-Name": filename
+    },
+    body: blob
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error("Cloud photo save failed" + (detail ? ": " + detail : ""));
+  }
+
+  return response.json();
 }
 
 async function ensurePhotoCapture() {
@@ -109,35 +162,7 @@ async function captureFamilyPhoto() {
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
   if (!blob) throw new Error("Could not create the family photo.");
 
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filename = `baby-shower-${stamp}.jpg`;
-
-  // Always keep a local copy as a backup.
-  const localUrl = URL.createObjectURL(blob);
-  const download = document.createElement("a");
-  download.href = localUrl;
-  download.download = filename;
-  download.style.display = "none";
-  document.body.appendChild(download);
-  download.click();
-  download.remove();
-  window.setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
-
-  const response = await fetch("/api/photos", {
-    method: "POST",
-    headers: {
-      "Content-Type": "image/jpeg",
-      "X-Photo-Name": filename
-    },
-    body: blob
-  });
-
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error("Cloud photo save failed" + (detail ? ": " + detail : ""));
-  }
-
-  return response.json();
+  return saveFamilyPhotoBlob(blob);
 }
 
 function ensureAudioContext() {
@@ -265,6 +290,19 @@ window.addEventListener("message", (event) => {
   if (event.origin !== window.location.origin) return;
 
   const message = event.data || {};
+
+  if (message.type === "zoom-capture-result" && message.requestId) {
+    const pending = zoomCaptureRequests.get(message.requestId);
+    if (pending) {
+      window.clearTimeout(pending.timeout);
+      zoomCaptureRequests.delete(message.requestId);
+      if (message.error) pending.reject(new Error(message.error));
+      else if (message.blob instanceof Blob) pending.resolve(message.blob);
+      else pending.reject(new Error("Zoom returned an invalid photo."));
+    }
+    return;
+  }
+
   if (message.type === "zoom-status") {
     statusText.textContent = message.text || "Zoom";
     callStatus.classList.toggle("compact", message.text === "Live");
@@ -392,23 +430,6 @@ document.querySelectorAll("[data-effect]").forEach((button) => {
     button.classList.remove("is-sent");
     void button.offsetWidth;
     button.classList.add("is-sent");
-
-    if (effect === "photo") {
-      try {
-        statusText.textContent = "Select this browser tab in the share window to save the family photo…";
-        await ensurePhotoCapture();
-      } catch (error) {
-        console.error("Photo capture permission error", error);
-        const reason = error && error.name ? ` (${error.name})` : "";
-        eventLabel.textContent = `Photo capture cancelled${reason}. Choose This Tab in the share window.`;
-        eventLabel.classList.add("visible");
-        statusText.textContent = stage.classList.contains("in-call") ? "Live" : "Ready to join";
-        window.setTimeout(() => eventLabel.classList.remove("visible"), 4000);
-        button.disabled = false;
-        button.classList.remove("is-sent");
-        return;
-      }
-    }
 
     sendEffect(effect);
 
@@ -580,16 +601,26 @@ function playEffect(effect, sender, capturePhoto = false) {
           playChime("photo");
 
           if (capturePhoto) {
-            // Capture before the visual flash so the saved image is clean.
-            captureFamilyPhoto()
+            // First try to capture Zoom's own same-origin video/canvas surfaces.
+            // Only ask for tab sharing if Zoom's renderer cannot be captured directly.
+            requestZoomPhoto()
+              .then((blob) => saveFamilyPhotoBlob(blob))
+              .catch(async (directError) => {
+                console.warn("Direct Zoom capture unavailable; falling back to tab capture", directError);
+                statusText.textContent = "Direct capture unavailable — select this tab once…";
+                await ensurePhotoCapture();
+                return captureFamilyPhoto();
+              })
               .then(() => {
                 eventLabel.textContent = "Family photo saved ✓";
                 eventLabel.classList.add("visible");
+                statusText.textContent = stage.classList.contains("in-call") ? "Live" : "Ready to join";
               })
               .catch((error) => {
                 console.error("Family photo save failed", error);
-                eventLabel.textContent = "Photo downloaded locally; cloud save failed.";
+                eventLabel.textContent = "Photo capture failed: " + (error.message || "unknown error");
                 eventLabel.classList.add("visible");
+                statusText.textContent = stage.classList.contains("in-call") ? "Live" : "Ready to join";
               });
           }
 
