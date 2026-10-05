@@ -9,12 +9,64 @@ const eventLabel = document.getElementById("event-label");
 const guestNameInput = document.getElementById("guest-name");
 const joinButton = document.getElementById("join-button");
 const callStatus = document.querySelector(".call-status");
+const photoButton = document.querySelector(".photo-button");
 
 let guestName = "";
 let effectTimer = null;
 let groupEffectTimer = null;
 let audioContext = null;
 let photoCaptureStream = null;
+let photoPeekTimer = null;
+let photoHideTimer = null;
+let photoPeekStarted = false;
+
+function hidePhotoButton() {
+  if (!photoButton) return;
+  photoButton.classList.remove("is-peeking");
+  photoButton.setAttribute("aria-hidden", "true");
+  window.clearTimeout(photoHideTimer);
+}
+
+function schedulePhotoPeek(initial = false) {
+  if (!photoButton || !stage.classList.contains("in-call")) return;
+
+  window.clearTimeout(photoPeekTimer);
+  const delay = initial
+    ? 9000 + Math.random() * 9000
+    : 18000 + Math.random() * 22000;
+
+  photoPeekTimer = window.setTimeout(() => {
+    if (!stage.classList.contains("in-call") || photoButton.disabled) {
+      schedulePhotoPeek();
+      return;
+    }
+
+    const width = photoButton.offsetWidth || 76;
+    const height = photoButton.offsetHeight || 42;
+    const margin = 14;
+    const maxX = Math.max(margin, stage.clientWidth - width - margin);
+    const maxY = Math.max(margin, stage.clientHeight - height - margin);
+
+    photoButton.style.left = `${margin + Math.random() * Math.max(0, maxX - margin)}px`;
+    photoButton.style.top = `${margin + Math.random() * Math.max(0, maxY - margin)}px`;
+    photoButton.style.right = "auto";
+    photoButton.style.bottom = "auto";
+    photoButton.classList.add("is-peeking");
+    photoButton.setAttribute("aria-hidden", "false");
+
+    window.clearTimeout(photoHideTimer);
+    photoHideTimer = window.setTimeout(() => {
+      hidePhotoButton();
+      schedulePhotoPeek();
+    }, 7000);
+  }, delay);
+}
+
+function startPhotoPeek() {
+  if (photoPeekStarted) return;
+  photoPeekStarted = true;
+  schedulePhotoPeek(true);
+}
 
 async function ensurePhotoCapture() {
   if (
@@ -243,6 +295,9 @@ window.addEventListener("message", (event) => {
   if (message.type === "zoom-status") {
     statusText.textContent = message.text || "Zoom";
     callStatus.classList.toggle("compact", message.text === "Live");
+    if (message.text === "Live") {
+      startPhotoPeek();
+    }
   }
 
   if (message.type === "zoom-config-error") {
@@ -366,6 +421,8 @@ document.querySelectorAll("[data-effect]").forEach((button) => {
     button.classList.add("is-sent");
 
     if (effect === "photo") {
+      hidePhotoButton();
+      window.clearTimeout(photoPeekTimer);
       try {
         statusText.textContent = "Select this browser tab in the share window to save the family photo…";
         await ensurePhotoCapture();
@@ -377,6 +434,7 @@ document.querySelectorAll("[data-effect]").forEach((button) => {
         window.setTimeout(() => eventLabel.classList.remove("visible"), 4000);
         button.disabled = false;
         button.classList.remove("is-sent");
+        schedulePhotoPeek();
         return;
       }
     }
@@ -386,6 +444,9 @@ document.querySelectorAll("[data-effect]").forEach((button) => {
     window.setTimeout(() => {
       button.disabled = false;
       button.classList.remove("is-sent");
+      if (effect === "photo") {
+        schedulePhotoPeek();
+      }
     }, effect === "photo" ? 4200 : 700);
   });
 });
