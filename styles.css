@@ -667,3 +667,91 @@ button { -webkit-tap-highlight-color: transparent; }
     transform: translate(-50%, -50%) scale(1);
   }
 }
+
+
+/* Google Meet-style grouped reactions: same ritual from several people
+   grows into a shared balloon, wiggles on each addition, then bursts. */
+.meet-reaction-balloon {
+  position: absolute;
+  z-index: 8;
+  left: 18px;
+  bottom: 28px;
+  width: 74px;
+  height: 74px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255,255,255,.95);
+  box-shadow: 0 10px 34px rgba(0,0,0,.28);
+  transform: scale(var(--group-scale, 1));
+  transform-origin: center bottom;
+  transition: transform .18s ease;
+}
+
+.meet-reaction-emoji {
+  font-size: 38px;
+  line-height: 1;
+}
+
+.meet-reaction-count {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+  box-shadow: 0 4px 14px rgba(0,0,0,.22);
+}
+
+.meet-reaction-balloon.wiggle {
+  animation: meet-balloon-wiggle .42s ease;
+}
+
+.meet-reaction-balloon.burst {
+  animation: meet-balloon-pop .48s ease-out forwards;
+}
+
+.meet-reaction-burst-piece {
+  position: absolute;
+  z-index: 9;
+  left: 55px;
+  bottom: 63px;
+  font-size: 24px;
+  pointer-events: none;
+  animation: meet-reaction-burst 1.35s cubic-bezier(.18,.72,.2,1) forwards;
+}
+
+@keyframes meet-balloon-wiggle {
+  0% { transform: scale(var(--group-scale, 1)) rotate(0deg); }
+  28% { transform: scale(calc(var(--group-scale, 1) * 1.1)) rotate(-8deg); }
+  58% { transform: scale(calc(var(--group-scale, 1) * 1.06)) rotate(7deg); }
+  100% { transform: scale(var(--group-scale, 1)) rotate(0deg); }
+}
+
+@keyframes meet-balloon-pop {
+  0% { opacity: 1; transform: scale(var(--group-scale, 1)); }
+  65% { opacity: 1; transform: scale(calc(var(--group-scale, 1) * 1.28)); }
+  100% { opacity: 0; transform: scale(calc(var(--group-scale, 1) * .25)); }
+}
+
+@keyframes meet-reaction-burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(.7) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform:
+      rotate(var(--angle))
+      translateX(var(--distance))
+      rotate(calc(-1 * var(--angle)))
+      scale(1.12);
+  }
+}
