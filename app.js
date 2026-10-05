@@ -8,6 +8,17 @@ const eventLabel = document.getElementById("event-label");
 
 let guestName = "";
 let effectTimer = null;
+let groupEffectTimer = null;
+
+const participantId = (() => {
+  const key = "baby-shower-participant-id";
+  let id = sessionStorage.getItem(key);
+  if (!id) {
+    id = crypto.randomUUID();
+    sessionStorage.setItem(key, id);
+  }
+  return id;
+})();
 
 joinForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -111,6 +122,9 @@ async function pollEvents() {
 
       if (data.event && data.event.type === "effect") {
         playEffect(data.event.effect, data.event.sender || "Someone");
+        if (data.event.groupCelebration) {
+          playGroupCelebration();
+        }
       }
     }
 
@@ -133,7 +147,8 @@ async function sendEffect(effect) {
       body: JSON.stringify({
         type: "effect",
         effect,
-        sender: guestName || "Someone"
+        sender: guestName || "Someone",
+        senderId: participantId
       }),
       cache: "no-store"
     });
@@ -150,6 +165,9 @@ async function sendEffect(effect) {
     }
 
     playEffect(effect, guestName || "Someone");
+    if (data.event && data.event.groupCelebration) {
+      playGroupCelebration();
+    }
   } catch (error) {
     console.error("Celebration sync send failed", error);
     statusText.textContent = "Celebration sync offline (" + (error.message || "error") + ")";
@@ -175,7 +193,7 @@ function playEffect(effect, sender) {
     flowers: "Flowers",
     ashirwad: "Ashirwad",
     supari: "Supari",
-    tika: "Tika",
+    tika: "Tikka",
     celebrate: "Celebrate"
   };
 
@@ -205,7 +223,7 @@ function playEffect(effect, sender) {
   if (effect === "ashirwad") {
     const burst = document.createElement("div");
     burst.className = "ashirwad-burst";
-    burst.textContent = "🙏✨";
+    burst.textContent = "🙌";
     effectLayer.appendChild(burst);
   }
 
@@ -234,5 +252,39 @@ function playEffect(effect, sender) {
   }, 3600);
 }
 
+function playGroupCelebration() {
+  clearTimeout(groupEffectTimer);
+
+  const group = document.createElement("div");
+  group.className = "group-celebration";
+
+  const banner = document.createElement("div");
+  banner.className = "group-celebration-banner";
+  banner.textContent = "Everyone's celebrating! 🎉";
+  group.appendChild(banner);
+
+  const pieces = ["🎉", "✨", "💐", "🌸", "🥳", "💛", "🩷", "🪷"];
+  for (let i = 0; i < 90; i += 1) {
+    const piece = document.createElement("span");
+    piece.className = "group-confetti";
+    piece.textContent = pieces[Math.floor(Math.random() * pieces.length)];
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.setProperty("--x", `${-140 + Math.random() * 280}px`);
+    piece.style.setProperty("--spin", `${Math.round(-720 + Math.random() * 1440)}deg`);
+    piece.style.setProperty("--duration", `${2.4 + Math.random() * 2.2}s`);
+    piece.style.animationDelay = `${Math.random() * 0.65}s`;
+    piece.style.fontSize = `${18 + Math.random() * 32}px`;
+    group.appendChild(piece);
+  }
+
+  effectLayer.appendChild(group);
+  eventLabel.textContent = "Group celebration! 🎉";
+  eventLabel.classList.add("visible");
+
+  groupEffectTimer = window.setTimeout(() => {
+    group.remove();
+  }, 5200);
+}
+
 // Expose only the small event-rendering boundary that the realtime layer needs.
-window.babyShower = { playEffect };
+window.babyShower = { playEffect, playGroupCelebration };
