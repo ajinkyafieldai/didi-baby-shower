@@ -146,7 +146,7 @@ async function pollEvents() {
           window.setTimeout(() => {
             playEffect(event.effect, event.sender || "Someone");
             if (event.groupCelebration) {
-              playGroupCelebration();
+              playGroupCelebration(event.effect, event.groupCount || 2, Boolean(event.groupBurst));
             }
           }, index * 450);
         });
@@ -195,7 +195,11 @@ async function sendEffect(effect) {
 
     playEffect(effect, guestName || "Someone");
     if (data.event && data.event.groupCelebration) {
-      playGroupCelebration();
+      playGroupCelebration(
+        data.event.effect,
+        data.event.groupCount || 2,
+        Boolean(data.event.groupBurst)
+      );
     }
   } catch (error) {
     console.error("Celebration sync send failed", error);
@@ -348,37 +352,66 @@ function playEffect(effect, sender) {
   }, 3600);
 }
 
-function playGroupCelebration() {
+const groupEmoji = {
+  ovalni: "🪔",
+  flowers: "🌸",
+  ashirwad: "🙌",
+  supari: "🌰",
+  haldi: "🟡",
+  kunku: "🔴",
+  oti: "🥥",
+  celebrate: "🎉"
+};
+
+function playGroupCelebration(effect, count = 2, burst = false) {
   clearTimeout(groupEffectTimer);
-  effectLayer.querySelectorAll(".group-celebration").forEach((node) => node.remove());
 
-  const group = document.createElement("div");
-  group.className = "group-celebration";
+  let group = effectLayer.querySelector(`.meet-reaction-balloon[data-effect="${effect}"]`);
+  if (!group) {
+    group = document.createElement("div");
+    group.className = "meet-reaction-balloon";
+    group.dataset.effect = effect;
 
-  const banner = document.createElement("div");
-  banner.className = "group-celebration-banner";
-  banner.textContent = "Family celebration! 🎉";
-  group.appendChild(banner);
+    const emoji = document.createElement("span");
+    emoji.className = "meet-reaction-emoji";
+    emoji.textContent = groupEmoji[effect] || "🎉";
 
-  const pieces = ["🎉", "✨", "💐", "🌸", "🥳", "💛", "🩷", "🪷"];
-  for (let i = 0; i < 90; i += 1) {
-    const piece = document.createElement("span");
-    piece.className = "group-confetti";
-    piece.textContent = pieces[Math.floor(Math.random() * pieces.length)];
-    piece.style.left = `${Math.random() * 100}%`;
-    piece.style.setProperty("--x", `${-140 + Math.random() * 280}px`);
-    piece.style.setProperty("--spin", `${Math.round(-720 + Math.random() * 1440)}deg`);
-    piece.style.setProperty("--duration", `${2.4 + Math.random() * 2.2}s`);
-    piece.style.animationDelay = `${Math.random() * 0.65}s`;
-    piece.style.fontSize = `${18 + Math.random() * 32}px`;
-    group.appendChild(piece);
+    const countBadge = document.createElement("span");
+    countBadge.className = "meet-reaction-count";
+
+    group.append(emoji, countBadge);
+    effectLayer.appendChild(group);
   }
 
-  effectLayer.appendChild(group);
+  const countBadge = group.querySelector(".meet-reaction-count");
+  countBadge.textContent = String(count);
+  group.style.setProperty("--group-scale", String(1 + Math.min(count - 2, 4) * 0.13));
+
+  group.classList.remove("wiggle");
+  void group.offsetWidth;
+  group.classList.add("wiggle");
+
+  if (burst) {
+    group.classList.add("burst");
+
+    for (let i = 0; i < 36; i += 1) {
+      const piece = document.createElement("span");
+      piece.className = "meet-reaction-burst-piece";
+      piece.textContent = groupEmoji[effect] || "🎉";
+      piece.style.setProperty("--angle", `${(360 / 36) * i + Math.random() * 12}deg`);
+      piece.style.setProperty("--distance", `${90 + Math.random() * 180}px`);
+      piece.style.animationDelay = `${Math.random() * 0.12}s`;
+      effectLayer.appendChild(piece);
+      window.setTimeout(() => piece.remove(), 1500);
+    }
+
+    window.setTimeout(() => group.remove(), 520);
+    return;
+  }
 
   groupEffectTimer = window.setTimeout(() => {
     group.remove();
-  }, 5200);
+  }, 3200);
 }
 
 // Expose only the small event-rendering boundary that the realtime layer needs.
