@@ -11,6 +11,12 @@ const joinButton = document.getElementById("join-button");
 const callStatus = document.querySelector(".call-status");
 const photoButton = document.querySelector(".photo-button");
 const photoHost = new URLSearchParams(location.search).get("photoHost") === "1";
+const gamePanel = document.getElementById("game-panel");
+const gameContent = document.getElementById("game-content");
+const gameClose = document.getElementById("game-close");
+
+let gameState = { names: [], quiz: [] };
+let activeGame = null;
 
 let guestName = "";
 let effectTimer = null;
@@ -342,6 +348,11 @@ async function pollEvents() {
 
     const data = await response.json();
 
+    if (data.games) {
+      gameState = data.games;
+      if (activeGame) renderGame(activeGame);
+    }
+
     if (!eventsInitialized) {
       if (typeof data.seq === "number") {
         lastEventSeq = data.seq;
@@ -442,6 +453,158 @@ document.querySelectorAll("[data-effect]").forEach((button) => {
       }
     }, effect === "photo" ? 4200 : 700);
   });
+});
+
+const didiQuestions = [
+  "What is Didi's comfort food?",
+  "What phrase does Didi say all the time?",
+  "Where would Didi pick for a surprise holiday?",
+  "What always makes Didi laugh?"
+];
+
+async function sendGame(body) {
+  const response = await fetch("/api/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...body,
+      sender: guestName || "Someone",
+      senderId: participantId
+    }),
+    cache: "no-store"
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Game update failed");
+  if (data.games) gameState = data.games;
+  if (activeGame) renderGame(activeGame);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function renderGame(game) {
+  activeGame = game;
+  gamePanel.hidden = false;
+
+  if (game === "names") {
+    const names = Array.isArray(gameState.names) ? gameState.names : [];
+    const rows = names.length
+      ? names.map((entry) => {
+          const voted = Array.isArray(entry.voters) && entry.voters.includes(participantId);
+          return `
+            <button class="name-vote ${voted ? "voted" : ""}" type="button" data-name-id="${entry.id}">
+              <span>${escapeHtml(entry.name)}</span>
+              <strong>♡ ${entry.voters?.length || 0}</strong>
+            </button>`;
+        }).join("")
+      : '<p class="game-empty">No suggestions yet. Be first 👀</p>';
+
+    gameContent.innerHTML = `
+      <h2 id="game-title">👶 Baby Name Poll</h2>
+      <p class="game-subtitle">Suggest a name or vote for your favourites.</p>
+      <form id="name-form" class="game-form">
+        <input name="babyName" maxlength="40" placeholder="Type a baby name…" required>
+        <button type="submit">Add + vote</button>
+      </form>
+      <div class="name-list">${rows}</div>`;
+
+    document.getElementById("name-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const input = event.currentTarget.elements.babyName;
+      const name = input.value.trim();
+      if (!name) return;
+      input.disabled = true;
+      try {
+        await sendGame({ type: "name_suggestion", name });
+      } catch (error) {
+        eventLabel.textContent = error.message;
+        eventLabel.classList.add("visible");
+      }
+    });
+
+    gameContent.querySelectorAll("[data-name-id]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+          await sendGame({ type: "name_vote", id: button.dataset.nameId });
+        } catch (error) {
+          button.disabled = false;
+        }
+      });
+    });
+    return;
+  }
+
+  const existing = Array.isArray(gameState.quiz)
+    ? gameState.quiz.find((entry) => entry.senderId === participantId)
+    : null;
+
+  if (existing) {
+    gameContent.innerHTML = `
+      <h2 id="game-title">🏆 Who Knows Didi Best?</h2>
+      <div class="quiz-done">Answers locked 🔒</div>
+      <p class="game-subtitle">Didi gets to judge. ${gameState.quiz.length} people have played.</p>
+      <div class="quiz-review">
+        ${didiQuestions.map((question, index) => `
+          <div><small>${escapeHtml(question)}</small><strong>${escapeHtml(existing.answers[index])}</strong></div>
+        `).join("")}
+      </div>`;
+    return;
+  }
+
+  gameContent.innerHTML = `
+    <h2 id="game-title">🏆 Who Knows Didi Best?</h2>
+    <p class="game-subtitle">No cheating. Didi judges the answers 😄</p>
+    <form id="didi-form" class="quiz-form">
+      ${didiQuestions.map((question, index) => `
+        <label>
+          <span>${escapeHtml(question)}</span>
+          <input name="q${index}" maxlength="100" required>
+        </label>
+      `).join("")}
+      <button type="submit">Lock my answers</button>
+    </form>
+    <p class="quiz-count">${gameState.quiz.length} people have played.</p>`;
+
+  document.getElementById("didi-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const answers = didiQuestions.map((_, index) => event.currentTarget.elements[`q${index}`].value.trim());
+    if (answers.some((value) => !value)) return;
+    event.currentTarget.querySelector("button").disabled = true;
+    try {
+      await sendGame({ type: "quiz_submit", answers });
+      playChime("photo");
+    } catch (error) {
+      event.currentTarget.querySelector("button").disabled = false;
+      eventLabel.textContent = error.message;
+      eventLabel.classList.add("visible");
+    }
+  });
+}
+
+document.querySelectorAll("[data-game]").forEach((button) => {
+  button.addEventListener("click", () => {
+    ensureAudioContext();
+    renderGame(button.dataset.game);
+  });
+});
+
+gameClose.addEventListener("click", () => {
+  activeGame = null;
+  gamePanel.hidden = true;
+});
+
+gamePanel.addEventListener("click", (event) => {
+  if (event.target === gamePanel) {
+    activeGame = null;
+    gamePanel.hidden = true;
+  }
 });
 
 pollEvents();
