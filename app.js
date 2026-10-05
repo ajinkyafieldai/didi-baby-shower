@@ -100,7 +100,8 @@ async function pollEvents() {
     });
 
     if (!response.ok) {
-      throw new Error("HTTP " + response.status);
+      const errorText = await response.text();
+      throw new Error("HTTP " + response.status + (errorText ? ": " + errorText : ""));
     }
 
     const data = await response.json();
@@ -138,7 +139,8 @@ async function sendEffect(effect) {
     });
 
     if (!response.ok) {
-      throw new Error("HTTP " + response.status);
+      const errorText = await response.text();
+      throw new Error("HTTP " + response.status + (errorText ? ": " + errorText : ""));
     }
 
     const data = await response.json();
