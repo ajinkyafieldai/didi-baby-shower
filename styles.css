@@ -171,6 +171,22 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .video-stage.in-call .status-dot { background: #69c687; }
 
+.call-status.compact {
+  width: 22px;
+  height: 22px;
+  padding: 7px;
+  gap: 0;
+}
+
+.call-status.compact #status-text {
+  display: none;
+}
+
+.call-status.compact .status-dot {
+  width: 8px;
+  height: 8px;
+}
+
 .effect-layer {
   position: absolute;
   inset: 0;
@@ -230,6 +246,21 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 .ritual-button:active { transform: scale(.97); }
+
+.ritual-button:disabled {
+  cursor: default;
+  opacity: .82;
+}
+
+.ritual-button.is-sent {
+  animation: ritual-sent .48s ease-out;
+}
+
+@keyframes ritual-sent {
+  0% { transform: scale(.96); }
+  45% { transform: scale(1.06); box-shadow: 0 0 0 5px rgba(169,71,98,.12), 0 6px 22px rgba(70,44,52,.10); }
+  100% { transform: scale(1); }
+}
 
 .ritual-icon { font-size: 1.35rem; line-height: 1; }
 
@@ -508,11 +539,22 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 .haldi-effect .tika-smudge {
+  width: 54px;
+  height: 34px;
+  border-radius: 58% 42% 62% 38%;
   background:
-    radial-gradient(ellipse at 48% 52%, rgba(246,199,39,.98) 0 42%, rgba(216,159,13,.86) 58%, rgba(168,112,4,.28) 73%, transparent 76%);
+    radial-gradient(ellipse at 44% 52%, rgba(248,207,58,.88) 0 34%, rgba(231,176,24,.64) 58%, rgba(188,127,8,.20) 76%, transparent 80%);
+  filter: blur(1.1px);
   box-shadow:
-    3px 1px 0 rgba(221,167,19,.20),
-    -2px 2px 0 rgba(221,167,19,.14);
+    7px 2px 0 rgba(230,174,35,.10),
+    -6px 3px 0 rgba(230,174,35,.08);
+}
+
+.kunku-effect .tika-smudge {
+  width: 24px;
+  height: 20px;
+  border-radius: 48% 52% 46% 54%;
+  filter: blur(.2px);
 }
 
 .kunku-effect .tika-applicator {
@@ -530,12 +572,34 @@ button { -webkit-tap-highlight-color: transparent; }
 .oti-lap {
   position: absolute;
   left: 50%;
-  bottom: 17%;
+  bottom: 14%;
+  width: min(58vw, 290px);
+  height: min(25vw, 120px);
+  display: grid;
+  place-items: center;
   transform: translateX(-50%);
-  font-size: clamp(72px, 20vw, 128px);
+  border-radius: 18px 18px 54% 54%;
+  border: 3px solid rgba(197,122,50,.72);
+  background:
+    linear-gradient(135deg, rgba(255,226,148,.96), rgba(235,166,72,.92));
+  font-size: clamp(42px, 12vw, 76px);
   filter: drop-shadow(0 12px 18px rgba(0,0,0,.28));
   animation: oti-lap 3.1s ease-out both;
 }
+
+.oti-lap::before,
+.oti-lap::after {
+  content: "";
+  position: absolute;
+  top: -12px;
+  width: 46%;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(255,239,188,.9);
+}
+
+.oti-lap::before { left: 3%; transform: rotate(8deg); }
+.oti-lap::after { right: 3%; transform: rotate(-8deg); }
 
 .oti-offering {
   position: absolute;
@@ -568,4 +632,21 @@ button { -webkit-tap-highlight-color: transparent; }
   0% { opacity: 0; transform: translateX(-50%) scale(.82); }
   15%, 78% { opacity: 1; transform: translateX(-50%) scale(1); }
   100% { opacity: 0; transform: translateX(-50%) scale(1.05); }
+}
+
+
+.video-heart {
+  position: absolute;
+  z-index: 8;
+  transform: translate(-50%, -50%);
+  font-size: clamp(36px, 12vw, 74px);
+  pointer-events: none;
+  animation: video-heart-float 1.7s ease-out both;
+  filter: drop-shadow(0 8px 14px rgba(0,0,0,.25));
+}
+
+@keyframes video-heart-float {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(.55); }
+  18% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+  100% { opacity: 0; transform: translate(-50%, -180%) scale(1); }
 }
