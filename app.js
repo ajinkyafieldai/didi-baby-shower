@@ -173,7 +173,9 @@ function playEffect(effect, sender) {
   const names = {
     ovalni: "Ovalni",
     flowers: "Flowers",
-    blessings: "Blessings",
+    blessings: "Blessing",
+    supari: "Supari",
+    tika: "Tika",
     celebrate: "Celebrate"
   };
 
@@ -204,6 +206,20 @@ function playEffect(effect, sender) {
     const burst = document.createElement("div");
     burst.className = "blessing-burst";
     burst.textContent = "🙏✨";
+    effectLayer.appendChild(burst);
+  }
+
+  if (effect === "supari") {
+    const burst = document.createElement("div");
+    burst.className = "ritual-burst";
+    burst.textContent = "🌰✨";
+    effectLayer.appendChild(burst);
+  }
+
+  if (effect === "tika") {
+    const burst = document.createElement("div");
+    burst.className = "ritual-burst";
+    burst.textContent = "🔴✨";
     effectLayer.appendChild(burst);
   }
 
