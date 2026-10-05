@@ -187,13 +187,16 @@ button { -webkit-tap-highlight-color: transparent; }
   height: 8px;
 }
 
+.mark-layer,
 .effect-layer {
   position: absolute;
   inset: 0;
-  z-index: 5;
   overflow: hidden;
   pointer-events: none;
 }
+
+.mark-layer { z-index: 4; }
+.effect-layer { z-index: 5; }
 
 .event-label {
   position: absolute;
@@ -398,11 +401,13 @@ button { -webkit-tap-highlight-color: transparent; }
   pointer-events: none;
 }
 
-.ritual-mark {
-  z-index: 1;
+.applied-mark {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
-.tika-effect:not(.ritual-mark) {
+.tika-effect {
   z-index: 2;
 }
 
@@ -643,6 +648,22 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 
-.persistent-smudge {
-  animation-fill-mode: forwards;
+.applied-smudge {
+  opacity: 0;
+  animation: applied-smudge-in 2.35s ease-out forwards;
+}
+
+@keyframes applied-smudge-in {
+  0%, 61% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.5);
+  }
+  72% {
+    opacity: .95;
+    transform: translate(-50%, -50%) scale(.86);
+  }
+  100% {
+    opacity: .92;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
