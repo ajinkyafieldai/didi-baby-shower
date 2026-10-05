@@ -85,65 +85,74 @@ window.addEventListener("message", (event) => {
   }
 });
 
-let eventSocket = null;
-let reconnectTimer = null;
-let reconnectDelay = 1000;
+let lastEventSeq = 0;
+let syncTimer = null;
+let syncBusy = false;
 
-function connectEvents() {
-  clearTimeout(reconnectTimer);
+async function pollEvents() {
+  if (syncBusy) return;
+  syncBusy = true;
 
-  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-  const socket = new WebSocket(`${protocol}//${location.host}/api/events`);
-  eventSocket = socket;
+  try {
+    const response = await fetch("/api/events", {
+      method: "GET",
+      cache: "no-store"
+    });
 
-  socket.addEventListener("open", () => {
-    reconnectDelay = 1000;
-    statusText.textContent = stage.classList.contains("in-call")
-      ? "Live"
-      : "Ready to join";
-  });
+    if (!response.ok) {
+      throw new Error("HTTP " + response.status);
+    }
 
-  socket.addEventListener("message", (event) => {
-    try {
-      const message = JSON.parse(event.data);
-      if (message.type === "effect" && message.effect) {
-        playEffect(message.effect, message.sender || "Someone");
+    const data = await response.json();
+
+    if (typeof data.seq === "number" && data.seq > lastEventSeq) {
+      lastEventSeq = data.seq;
+
+      if (data.event && data.event.type === "effect") {
+        playEffect(data.event.effect, data.event.sender || "Someone");
       }
-    } catch (error) {
-      console.error("Invalid celebration event", error);
-    }
-  });
-
-  socket.addEventListener("close", (event) => {
-    if (eventSocket === socket) {
-      eventSocket = null;
     }
 
-    const reason = event.reason ? `: ${event.reason}` : "";
-    statusText.textContent = `Celebration sync offline (${event.code})${reason}`;
-
-    reconnectTimer = window.setTimeout(connectEvents, reconnectDelay);
-    reconnectDelay = Math.min(reconnectDelay * 2, 10000);
-  });
-
-  socket.addEventListener("error", () => {
-    statusText.textContent = "Celebration sync connection failed";
-    socket.close();
-  });
+    if (!stage.classList.contains("in-call")) {
+      statusText.textContent = "Ready to join";
+    }
+  } catch (error) {
+    console.error("Celebration sync poll failed", error);
+    statusText.textContent = "Celebration sync offline";
+  } finally {
+    syncBusy = false;
+  }
 }
 
-function sendEffect(effect) {
-  if (!eventSocket || eventSocket.readyState !== WebSocket.OPEN) {
-    playEffect(effect, guestName || "Someone");
-    statusText.textContent = "Celebration sync reconnecting…";
-    return;
-  }
+async function sendEffect(effect) {
+  try {
+    const response = await fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "effect",
+        effect,
+        sender: guestName || "Someone"
+      }),
+      cache: "no-store"
+    });
 
-  eventSocket.send(JSON.stringify({
-    type: "effect",
-    effect,
-    sender: guestName || "Someone"
-  }));
+    if (!response.ok) {
+      throw new Error("HTTP " + response.status);
+    }
+
+    const data = await response.json();
+
+    if (typeof data.seq === "number") {
+      lastEventSeq = Math.max(lastEventSeq, data.seq);
+    }
+
+    playEffect(effect, guestName || "Someone");
+  } catch (error) {
+    console.error("Celebration sync send failed", error);
+    statusText.textContent = "Celebration sync offline";
+    playEffect(effect, guestName || "Someone");
+  }
 }
 
 document.querySelectorAll("[data-effect]").forEach((button) => {
@@ -152,7 +161,8 @@ document.querySelectorAll("[data-effect]").forEach((button) => {
   });
 });
 
-connectEvents();
+pollEvents();
+syncTimer = window.setInterval(pollEvents, 750);
 
 function playEffect(effect, sender) {
   clearTimeout(effectTimer);
