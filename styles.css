@@ -760,64 +760,71 @@ button { -webkit-tap-highlight-color: transparent; }
 .meet-celebration {
   position: absolute;
   inset: 0;
-  z-index: 10;
-  overflow: hidden;
+  z-index: 9;
   pointer-events: none;
+  overflow: hidden;
+}
+
+.meet-celebration-origin {
+  position: absolute;
+  left: 55px;
+  bottom: 63px;
+  width: 1px;
+  height: 1px;
+}
+
+.meet-celebration-confetti,
+.meet-celebration-balloon {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  opacity: 0;
+  will-change: transform, opacity;
 }
 
 .meet-celebration-confetti {
-  position: absolute;
-  bottom: 10%;
-  font-size: clamp(16px, 4vw, 26px);
-  opacity: 0;
-  will-change: transform, opacity;
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,.12));
-  animation: meet-celebration-float var(--float-time, 3.4s) cubic-bezier(.22,.72,.24,1) forwards;
+  font-size: clamp(17px, 4vw, 27px);
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,.10));
+  animation: meet-confetti-pop 1.85s cubic-bezier(.16,.72,.22,1) forwards;
 }
 
 .meet-celebration-balloon {
-  position: absolute;
-  bottom: -10%;
-  font-size: clamp(32px, 8vw, 54px);
-  opacity: 0;
-  will-change: transform, opacity;
-  filter: drop-shadow(0 6px 10px rgba(0,0,0,.14));
-  animation: meet-celebration-balloon-rise var(--rise-time, 3.8s) cubic-bezier(.2,.68,.24,1) forwards;
+  font-size: clamp(30px, 7vw, 48px);
+  filter: drop-shadow(0 5px 9px rgba(0,0,0,.12));
+  animation: meet-balloon-float 2.7s cubic-bezier(.2,.7,.22,1) forwards;
 }
 
-@keyframes meet-celebration-float {
+@keyframes meet-confetti-pop {
   0% {
     opacity: 0;
-    transform: translate3d(0,18px,0) rotate(0deg) scale(.82);
+    transform: translate3d(0,0,0) rotate(0deg) scale(.5);
   }
-  12% {
+  10% {
+    opacity: 1;
+  }
+  68% {
     opacity: .95;
   }
-  72% {
-    opacity: .9;
-  }
   100% {
     opacity: 0;
-    transform: translate3d(var(--drift,0),calc(-1 * var(--rise,52vh)),0) rotate(var(--spin,180deg)) scale(1.02);
+    transform: translate3d(var(--x),var(--y),0) rotate(var(--r)) scale(1);
   }
 }
 
-@keyframes meet-celebration-balloon-rise {
+@keyframes meet-balloon-float {
   0% {
     opacity: 0;
-    transform: translate3d(0,18px,0) scale(.84) rotate(-2deg);
+    transform: translate3d(0,0,0) scale(.72) rotate(-2deg);
   }
-  14% {
-    opacity: .96;
+  12% {
+    opacity: .98;
   }
-  78% {
-    opacity: .9;
+  72% {
+    opacity: .92;
+    transform: translate3d(calc(var(--x) * .72),calc(var(--rise) * .72),0) scale(.98) rotate(2deg);
   }
   100% {
     opacity: 0;
-    transform: translate3d(var(--sway,0),-86vh,0) scale(1.02) rotate(3deg);
+    transform: translate3d(calc(var(--x) + var(--sway)),var(--rise),0) scale(1.02) rotate(-2deg);
   }
-}
-  72% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
-  100% { opacity: 0; transform: translate(-50%,-50%) scale(1.06); }
 }
