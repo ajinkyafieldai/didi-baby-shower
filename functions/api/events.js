@@ -5,13 +5,12 @@ export async function onRequest(context) {
     return new Response("Expected WebSocket", { status: 426 });
   }
 
-  if (!context.env.REALTIME) {
-    return new Response("Realtime service is not bound", { status: 503 });
+  if (!context.env.CELEBRATION_ROOM) {
+    return new Response("Celebration room is not bound", { status: 503 });
   }
 
-  const url = new URL(context.request.url);
-  url.pathname = "/room";
-  url.search = "";
+  const id = context.env.CELEBRATION_ROOM.idFromName("didi-baby-shower");
+  const room = context.env.CELEBRATION_ROOM.get(id);
 
-  return context.env.REALTIME.fetch(new Request(url.toString(), context.request));
+  return room.fetch(context.request);
 }
