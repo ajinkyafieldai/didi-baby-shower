@@ -13,6 +13,51 @@ const callStatus = document.querySelector(".call-status");
 let guestName = "";
 let effectTimer = null;
 let groupEffectTimer = null;
+let audioContext = null;
+
+function ensureAudioContext() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+
+  if (!audioContext) {
+    audioContext = new AudioContextClass();
+  }
+
+  if (audioContext.state === "suspended") {
+    audioContext.resume().catch(() => {});
+  }
+
+  return audioContext;
+}
+
+function playChime(kind = "ritual") {
+  const ctx = ensureAudioContext();
+  if (!ctx || ctx.state !== "running") return;
+
+  const now = ctx.currentTime;
+  const notes = kind === "photo"
+    ? [659.25, 783.99, 987.77]
+    : [523.25, 659.25];
+
+  notes.forEach((frequency, index) => {
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency, now);
+
+    const start = now + index * 0.095;
+    const end = start + 0.42;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(kind === "photo" ? 0.055 : 0.035, start + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.0001, end);
+
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start(start);
+    oscillator.stop(end + 0.02);
+  });
+}
 
 const participantId = (() => {
   const key = "baby-shower-participant-id";
@@ -33,6 +78,7 @@ updateJoinButtonState();
 
 joinForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  ensureAudioContext();
 
   const formData = new FormData(joinForm);
   guestName = String(formData.get("guestName") || "").trim();
@@ -211,6 +257,7 @@ async function sendEffect(effect) {
 document.querySelectorAll("[data-effect]").forEach((button) => {
   button.addEventListener("click", () => {
     if (button.disabled) return;
+    ensureAudioContext();
     button.disabled = true;
     button.classList.remove("is-sent");
     void button.offsetWidth;
@@ -251,11 +298,16 @@ function playEffect(effect, sender) {
     haldi: "Haldi",
     kunku: "Kunku",
     oti: "Oti",
-    celebrate: "Celebrate"
+    celebrate: "Celebrate",
+    photo: "Family Photo"
   };
 
-  eventLabel.textContent = `${sender} sent ${names[effect] || "a celebration"}`;
+  eventLabel.textContent = effect === "photo"
+    ? `${sender} called for a family photo 📸`
+    : `${sender} sent ${names[effect] || "a celebration"}`;
   eventLabel.classList.add("visible");
+
+  playChime(effect === "photo" ? "photo" : "ritual");
 
   if (effect === "ovalni") {
     const ring = document.createElement("div");
@@ -343,6 +395,51 @@ function playEffect(effect, sender) {
     effectLayer.appendChild(oti);
   }
 
+
+  if (effect === "photo") {
+    const photo = document.createElement("div");
+    photo.className = "photo-moment";
+
+    const prompt = document.createElement("div");
+    prompt.className = "photo-prompt";
+    prompt.textContent = "Everyone smile! 📸";
+
+    const countdown = document.createElement("div");
+    countdown.className = "photo-countdown";
+    countdown.textContent = "3";
+
+    photo.append(prompt, countdown);
+    effectLayer.appendChild(photo);
+
+    const steps = [
+      { delay: 1000, text: "2" },
+      { delay: 2000, text: "1" },
+      { delay: 3000, text: "📸", snap: true }
+    ];
+
+    steps.forEach(({ delay, text, snap }) => {
+      window.setTimeout(() => {
+        if (!countdown.isConnected) return;
+        countdown.textContent = text;
+        countdown.classList.remove("tick");
+        void countdown.offsetWidth;
+        countdown.classList.add("tick");
+
+        if (snap) {
+          playChime("photo");
+          const flash = document.createElement("div");
+          flash.className = "photo-flash";
+          effectLayer.appendChild(flash);
+          window.setTimeout(() => flash.remove(), 650);
+        } else {
+          playChime("ritual");
+        }
+      }, delay);
+    });
+
+    window.setTimeout(() => photo.remove(), 4600);
+  }
+
   if (effect === "celebrate") {
     const burst = document.createElement("div");
     burst.className = "celebration-burst";
@@ -364,7 +461,8 @@ const groupEmoji = {
   haldi: "🟡",
   kunku: "🔴",
   oti: "🥥",
-  celebrate: "🎉"
+  celebrate: "🎉",
+  photo: "📸"
 };
 
 function playGroupCelebration(effect, count = 2, burst = false) {
