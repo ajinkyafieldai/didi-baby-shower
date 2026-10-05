@@ -7,6 +7,7 @@ const effectLayer = document.getElementById("effect-layer");
 const eventLabel = document.getElementById("event-label");
 const guestNameInput = document.getElementById("guest-name");
 const joinButton = document.getElementById("join-button");
+const callStatus = document.querySelector(".call-status");
 
 let guestName = "";
 let effectTimer = null;
@@ -94,12 +95,14 @@ window.addEventListener("message", (event) => {
   const message = event.data || {};
   if (message.type === "zoom-status") {
     statusText.textContent = message.text || "Zoom";
+    callStatus.classList.toggle("compact", message.text === "Live");
   }
 
   if (message.type === "zoom-config-error") {
     stage.classList.remove("in-call");
     joinMessage.textContent = message.text || "Zoom is not configured yet.";
     statusText.textContent = "Zoom setup needed";
+    callStatus.classList.remove("compact");
   }
 });
 
@@ -112,7 +115,7 @@ async function pollEvents() {
   syncBusy = true;
 
   try {
-    const response = await fetch("/api/events", {
+    const response = await fetch(`/api/events?since=${lastEventSeq}`, {
       method: "GET",
       cache: "no-store"
     });
@@ -123,16 +126,24 @@ async function pollEvents() {
     }
 
     const data = await response.json();
+    const events = Array.isArray(data.events)
+      ? data.events
+      : (data.event ? [data.event] : []);
 
-    if (typeof data.seq === "number" && data.seq > lastEventSeq) {
-      lastEventSeq = data.seq;
+    events
+      .filter((event) => event && event.type === "effect" && Number(event.seq || 0) > lastEventSeq)
+      .sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0))
+      .forEach((event, index) => {
+        window.setTimeout(() => {
+          playEffect(event.effect, event.sender || "Someone");
+          if (event.groupCelebration) {
+            playGroupCelebration();
+          }
+        }, index * 450);
+      });
 
-      if (data.event && data.event.type === "effect") {
-        playEffect(data.event.effect, data.event.sender || "Someone");
-        if (data.event.groupCelebration) {
-          playGroupCelebration();
-        }
-      }
+    if (typeof data.seq === "number") {
+      lastEventSeq = Math.max(lastEventSeq, data.seq);
     }
 
     if (!stage.classList.contains("in-call")) {
@@ -140,6 +151,7 @@ async function pollEvents() {
     }
   } catch (error) {
     console.error("Celebration sync poll failed", error);
+    callStatus.classList.remove("compact");
     statusText.textContent = "Celebration sync offline (" + (error.message || "error") + ")";
   } finally {
     syncBusy = false;
@@ -184,8 +196,38 @@ async function sendEffect(effect) {
 
 document.querySelectorAll("[data-effect]").forEach((button) => {
   button.addEventListener("click", () => {
+    if (button.disabled) return;
+    button.disabled = true;
+    button.classList.remove("is-sent");
+    void button.offsetWidth;
+    button.classList.add("is-sent");
     sendEffect(button.dataset.effect);
+
+    window.setTimeout(() => {
+      button.disabled = false;
+      button.classList.remove("is-sent");
+    }, 700);
   });
+});
+
+let lastVideoTapAt = 0;
+stage.addEventListener("pointerup", (event) => {
+  if (!stage.classList.contains("in-call")) return;
+  if (event.target.closest && event.target.closest(".ritual-dock")) return;
+
+  const now = Date.now();
+  if (now - lastVideoTapAt < 360) {
+    const heart = document.createElement("div");
+    heart.className = "video-heart";
+    heart.textContent = "❤️";
+    heart.style.left = `${Math.min(92, Math.max(8, (event.clientX / window.innerWidth) * 100))}%`;
+    heart.style.top = `${Math.min(88, Math.max(12, (event.clientY / window.innerHeight) * 100))}%`;
+    effectLayer.appendChild(heart);
+    window.setTimeout(() => heart.remove(), 1800);
+    lastVideoTapAt = 0;
+    return;
+  }
+  lastVideoTapAt = now;
 });
 
 pollEvents();
@@ -262,9 +304,9 @@ function playEffect(effect, sender) {
 
     const lap = document.createElement("div");
     lap.className = "oti-lap";
-    lap.textContent = "🧺";
+    lap.textContent = "🪷";
 
-    const offerings = ["🥥", "🌾", "🌸", "🪷", "✨", "🌾", "🌸"];
+    const offerings = ["🥥", "🌾", "🌾", "🌸", "🪷", "🌾", "✨"];
     offerings.forEach((symbol, index) => {
       const item = document.createElement("span");
       item.className = "oti-offering";
@@ -299,7 +341,7 @@ function playGroupCelebration() {
 
   const banner = document.createElement("div");
   banner.className = "group-celebration-banner";
-  banner.textContent = "Everyone's celebrating! 🎉";
+  banner.textContent = "Family celebration! 🎉";
   group.appendChild(banner);
 
   const pieces = ["🎉", "✨", "💐", "🌸", "🥳", "💛", "🩷", "🪷"];
@@ -317,8 +359,6 @@ function playGroupCelebration() {
   }
 
   effectLayer.appendChild(group);
-  eventLabel.textContent = "Group celebration! 🎉";
-  eventLabel.classList.add("visible");
 
   groupEffectTimer = window.setTimeout(() => {
     group.remove();
