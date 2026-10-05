@@ -61,6 +61,7 @@
         ZoomMtg.init({
           leaveUrl: location.origin + "/",
           disableCORP: !window.crossOriginIsolated,
+          disablePreview: true,
           patchJsMedia: true,
           success: function () {
             stage("Joining the family call…");
