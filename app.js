@@ -394,15 +394,19 @@ function playGroupCelebration(effect, count = 2, burst = false) {
   if (burst) {
     group.classList.add("burst");
 
-    for (let i = 0; i < 36; i += 1) {
-      const piece = document.createElement("span");
-      piece.className = "meet-reaction-burst-piece";
-      piece.textContent = groupEmoji[effect] || "🎉";
-      piece.style.setProperty("--angle", `${(360 / 36) * i + Math.random() * 12}deg`);
-      piece.style.setProperty("--distance", `${90 + Math.random() * 180}px`);
-      piece.style.animationDelay = `${Math.random() * 0.12}s`;
-      effectLayer.appendChild(piece);
-      window.setTimeout(() => piece.remove(), 1500);
+    if (effect === "celebrate") {
+      playMeetCelebrationBurst();
+    } else {
+      for (let i = 0; i < 36; i += 1) {
+        const piece = document.createElement("span");
+        piece.className = "meet-reaction-burst-piece";
+        piece.textContent = groupEmoji[effect] || "🎉";
+        piece.style.setProperty("--angle", `${(360 / 36) * i + Math.random() * 12}deg`);
+        piece.style.setProperty("--distance", `${90 + Math.random() * 180}px`);
+        piece.style.animationDelay = `${Math.random() * 0.12}s`;
+        effectLayer.appendChild(piece);
+        window.setTimeout(() => piece.remove(), 1500);
+      }
     }
 
     window.setTimeout(() => group.remove(), 520);
@@ -412,6 +416,44 @@ function playGroupCelebration(effect, count = 2, burst = false) {
   groupEffectTimer = window.setTimeout(() => {
     group.remove();
   }, 3200);
+}
+
+function playMeetCelebrationBurst() {
+  const celebration = document.createElement("div");
+  celebration.className = "meet-celebration";
+
+  const confetti = ["🎉", "✨", "🎊", "💛", "🩷", "💐"];
+  for (let i = 0; i < 86; i += 1) {
+    const piece = document.createElement("span");
+    piece.className = "meet-celebration-confetti";
+    piece.textContent = confetti[Math.floor(Math.random() * confetti.length)];
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.setProperty("--drift", `${-110 + Math.random() * 220}px`);
+    piece.style.setProperty("--spin", `${-540 + Math.random() * 1080}deg`);
+    piece.style.setProperty("--fall-time", `${2.2 + Math.random() * 1.8}s`);
+    piece.style.animationDelay = `${Math.random() * 0.55}s`;
+    celebration.appendChild(piece);
+  }
+
+  const balloons = ["🎈", "🎈", "🎈", "🥳"];
+  for (let i = 0; i < 14; i += 1) {
+    const balloon = document.createElement("span");
+    balloon.className = "meet-celebration-balloon";
+    balloon.textContent = balloons[i % balloons.length];
+    balloon.style.left = `${4 + Math.random() * 92}%`;
+    balloon.style.setProperty("--sway", `${-55 + Math.random() * 110}px`);
+    balloon.style.setProperty("--rise-time", `${2.7 + Math.random() * 1.4}s`);
+    balloon.style.animationDelay = `${Math.random() * 0.45}s`;
+    celebration.appendChild(balloon);
+  }
+
+  const banner = document.createElement("div");
+  banner.className = "meet-celebration-banner";
+  banner.textContent = "Family celebration! 🎉";
+  celebration.appendChild(banner);
+
+  effectLayer.appendChild(celebration);
+  window.setTimeout(() => celebration.remove(), 4700);
 }
 
 // Expose only the small event-rendering boundary that the realtime layer needs.
