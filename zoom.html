@@ -23,11 +23,10 @@
 
   <script src="https://source.zoom.us/6.5.0/lib/vendor/react.min.js"></script>
   <script src="https://source.zoom.us/6.5.0/lib/vendor/react-dom.min.js"></script>
-  <script src="https://source.zoom.us/6.5.0/lib/vendor/react-redux.min.js"></script>
   <script src="https://source.zoom.us/6.5.0/lib/vendor/redux.min.js"></script>
   <script src="https://source.zoom.us/6.5.0/lib/vendor/redux-thunk.min.js"></script>
   <script src="https://source.zoom.us/6.5.0/lib/vendor/lodash.min.js"></script>
-  <script src="https://source.zoom.us/6.5.0/zoom-meeting-6.5.0.min.js"></script>
+  <script src="https://source.zoom.us/zoom-meeting-6.5.0.min.js"></script>
 </head>
 <body>
   <div id="boot-message">Preparing the family video call…</div>
@@ -40,16 +39,28 @@
       parent.postMessage({ type, text }, location.origin);
     }
 
+    function stage(text) {
+      bootMessage.textContent = text;
+      report("zoom-status", text);
+    }
+
     async function startZoom() {
       try {
-        report("zoom-status", "Preparing Zoom…");
+        stage("Getting Zoom access…");
+
+        const controller = new AbortController();
+        const signatureTimeout = setTimeout(() => controller.abort(), 10000);
 
         const response = await fetch("/api/zoom-signature", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: "{}",
-          cache: "no-store"
+          cache: "no-store",
+          signal: controller.signal
         });
+
+        clearTimeout(signatureTimeout);
+        stage("Zoom access received…");
 
         const config = await response.json();
 
@@ -61,19 +72,26 @@
           throw new Error("Zoom Meeting SDK did not load.");
         }
 
+        stage("Loading Zoom video engine…");
+
         ZoomMtg.setZoomJSLib("https://source.zoom.us/6.5.0/lib", "/av");
         ZoomMtg.preLoadWasm();
         ZoomMtg.prepareWebSDK();
 
-        report("zoom-status", "Joining Zoom…");
+        stage("Starting Zoom…");
+
+        const initTimeout = setTimeout(() => {
+          stage("Zoom startup is taking too long. Please reload and try again.");
+        }, 20000);
 
         ZoomMtg.init({
           leaveUrl: location.origin + "/",
           patchJsMedia: true,
           success: function () {
+            clearTimeout(initTimeout);
+            stage("Joining the family call…");
             ZoomMtg.join({
               signature: config.signature,
-              sdkKey: config.sdkKey,
               meetingNumber: config.meetingNumber,
               passWord: config.passcode || "",
               userName: name,
@@ -83,21 +101,27 @@
               },
               error: function (error) {
                 console.error(error);
-                bootMessage.textContent = "Could not join the Zoom meeting.";
-                report("zoom-status", "Could not join Zoom");
+                const detail = error && (error.reason || error.errorMessage || error.message);
+                bootMessage.textContent = detail ? "Could not join Zoom: " + detail : "Could not join the Zoom meeting.";
+                report("zoom-status", bootMessage.textContent);
               }
             });
           },
           error: function (error) {
+            clearTimeout(initTimeout);
             console.error(error);
-            bootMessage.textContent = "Could not start Zoom.";
-            report("zoom-status", "Could not start Zoom");
+            const detail = error && (error.reason || error.errorMessage || error.message);
+            bootMessage.textContent = detail ? "Could not start Zoom: " + detail : "Could not start Zoom.";
+            report("zoom-status", bootMessage.textContent);
           }
         });
       } catch (error) {
         console.error(error);
-        bootMessage.textContent = error.message || "Zoom is not configured yet.";
-        report("zoom-config-error", bootMessage.textContent);
+        const message = error && error.name === "AbortError"
+          ? "Timed out while getting Zoom access."
+          : (error.message || "Zoom is not configured yet.");
+        bootMessage.textContent = message;
+        report("zoom-config-error", message);
       }
     }
 
