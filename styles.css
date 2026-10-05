@@ -204,34 +204,40 @@ button { -webkit-tap-highlight-color: transparent; }
   position: relative;
   z-index: 10;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  padding: 10px 10px max(10px, env(safe-area-inset-bottom));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(64px, 1fr);
+  gap: 6px;
+  padding: 7px 8px max(7px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
   background: rgba(255,250,247,.94);
   backdrop-filter: blur(18px);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
 
+.ritual-dock::-webkit-scrollbar { display: none; }
+
 .ritual-button {
-  min-height: 70px;
+  min-height: 54px;
   border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 8px 4px;
+  border-radius: 14px;
+  padding: 5px 4px;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 2px;
+  gap: 1px;
   background: white;
   color: var(--ink);
-  font-size: clamp(.72rem, 2.8vw, .92rem);
+  font-size: clamp(.62rem, 2.4vw, .78rem);
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 6px 22px rgba(70,44,52,.08);
+  box-shadow: 0 4px 16px rgba(70,44,52,.08);
 }
 
 .ritual-button:active { transform: scale(.97); }
 
-.ritual-icon { font-size: 1.7rem; line-height: 1; }
+.ritual-icon { font-size: 1.35rem; line-height: 1; }
 
 .effect-ovalni-ring {
   position: absolute;
@@ -303,8 +309,11 @@ button { -webkit-tap-highlight-color: transparent; }
   }
 
   .ritual-dock {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
     grid-template-columns: 1fr;
     grid-template-rows: repeat(8, 1fr);
+    overflow: visible;
     border-top: 0;
     border-left: 1px solid var(--line);
     padding: 12px;
