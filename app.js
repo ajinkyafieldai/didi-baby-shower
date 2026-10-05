@@ -353,7 +353,7 @@ function playEffect(effect, sender) {
   effectTimer = window.setTimeout(() => {
     clearNormalEffects();
     eventLabel.classList.remove("visible");
-  }, 3600);
+  }, 5200);
 }
 
 const groupEmoji = {
