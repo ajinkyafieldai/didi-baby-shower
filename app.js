@@ -173,7 +173,7 @@ function playEffect(effect, sender) {
   const names = {
     ovalni: "Ovalni",
     flowers: "Flowers",
-    blessings: "Blessing",
+    ashirwad: "Ashirwad",
     supari: "Supari",
     tika: "Tika",
     celebrate: "Celebrate"
@@ -202,25 +202,23 @@ function playEffect(effect, sender) {
     }
   }
 
-  if (effect === "blessings") {
+  if (effect === "ashirwad") {
     const burst = document.createElement("div");
-    burst.className = "blessing-burst";
+    burst.className = "ashirwad-burst";
     burst.textContent = "🙏✨";
     effectLayer.appendChild(burst);
   }
 
   if (effect === "supari") {
-    const burst = document.createElement("div");
-    burst.className = "ritual-burst";
-    burst.textContent = "🌰✨";
-    effectLayer.appendChild(burst);
+    const supari = document.createElement("div");
+    supari.className = "supari-circle";
+    effectLayer.appendChild(supari);
   }
 
   if (effect === "tika") {
-    const burst = document.createElement("div");
-    burst.className = "ritual-burst";
-    burst.textContent = "🔴✨";
-    effectLayer.appendChild(burst);
+    const tika = document.createElement("div");
+    tika.className = "tika-drop";
+    effectLayer.appendChild(tika);
   }
 
   if (effect === "celebrate") {
