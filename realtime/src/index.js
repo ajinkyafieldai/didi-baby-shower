@@ -1,78 +1,63 @@
 const EFFECTS = new Set(["ovalni", "flowers", "blessings", "celebrate"]);
 
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
+    }
+  });
+}
+
 export class CelebrationRoom {
   constructor(ctx) {
     this.ctx = ctx;
   }
 
   async fetch(request) {
-    if (request.headers.get("Upgrade") !== "websocket") {
-      return new Response("Expected WebSocket", { status: 426 });
+    if (request.method === "GET") {
+      const latest = await this.ctx.storage.get("latest");
+      return json(latest || { seq: 0, event: null });
     }
 
-    const pair = new WebSocketPair();
-    const client = pair[0];
-    const server = pair[1];
+    if (request.method === "POST") {
+      let body;
 
-    this.ctx.acceptWebSocket(server);
-
-    return new Response(null, {
-      status: 101,
-      webSocket: client
-    });
-  }
-
-  async webSocketMessage(_socket, message) {
-    let event;
-
-    try {
-      event = JSON.parse(typeof message === "string" ? message : new TextDecoder().decode(message));
-    } catch {
-      return;
-    }
-
-    if (!event || event.type !== "effect" || !EFFECTS.has(event.effect)) {
-      return;
-    }
-
-    const sender = String(event.sender || "Someone").trim().slice(0, 60) || "Someone";
-
-    const broadcast = JSON.stringify({
-      type: "effect",
-      effect: event.effect,
-      sender,
-      id: crypto.randomUUID(),
-      at: Date.now()
-    });
-
-    for (const socket of this.ctx.getWebSockets()) {
       try {
-        socket.send(broadcast);
+        body = await request.json();
       } catch {
-        // Cloudflare will clean up disconnected hibernating sockets.
+        return json({ error: "Invalid JSON" }, 400);
       }
+
+      if (!body || body.type !== "effect" || !EFFECTS.has(body.effect)) {
+        return json({ error: "Invalid effect" }, 400);
+      }
+
+      const previous = await this.ctx.storage.get("latest");
+      const seq = (previous && Number(previous.seq)) ? Number(previous.seq) + 1 : 1;
+
+      const latest = {
+        seq,
+        event: {
+          type: "effect",
+          effect: body.effect,
+          sender: String(body.sender || "Someone").trim().slice(0, 60) || "Someone",
+          id: crypto.randomUUID(),
+          at: Date.now()
+        }
+      };
+
+      await this.ctx.storage.put("latest", latest);
+      return json(latest);
     }
-  }
 
-  async webSocketClose(socket, code, reason) {
-    socket.close(code, reason);
-  }
-
-  async webSocketError(socket) {
-    try {
-      socket.close(1011, "WebSocket error");
-    } catch {}
+    return json({ error: "Method not allowed" }, 405);
   }
 }
 
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
-
-    if (url.pathname !== "/room") {
-      return new Response("Not found", { status: 404 });
-    }
-
     const id = env.CELEBRATION_ROOM.idFromName("didi-baby-shower");
     return env.CELEBRATION_ROOM.get(id).fetch(request);
   }
