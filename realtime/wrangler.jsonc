@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "didi-baby-shower-realtime",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-05",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CELEBRATION_ROOM",
+        "class_name": "CelebrationRoom"
+      }
+    ]
+  },
+  "exports": {
+    "CelebrationRoom": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
+}
