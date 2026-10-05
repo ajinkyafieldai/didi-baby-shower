@@ -1,4 +1,4 @@
-const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "tika", "celebrate"]);
+const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate"]);
 const GROUP_WINDOW_MS = 10_000;
 const GROUP_THRESHOLD = 2;
 const GROUP_COOLDOWN_MS = 10_000;
