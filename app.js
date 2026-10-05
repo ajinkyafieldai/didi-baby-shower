@@ -10,6 +10,7 @@ const guestNameInput = document.getElementById("guest-name");
 const joinButton = document.getElementById("join-button");
 const callStatus = document.querySelector(".call-status");
 const photoButton = document.querySelector(".photo-button");
+const photoHost = new URLSearchParams(location.search).get("photoHost") === "1";
 
 let guestName = "";
 let effectTimer = null;
@@ -356,7 +357,7 @@ async function pollEvents() {
         .sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0))
         .forEach((event, index) => {
           window.setTimeout(() => {
-            playEffect(event.effect, event.sender || "Someone", false);
+            playEffect(event.effect, event.sender || "Someone", event.effect === "photo" && photoHost);
             if (event.groupCelebration) {
               playGroupCelebration(event.effect, event.groupCount || 2, Boolean(event.groupBurst));
             }
@@ -405,7 +406,7 @@ async function sendEffect(effect) {
       lastEventSeq = Math.max(lastEventSeq, data.seq);
     }
 
-    playEffect(effect, guestName || "Someone", effect === "photo");
+    playEffect(effect, guestName || "Someone", effect === "photo" && photoHost);
     if (data.event && data.event.groupCelebration) {
       playGroupCelebration(
         data.event.effect,
@@ -416,7 +417,7 @@ async function sendEffect(effect) {
   } catch (error) {
     console.error("Celebration sync send failed", error);
     statusText.textContent = "Celebration sync offline (" + (error.message || "error") + ")";
-    playEffect(effect, guestName || "Someone", effect === "photo");
+    playEffect(effect, guestName || "Someone", effect === "photo" && photoHost);
   }
 }
 
@@ -601,13 +602,16 @@ function playEffect(effect, sender, capturePhoto = false) {
           playChime("photo");
 
           if (capturePhoto) {
-            // First try to capture Zoom's own same-origin video/canvas surfaces.
-            // Only ask for tab sharing if Zoom's renderer cannot be captured directly.
+            // Only the designated desktop/laptop photo host stores the image.
+            // Everyone else just participates in the synchronized countdown.
             requestZoomPhoto()
               .then((blob) => saveFamilyPhotoBlob(blob))
               .catch(async (directError) => {
                 console.warn("Direct Zoom capture unavailable; falling back to tab capture", directError);
-                statusText.textContent = "Direct capture unavailable — select this tab once…";
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                  throw new Error("Photo host browser does not support tab capture.");
+                }
+                statusText.textContent = "Photo host: select this tab once…";
                 await ensurePhotoCapture();
                 return captureFamilyPhoto();
               })
@@ -618,7 +622,7 @@ function playEffect(effect, sender, capturePhoto = false) {
               })
               .catch((error) => {
                 console.error("Family photo save failed", error);
-                eventLabel.textContent = "Photo capture failed: " + (error.message || "unknown error");
+                eventLabel.textContent = "Photo host failed to save: " + (error.message || "unknown error");
                 eventLabel.classList.add("visible");
                 statusText.textContent = stage.classList.contains("in-call") ? "Live" : "Ready to join";
               });
@@ -758,3 +762,8 @@ window.babyShower = { playEffect, playGroupCelebration };
 
 
 showPhotoButton();
+
+
+if (photoHost) {
+  console.info("Family photo host enabled for this browser.");
+}
