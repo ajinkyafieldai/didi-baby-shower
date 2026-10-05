@@ -200,7 +200,9 @@ function playEffect(effect, sender) {
     flowers: "Flowers",
     ashirwad: "Ashirwad",
     supari: "Supari",
-    tika: "Tikka",
+    haldi: "Haldi",
+    kunku: "Kunku",
+    oti: "Oti",
     celebrate: "Celebrate"
   };
 
@@ -240,9 +242,9 @@ function playEffect(effect, sender) {
     effectLayer.appendChild(supari);
   }
 
-  if (effect === "tika") {
-    const tika = document.createElement("div");
-    tika.className = "tika-effect";
+  if (effect === "haldi" || effect === "kunku" || effect === "tika") {
+    const application = document.createElement("div");
+    application.className = `tika-effect ${effect === "haldi" ? "haldi-effect" : "kunku-effect"}`;
 
     const applicator = document.createElement("div");
     applicator.className = "tika-applicator";
@@ -250,8 +252,30 @@ function playEffect(effect, sender) {
     const smudge = document.createElement("div");
     smudge.className = "tika-smudge";
 
-    tika.append(applicator, smudge);
-    effectLayer.appendChild(tika);
+    application.append(applicator, smudge);
+    effectLayer.appendChild(application);
+  }
+
+  if (effect === "oti") {
+    const oti = document.createElement("div");
+    oti.className = "oti-effect";
+
+    const lap = document.createElement("div");
+    lap.className = "oti-lap";
+    lap.textContent = "🧺";
+
+    const offerings = ["🥥", "🌾", "🌸", "🪷", "✨", "🌾", "🌸"];
+    offerings.forEach((symbol, index) => {
+      const item = document.createElement("span");
+      item.className = "oti-offering";
+      item.textContent = symbol;
+      item.style.setProperty("--oti-x", `${-72 + index * 24}px`);
+      item.style.animationDelay = `${index * 0.12}s`;
+      oti.appendChild(item);
+    });
+
+    oti.appendChild(lap);
+    effectLayer.appendChild(oti);
   }
 
   if (effect === "celebrate") {
