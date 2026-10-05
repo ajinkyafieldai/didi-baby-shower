@@ -28,14 +28,11 @@ async function ensurePhotoCapture() {
     throw new Error("This browser cannot capture the family photo.");
   }
 
+  // Keep the request deliberately minimal. Some browsers reject the
+  // Chromium-only "prefer current tab" hints instead of ignoring them.
   photoCaptureStream = await navigator.mediaDevices.getDisplayMedia({
-    video: {
-      displaySurface: "browser"
-    },
-    audio: false,
-    preferCurrentTab: true,
-    selfBrowserSurface: "include",
-    surfaceSwitching: "exclude"
+    video: true,
+    audio: false
   });
 
   const [track] = photoCaptureStream.getVideoTracks();
@@ -370,11 +367,11 @@ document.querySelectorAll("[data-effect]").forEach((button) => {
 
     if (effect === "photo") {
       try {
-        statusText.textContent = "Choose This Tab so I can save the family photo…";
+        statusText.textContent = "Select this browser tab in the share window to save the family photo…";
         await ensurePhotoCapture();
       } catch (error) {
         console.error("Photo capture permission error", error);
-        eventLabel.textContent = "Photo cancelled — choose This Tab to save it.";
+        eventLabel.textContent = "Photo capture cancelled — select this browser tab when asked.";
         eventLabel.classList.add("visible");
         statusText.textContent = stage.classList.contains("in-call") ? "Live" : "Ready to join";
         window.setTimeout(() => eventLabel.classList.remove("visible"), 4000);
