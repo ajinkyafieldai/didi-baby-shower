@@ -633,20 +633,3 @@ button { -webkit-tap-highlight-color: transparent; }
   15%, 78% { opacity: 1; transform: translateX(-50%) scale(1); }
   100% { opacity: 0; transform: translateX(-50%) scale(1.05); }
 }
-
-
-.video-heart {
-  position: absolute;
-  z-index: 8;
-  transform: translate(-50%, -50%);
-  font-size: clamp(36px, 12vw, 74px);
-  pointer-events: none;
-  animation: video-heart-float 1.7s ease-out both;
-  filter: drop-shadow(0 8px 14px rgba(0,0,0,.25));
-}
-
-@keyframes video-heart-float {
-  0% { opacity: 0; transform: translate(-50%, -30%) scale(.55); }
-  18% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
-  100% { opacity: 0; transform: translate(-50%, -180%) scale(1); }
-}
