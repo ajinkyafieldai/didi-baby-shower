@@ -1,7 +1,7 @@
 const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate"]);
 const GROUP_WINDOW_MS = 10_000;
 const GROUP_THRESHOLD = 2;
-const GROUP_COOLDOWN_MS = 10_000;
+const GROUP_BURST_THRESHOLD = 4;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -58,13 +58,12 @@ export class CelebrationRoom {
         ? storedRecent.filter((entry) => now - Number(entry.at || 0) <= GROUP_WINDOW_MS)
         : [];
 
-      recent.push({ senderId, at: now });
+      recent.push({ senderId, effect: body.effect, at: now });
 
-      const uniqueParticipants = new Set(recent.map((entry) => entry.senderId)).size;
-      const lastGroupAt = Number(await this.ctx.storage.get("lastGroupAt") || 0);
-      const groupCelebration =
-        uniqueParticipants >= GROUP_THRESHOLD &&
-        now - lastGroupAt >= GROUP_COOLDOWN_MS;
+      const sameEffect = recent.filter((entry) => entry.effect === body.effect);
+      const uniqueParticipants = new Set(sameEffect.map((entry) => entry.senderId)).size;
+      const groupCelebration = uniqueParticipants >= GROUP_THRESHOLD;
+      const groupBurst = uniqueParticipants >= GROUP_BURST_THRESHOLD;
 
       const event = {
         type: "effect",
@@ -74,7 +73,9 @@ export class CelebrationRoom {
         id: crypto.randomUUID(),
         at: now,
         seq,
-        groupCelebration
+        groupCelebration,
+        groupCount: uniqueParticipants,
+        groupBurst
       };
 
       const latest = { seq, event };
@@ -85,10 +86,12 @@ export class CelebrationRoom {
 
       await this.ctx.storage.put("latest", latest);
       await this.ctx.storage.put("events", trimmedEvents);
-      await this.ctx.storage.put("recentCelebrations", recent);
-      if (groupCelebration) {
-        await this.ctx.storage.put("lastGroupAt", now);
-      }
+      await this.ctx.storage.put(
+        "recentCelebrations",
+        groupBurst
+          ? recent.filter((entry) => entry.effect !== body.effect)
+          : recent
+      );
       return json(latest);
     }
 
