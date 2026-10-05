@@ -39,10 +39,26 @@
         <span id="status-text">Ready to join</span>
       </div>
 
+      <div class="game-actions" aria-label="Baby shower games">
+        <button class="game-launch" data-game="names" type="button">
+          <span aria-hidden="true">👶</span><span>Baby Names</span>
+        </button>
+        <button class="game-launch" data-game="didi" type="button">
+          <span aria-hidden="true">🏆</span><span>Didi Quiz</span>
+        </button>
+      </div>
+
       <button class="photo-button" data-effect="photo" type="button" aria-label="Family photo moment">
         <span aria-hidden="true">📸</span>
         <span>Photo</span>
       </button>
+
+      <div id="game-panel" class="game-panel" hidden>
+        <div class="game-card" role="dialog" aria-modal="true" aria-labelledby="game-title">
+          <button id="game-close" class="game-close" type="button" aria-label="Close game">×</button>
+          <div id="game-content"></div>
+        </div>
+      </div>
     </section>
 
     <nav class="ritual-dock" aria-label="Baby shower celebrations">
