@@ -14,6 +14,109 @@ let guestName = "";
 let effectTimer = null;
 let groupEffectTimer = null;
 let audioContext = null;
+let photoCaptureStream = null;
+
+async function ensurePhotoCapture() {
+  if (
+    photoCaptureStream &&
+    photoCaptureStream.getVideoTracks().some((track) => track.readyState === "live")
+  ) {
+    return photoCaptureStream;
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    throw new Error("This browser cannot capture the family photo.");
+  }
+
+  photoCaptureStream = await navigator.mediaDevices.getDisplayMedia({
+    video: {
+      displaySurface: "browser"
+    },
+    audio: false,
+    preferCurrentTab: true,
+    selfBrowserSurface: "include",
+    surfaceSwitching: "exclude"
+  });
+
+  const [track] = photoCaptureStream.getVideoTracks();
+  if (track) {
+    track.addEventListener("ended", () => {
+      photoCaptureStream = null;
+    }, { once: true });
+  }
+
+  return photoCaptureStream;
+}
+
+async function captureFamilyPhoto() {
+  const stream = photoCaptureStream;
+  const track = stream && stream.getVideoTracks()[0];
+
+  if (!track || track.readyState !== "live") {
+    throw new Error("Photo capture is no longer active.");
+  }
+
+  const video = document.createElement("video");
+  video.muted = true;
+  video.playsInline = true;
+  video.srcObject = stream;
+
+  await new Promise((resolve, reject) => {
+    video.onloadedmetadata = resolve;
+    video.onerror = () => reject(new Error("Could not read the captured tab."));
+  });
+  await video.play();
+
+  const rect = stage.getBoundingClientRect();
+  const scaleX = video.videoWidth / window.innerWidth;
+  const scaleY = video.videoHeight / window.innerHeight;
+  const sx = Math.max(0, Math.round(rect.left * scaleX));
+  const sy = Math.max(0, Math.round(rect.top * scaleY));
+  const sw = Math.min(video.videoWidth - sx, Math.max(1, Math.round(rect.width * scaleX)));
+  const sh = Math.min(video.videoHeight - sy, Math.max(1, Math.round(rect.height * scaleY)));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = sw;
+  canvas.height = sh;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+
+  video.pause();
+  video.srcObject = null;
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+  if (!blob) throw new Error("Could not create the family photo.");
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const filename = `baby-shower-${stamp}.jpg`;
+
+  // Always keep a local copy as a backup.
+  const localUrl = URL.createObjectURL(blob);
+  const download = document.createElement("a");
+  download.href = localUrl;
+  download.download = filename;
+  download.style.display = "none";
+  document.body.appendChild(download);
+  download.click();
+  download.remove();
+  window.setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+
+  const response = await fetch("/api/photos", {
+    method: "POST",
+    headers: {
+      "Content-Type": "image/jpeg",
+      "X-Photo-Name": filename
+    },
+    body: blob
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error("Cloud photo save failed" + (detail ? ": " + detail : ""));
+  }
+
+  return response.json();
+}
 
 function ensureAudioContext() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -190,7 +293,7 @@ async function pollEvents() {
         .sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0))
         .forEach((event, index) => {
           window.setTimeout(() => {
-            playEffect(event.effect, event.sender || "Someone");
+            playEffect(event.effect, event.sender || "Someone", false);
             if (event.groupCelebration) {
               playGroupCelebration(event.effect, event.groupCount || 2, Boolean(event.groupBurst));
             }
@@ -239,7 +342,7 @@ async function sendEffect(effect) {
       lastEventSeq = Math.max(lastEventSeq, data.seq);
     }
 
-    playEffect(effect, guestName || "Someone");
+    playEffect(effect, guestName || "Someone", effect === "photo");
     if (data.event && data.event.groupCelebration) {
       playGroupCelebration(
         data.event.effect,
@@ -250,24 +353,43 @@ async function sendEffect(effect) {
   } catch (error) {
     console.error("Celebration sync send failed", error);
     statusText.textContent = "Celebration sync offline (" + (error.message || "error") + ")";
-    playEffect(effect, guestName || "Someone");
+    playEffect(effect, guestName || "Someone", effect === "photo");
   }
 }
 
 document.querySelectorAll("[data-effect]").forEach((button) => {
-  button.addEventListener("click", () => {
+  button.addEventListener("click", async () => {
     if (button.disabled) return;
     ensureAudioContext();
+
+    const effect = button.dataset.effect;
     button.disabled = true;
     button.classList.remove("is-sent");
     void button.offsetWidth;
     button.classList.add("is-sent");
-    sendEffect(button.dataset.effect);
+
+    if (effect === "photo") {
+      try {
+        statusText.textContent = "Choose This Tab so I can save the family photo…";
+        await ensurePhotoCapture();
+      } catch (error) {
+        console.error("Photo capture permission error", error);
+        eventLabel.textContent = "Photo cancelled — choose This Tab to save it.";
+        eventLabel.classList.add("visible");
+        statusText.textContent = stage.classList.contains("in-call") ? "Live" : "Ready to join";
+        window.setTimeout(() => eventLabel.classList.remove("visible"), 4000);
+        button.disabled = false;
+        button.classList.remove("is-sent");
+        return;
+      }
+    }
+
+    sendEffect(effect);
 
     window.setTimeout(() => {
       button.disabled = false;
       button.classList.remove("is-sent");
-    }, 700);
+    }, effect === "photo" ? 4200 : 700);
   });
 });
 
@@ -286,7 +408,7 @@ function clearNormalEffects() {
   });
 }
 
-function playEffect(effect, sender) {
+function playEffect(effect, sender, capturePhoto = false) {
   clearTimeout(effectTimer);
   clearNormalEffects();
 
@@ -427,6 +549,21 @@ function playEffect(effect, sender) {
 
         if (snap) {
           playChime("photo");
+
+          if (capturePhoto) {
+            // Capture before the visual flash so the saved image is clean.
+            captureFamilyPhoto()
+              .then(() => {
+                eventLabel.textContent = "Family photo saved ✓";
+                eventLabel.classList.add("visible");
+              })
+              .catch((error) => {
+                console.error("Family photo save failed", error);
+                eventLabel.textContent = "Photo downloaded locally; cloud save failed.";
+                eventLabel.classList.add("visible");
+              });
+          }
+
           const flash = document.createElement("div");
           flash.className = "photo-flash";
           effectLayer.appendChild(flash);
