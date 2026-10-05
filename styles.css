@@ -398,6 +398,14 @@ button { -webkit-tap-highlight-color: transparent; }
   pointer-events: none;
 }
 
+.ritual-mark {
+  z-index: 1;
+}
+
+.tika-effect:not(.ritual-mark) {
+  z-index: 2;
+}
+
 .tika-applicator {
   position: absolute;
   left: 50%;
@@ -632,4 +640,9 @@ button { -webkit-tap-highlight-color: transparent; }
   0% { opacity: 0; transform: translateX(-50%) scale(.82); }
   15%, 78% { opacity: 1; transform: translateX(-50%) scale(1); }
   100% { opacity: 0; transform: translateX(-50%) scale(1.05); }
+}
+
+
+.persistent-smudge {
+  animation-fill-mode: forwards;
 }
