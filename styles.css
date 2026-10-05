@@ -339,23 +339,36 @@ button { -webkit-tap-highlight-color: transparent; }
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(30vw, 140px);
+  width: min(44vw, 240px);
   aspect-ratio: 1;
-  border-radius: 50%;
   transform: translate(-50%, -50%);
-  background: radial-gradient(circle at 35% 30%, #b9784f 0%, #915533 35%, #6b3a22 70%, #4c2718 100%);
-  box-shadow: 0 0 0 10px rgba(185,120,79,.14), 0 10px 30px rgba(0,0,0,.28);
-  animation: supari-pop 2.8s ease-out both;
+  border: 3px solid rgba(255, 206, 90, .68);
+  border-radius: 50%;
+  box-shadow: 0 0 0 12px rgba(255,190,92,.10), 0 0 45px rgba(255,191,73,.45);
+  animation: supari-aarti 3.2s ease-in-out both;
+}
+
+.supari-circle::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -26px;
+  width: 52px;
+  height: 52px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #c9875d 0%, #925532 42%, #5b301d 100%);
+  box-shadow: 0 8px 18px rgba(0,0,0,.3), 0 0 0 5px rgba(255,215,135,.22);
 }
 
 .tika-drop {
   position: absolute;
   left: 50%;
-  top: 8%;
+  bottom: 5%;
   width: 22px;
   height: 90px;
   transform: translateX(-50%);
-  animation: tika-fall 2.4s ease-out both;
+  animation: tika-rise 2.6s ease-in-out both;
 }
 
 .tika-drop::before {
@@ -384,16 +397,68 @@ button { -webkit-tap-highlight-color: transparent; }
   box-shadow: 0 0 0 10px rgba(211,23,23,.10), 0 0 24px rgba(211,23,23,.35);
 }
 
-@keyframes supari-pop {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(.45) rotate(-18deg); }
-  18% { opacity: 1; transform: translate(-50%, -50%) scale(1.05) rotate(5deg); }
-  70% { opacity: 1; transform: translate(-50%, -50%) scale(.98); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15) rotate(8deg); }
+@keyframes supari-aarti {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(-20deg) scale(.72); }
+  12% { opacity: 1; }
+  82% { opacity: 1; transform: translate(-50%, -50%) rotate(700deg) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(720deg) scale(.9); }
 }
 
-@keyframes tika-fall {
-  0% { opacity: 0; transform: translate(-50%, -60px) scale(.7); }
-  20% { opacity: 1; transform: translate(-50%, 0) scale(1); }
-  70% { opacity: 1; transform: translate(-50%, 90px) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, 110px) scale(1.05); }
+@keyframes tika-rise {
+  0% { opacity: 0; transform: translate(-50%, 70px) scale(.7); }
+  15% { opacity: 1; }
+  72% { opacity: 1; transform: translate(-50%, -46vh) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -58vh) scale(1.06); }
+}
+
+
+.group-celebration {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.group-celebration-banner {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  padding: 14px 20px;
+  border-radius: 999px;
+  background: rgba(255,250,247,.94);
+  color: var(--ink);
+  font-size: clamp(1.05rem, 5vw, 2rem);
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 0 14px 50px rgba(0,0,0,.28);
+  animation: group-banner 4.3s ease-out both;
+}
+
+.group-confetti {
+  position: absolute;
+  z-index: 1;
+  top: -14%;
+  will-change: transform, opacity;
+  animation: group-confetti-fall var(--duration, 3.2s) cubic-bezier(.18,.7,.28,1) forwards;
+}
+
+@keyframes group-confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0,-8vh,0) rotate(0deg) scale(.6);
+  }
+  8% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--x, 0), 124vh, 0) rotate(var(--spin, 720deg)) scale(1.15);
+  }
+}
+
+@keyframes group-banner {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.5); }
+  15% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  72% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.12); }
 }
