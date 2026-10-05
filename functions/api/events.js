@@ -16,6 +16,8 @@ export async function onRequest(context) {
   }
 
   const upstream = new URL(REALTIME_URL);
+  const incoming = new URL(context.request.url);
+  upstream.search = incoming.search;
 
   const headers = new Headers();
   headers.set("x-realtime-secret", REALTIME_SHARED_SECRET);
