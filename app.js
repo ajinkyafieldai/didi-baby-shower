@@ -114,16 +114,20 @@ function connectEvents() {
     }
   });
 
-  socket.addEventListener("close", () => {
+  socket.addEventListener("close", (event) => {
     if (eventSocket === socket) {
       eventSocket = null;
     }
+
+    const reason = event.reason ? `: ${event.reason}` : "";
+    statusText.textContent = `Celebration sync offline (${event.code})${reason}`;
 
     reconnectTimer = window.setTimeout(connectEvents, reconnectDelay);
     reconnectDelay = Math.min(reconnectDelay * 2, 10000);
   });
 
   socket.addEventListener("error", () => {
+    statusText.textContent = "Celebration sync connection failed";
     socket.close();
   });
 }
