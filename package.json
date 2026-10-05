@@ -1,0 +1,15 @@
+{
+  "name": "didi-baby-shower",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@zoom/meetingsdk": "^6.5.0"
+  },
+  "devDependencies": {
+    "vite": "^7.1.7"
+  }
+}
