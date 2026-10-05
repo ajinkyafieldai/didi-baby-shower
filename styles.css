@@ -279,7 +279,7 @@ button { -webkit-tap-highlight-color: transparent; }
   box-shadow:
     0 0 0 14px rgba(255, 190, 92, .12),
     0 0 55px rgba(255, 191, 73, .62);
-  animation: ovalni-spin 3.2s ease-in-out both;
+  animation: ovalni-spin 4.8s ease-in-out both;
 }
 
 .effect-ovalni-ring::before {
@@ -296,7 +296,7 @@ button { -webkit-tap-highlight-color: transparent; }
   position: absolute;
   top: -12%;
   font-size: clamp(20px, 7vw, 44px);
-  animation: petal-fall var(--fall, 3s) ease-in forwards;
+  animation: petal-fall var(--fall, 4.2s) ease-in-out forwards;
 }
 
 .ashirwad-burst,
@@ -306,7 +306,7 @@ button { -webkit-tap-highlight-color: transparent; }
   display: grid;
   place-items: center;
   font-size: clamp(64px, 20vw, 150px);
-  animation: burst 2.8s ease-out both;
+  animation: burst 4.4s ease-in-out both;
   text-shadow: 0 10px 30px rgba(0,0,0,.25);
 }
 
@@ -379,7 +379,7 @@ button { -webkit-tap-highlight-color: transparent; }
   border: 3px solid rgba(255, 206, 90, .68);
   border-radius: 50%;
   box-shadow: 0 0 0 12px rgba(255,190,92,.10), 0 0 45px rgba(255,191,73,.45);
-  animation: supari-aarti 3.2s ease-in-out both;
+  animation: supari-aarti 4.8s ease-in-out both;
 }
 
 .supari-circle::before {
@@ -423,7 +423,7 @@ button { -webkit-tap-highlight-color: transparent; }
     radial-gradient(circle at 50% 72%, #c61f1f 0 24%, transparent 25%),
     radial-gradient(circle at 45% 36%, #ffd2ba 0%, #e9a987 68%, #bd7659 100%);
   box-shadow: 0 8px 20px rgba(0,0,0,.26);
-  animation: tika-apply 2.35s cubic-bezier(.22,.8,.22,1) both;
+  animation: tika-apply 3.8s cubic-bezier(.22,.72,.22,1) both;
   z-index: 2;
 }
 
@@ -442,7 +442,7 @@ button { -webkit-tap-highlight-color: transparent; }
   box-shadow:
     3px 1px 0 rgba(183,18,18,.20),
     -2px 2px 0 rgba(183,18,18,.13);
-  animation: tika-smudge 2.35s ease-out both;
+  animation: tika-smudge 3.8s ease-in-out both;
   z-index: 1;
 }
 
@@ -597,7 +597,7 @@ button { -webkit-tap-highlight-color: transparent; }
     linear-gradient(135deg, rgba(255,226,148,.96), rgba(235,166,72,.92));
   font-size: clamp(42px, 12vw, 76px);
   filter: drop-shadow(0 12px 18px rgba(0,0,0,.28));
-  animation: oti-lap 3.1s ease-out both;
+  animation: oti-lap 4.6s ease-in-out both;
 }
 
 .oti-lap::before,
@@ -620,7 +620,7 @@ button { -webkit-tap-highlight-color: transparent; }
   top: 18%;
   font-size: clamp(28px, 8vw, 48px);
   opacity: 0;
-  animation: oti-fill 2.7s cubic-bezier(.2,.76,.28,1) forwards;
+  animation: oti-fill 4.2s cubic-bezier(.2,.7,.28,1) forwards;
 }
 
 @keyframes oti-fill {
@@ -650,7 +650,7 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .applied-smudge {
   opacity: 0;
-  animation: applied-smudge-in 2.35s ease-out forwards;
+  animation: applied-smudge-in 3.8s ease-in-out forwards;
 }
 
 @keyframes applied-smudge-in {
