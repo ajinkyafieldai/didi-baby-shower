@@ -320,3 +320,16 @@ button { -webkit-tap-highlight-color: transparent; }
     scroll-behavior: auto !important;
   }
 }
+
+.permission-help {
+  width: min(100%, 26rem);
+  margin: 0;
+  color: var(--muted);
+  font-size: .88rem;
+  line-height: 1.4;
+}
+
+.primary-button:disabled {
+  opacity: .65;
+  cursor: wait;
+}
