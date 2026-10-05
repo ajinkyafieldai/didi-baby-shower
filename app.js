@@ -3,6 +3,7 @@ const frame = document.getElementById("zoom-frame");
 const joinForm = document.getElementById("join-form");
 const joinMessage = document.getElementById("join-message");
 const statusText = document.getElementById("status-text");
+const markLayer = document.getElementById("mark-layer");
 const effectLayer = document.getElementById("effect-layer");
 const eventLabel = document.getElementById("event-label");
 const guestNameInput = document.getElementById("guest-name");
@@ -224,10 +225,7 @@ syncTimer = window.setInterval(pollEvents, 750);
 
 function clearNormalEffects() {
   Array.from(effectLayer.children).forEach((child) => {
-    if (
-      !child.classList.contains("group-celebration") &&
-      !child.classList.contains("ritual-mark")
-    ) {
+    if (!child.classList.contains("group-celebration")) {
       child.remove();
     }
   });
@@ -294,21 +292,21 @@ function playEffect(effect, sender) {
     const applicator = document.createElement("div");
     applicator.className = "tika-applicator";
     application.appendChild(applicator);
+    effectLayer.appendChild(application);
 
-    const existingMark = effectLayer.querySelector(`.ritual-mark[data-mark="${markType}"]`);
+    const existingMark = markLayer.querySelector(`[data-mark="${markType}"]`);
     if (existingMark) {
       existingMark.remove();
     }
 
     const mark = document.createElement("div");
-    mark.className = `tika-effect ritual-mark ${effectClass}`;
+    mark.className = `applied-mark ${effectClass}`;
     mark.dataset.mark = markType;
 
     const smudge = document.createElement("div");
-    smudge.className = "tika-smudge persistent-smudge";
+    smudge.className = "tika-smudge applied-smudge";
     mark.appendChild(smudge);
-
-    effectLayer.append(application, mark);
+    markLayer.appendChild(mark);
   }
 
   if (effect === "oti") {
