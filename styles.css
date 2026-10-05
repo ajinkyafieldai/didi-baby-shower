@@ -304,7 +304,7 @@ button { -webkit-tap-highlight-color: transparent; }
 
   .ritual-dock {
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(6, 1fr);
+    grid-template-rows: repeat(8, 1fr);
     border-top: 0;
     border-left: 1px solid var(--line);
     padding: 12px;
@@ -498,4 +498,74 @@ button { -webkit-tap-highlight-color: transparent; }
   15% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
   72% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1.12); }
+}
+
+
+.haldi-effect .tika-applicator {
+  background:
+    radial-gradient(circle at 50% 72%, #e7b51b 0 24%, transparent 25%),
+    radial-gradient(circle at 45% 36%, #ffd2ba 0%, #e9a987 68%, #bd7659 100%);
+}
+
+.haldi-effect .tika-smudge {
+  background:
+    radial-gradient(ellipse at 48% 52%, rgba(246,199,39,.98) 0 42%, rgba(216,159,13,.86) 58%, rgba(168,112,4,.28) 73%, transparent 76%);
+  box-shadow:
+    3px 1px 0 rgba(221,167,19,.20),
+    -2px 2px 0 rgba(221,167,19,.14);
+}
+
+.kunku-effect .tika-applicator {
+  background:
+    radial-gradient(circle at 50% 72%, #c61f1f 0 24%, transparent 25%),
+    radial-gradient(circle at 45% 36%, #ffd2ba 0%, #e9a987 68%, #bd7659 100%);
+}
+
+.oti-effect {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.oti-lap {
+  position: absolute;
+  left: 50%;
+  bottom: 17%;
+  transform: translateX(-50%);
+  font-size: clamp(72px, 20vw, 128px);
+  filter: drop-shadow(0 12px 18px rgba(0,0,0,.28));
+  animation: oti-lap 3.1s ease-out both;
+}
+
+.oti-offering {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  font-size: clamp(28px, 8vw, 48px);
+  opacity: 0;
+  animation: oti-fill 2.7s cubic-bezier(.2,.76,.28,1) forwards;
+}
+
+@keyframes oti-fill {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -30px) rotate(-18deg) scale(.65);
+  }
+  15% {
+    opacity: 1;
+  }
+  76% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--oti-x)), 50vh) rotate(12deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--oti-x)), 54vh) rotate(18deg) scale(.82);
+  }
+}
+
+@keyframes oti-lap {
+  0% { opacity: 0; transform: translateX(-50%) scale(.82); }
+  15%, 78% { opacity: 1; transform: translateX(-50%) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) scale(1.05); }
 }
