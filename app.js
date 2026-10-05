@@ -9,7 +9,7 @@ const eventLabel = document.getElementById("event-label");
 let guestName = "";
 let effectTimer = null;
 
-joinForm.addEventListener("submit", (event) => {
+joinForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const formData = new FormData(joinForm);
@@ -20,11 +20,54 @@ joinForm.addEventListener("submit", (event) => {
     return;
   }
 
-  joinMessage.textContent = "";
-  statusText.textContent = "Connecting to Zoom…";
+  const joinButton = document.getElementById("join-button");
 
-  frame.src = `/zoom.html?name=${encodeURIComponent(guestName)}`;
-  stage.classList.add("in-call");
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    joinMessage.textContent = "This browser cannot access the camera and microphone.";
+    return;
+  }
+
+  joinButton.disabled = true;
+  joinButton.textContent = "Waiting for permission…";
+  joinMessage.textContent = "When your browser asks, tap Allow for camera and microphone.";
+  statusText.textContent = "Requesting camera & microphone…";
+
+  let stream;
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true
+    });
+
+    stream.getTracks().forEach((track) => track.stop());
+
+    joinMessage.textContent = "";
+    joinButton.textContent = "Opening family call…";
+    statusText.textContent = "Connecting to Zoom…";
+
+    frame.src = `/zoom.html?name=${encodeURIComponent(guestName)}`;
+    stage.classList.add("in-call");
+  } catch (error) {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+
+    console.error("Camera/microphone permission error", error);
+
+    const denied = error && (
+      error.name === "NotAllowedError" ||
+      error.name === "SecurityError"
+    );
+
+    joinMessage.textContent = denied
+      ? "Camera and microphone permission was not allowed. Please enable it in your browser and try again."
+      : "Could not access the camera and microphone. Please check your device settings and try again.";
+
+    statusText.textContent = "Camera & microphone permission needed";
+    joinButton.disabled = false;
+    joinButton.textContent = "Try camera & microphone again";
+  }
 });
 
 window.addEventListener("message", (event) => {
