@@ -242,7 +242,15 @@ function playEffect(effect, sender) {
 
   if (effect === "tika") {
     const tika = document.createElement("div");
-    tika.className = "tika-drop";
+    tika.className = "tika-effect";
+
+    const applicator = document.createElement("div");
+    applicator.className = "tika-applicator";
+
+    const smudge = document.createElement("div");
+    smudge.className = "tika-smudge";
+
+    tika.append(applicator, smudge);
     effectLayer.appendChild(tika);
   }
 
