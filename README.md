@@ -90,3 +90,47 @@ npm run rtms:transcript \
 ```
 
 Configure the Zoom app's RTMS webhook endpoint to the public URL serving `ZM_RTMS_PATH`.
+
+
+### Public RTMS webhook runtime
+
+The RTMS process binds locally and is intended to be exposed only through Cloudflare Tunnel.
+
+Runtime layout:
+
+```text
+Zoom RTMS webhook
+       |
+       v
+https://rtms.example.com/webhook
+       |
+Cloudflare Tunnel
+       |
+http://127.0.0.1:8080/webhook
+       |
+babyshower-rtms.service
+       |
+rtms-transcript -> phrase-map -> babyshower trigger
+```
+
+Install the local service:
+
+```sh
+sudo ./scripts/install-rtms-service.sh /opt/babyshower/current
+```
+
+Then edit:
+
+```text
+/etc/babyshower/rtms.env
+```
+
+and configure Cloudflare Tunnel from:
+
+```text
+deploy/cloudflared/config.yml.example
+```
+
+The application listens on localhost. No direct inbound RTMS port needs to be exposed.
+
+Secret storage is intentionally abstracted behind `/etc/babyshower/rtms.env` for now. A vault-backed mechanism can replace that later without changing the JS runtime or systemd unit.
