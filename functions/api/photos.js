@@ -14,6 +14,30 @@ function safeName(value) {
     .slice(0, 120);
 }
 
+export async function onRequestGet(context) {
+  const bucket = context.env.BABY_SHOWER_PHOTOS;
+  if (!bucket) {
+    return json({ error: "Photo storage is not configured." }, 503);
+  }
+
+  const url = new URL(context.request.url);
+  const key = String(url.searchParams.get("key") || "");
+  if (!key.startsWith("photos/") || key.includes("..")) {
+    return json({ error: "Invalid photo key." }, 400);
+  }
+
+  const object = await bucket.get(key);
+  if (!object) {
+    return json({ error: "Photo not found." }, 404);
+  }
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("cache-control", "private, max-age=0, no-store");
+  headers.set("content-disposition", "inline");
+  return new Response(object.body, { headers });
+}
+
 export async function onRequestPost(context) {
   const bucket = context.env.BABY_SHOWER_PHOTOS;
   if (!bucket) {

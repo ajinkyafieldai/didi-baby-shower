@@ -226,6 +226,28 @@ const participantId = (() => {
   return id;
 })();
 
+let latestRenderLatencyMs = null;
+
+async function sendTelemetry() {
+  try {
+    await fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "telemetry",
+        clientId: participantId,
+        role: "guest",
+        latencyMs: latestRenderLatencyMs,
+        lastEventSeq,
+        visible: document.visibilityState === "visible"
+      }),
+      cache: "no-store"
+    });
+  } catch (error) {
+    console.debug("Telemetry heartbeat failed", error);
+  }
+}
+
 function updateJoinButtonState() {
   joinButton.disabled = !guestNameInput.value.trim();
 }
@@ -330,6 +352,41 @@ let lastEventSeq = 0;
 let eventsInitialized = false;
 let syncTimer = null;
 let syncBusy = false;
+let lastPollCompletedAt = Date.now();
+let resyncOnNextPoll = false;
+const RESUME_GAP_MS = 5000;
+const MAX_EFFECT_AGE_MS = 4000;
+
+function photoAssetUrl(asset) {
+  return "/api/photos?key=" + encodeURIComponent(asset);
+}
+
+function showCapturedPhoto(asset) {
+  if (!asset) return;
+
+  let overlay = document.getElementById("shared-photo-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "shared-photo-overlay";
+    overlay.className = "shared-photo-overlay";
+
+    const image = document.createElement("img");
+    image.alt = "Latest family photo";
+    overlay.appendChild(image);
+    document.body.appendChild(overlay);
+  }
+
+  const image = overlay.querySelector("img");
+  image.src = photoAssetUrl(asset);
+  overlay.classList.remove("visible");
+  void overlay.offsetWidth;
+  overlay.classList.add("visible");
+
+  window.clearTimeout(overlay._hideTimer);
+  overlay._hideTimer = window.setTimeout(() => {
+    overlay.classList.remove("visible");
+  }, 5000);
+}
 
 async function pollEvents() {
   if (syncBusy) return;
@@ -347,27 +404,52 @@ async function pollEvents() {
     }
 
     const data = await response.json();
+    const now = Date.now();
+    const resumedAfterGap = now - lastPollCompletedAt > RESUME_GAP_MS;
+    const shouldResync = resyncOnNextPoll || resumedAfterGap;
 
     if (data.games) {
       gameState = data.games;
       if (activeGame) renderGame(activeGame);
     }
 
-    if (!eventsInitialized) {
+    if (!eventsInitialized || shouldResync) {
       if (typeof data.seq === "number") {
         lastEventSeq = data.seq;
       }
       eventsInitialized = true;
+      resyncOnNextPoll = false;
     } else {
       const events = Array.isArray(data.events)
         ? data.events
         : (data.event ? [data.event] : []);
 
       events
-        .filter((event) => event && event.type === "effect" && Number(event.seq || 0) > lastEventSeq)
+        .filter((event) =>
+          event &&
+          event.type === "command" &&
+          event.command === "photo.show" &&
+          event.asset &&
+          Number(event.seq || 0) > lastEventSeq &&
+          now - Number(event.at || 0) <= MAX_EFFECT_AGE_MS
+        )
+        .sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0))
+        .forEach((event) => {
+          latestRenderLatencyMs = Math.max(0, Date.now() - Number(event.at || Date.now()));
+          showCapturedPhoto(event.asset);
+        });
+
+      events
+        .filter((event) =>
+          event &&
+          event.type === "effect" &&
+          Number(event.seq || 0) > lastEventSeq &&
+          now - Number(event.at || 0) <= MAX_EFFECT_AGE_MS
+        )
         .sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0))
         .forEach((event, index) => {
           window.setTimeout(() => {
+            latestRenderLatencyMs = Math.max(0, Date.now() - Number(event.at || Date.now()));
             playEffect(event.effect, event.sender || "Someone", event.effect === "photo" && photoHost);
             if (event.groupCelebration) {
               playGroupCelebration(event.effect, event.groupCount || 2, Boolean(event.groupBurst));
@@ -388,6 +470,7 @@ async function pollEvents() {
     callStatus.classList.remove("compact");
     statusText.textContent = "Celebration sync offline (" + (error.message || "error") + ")";
   } finally {
+    lastPollCompletedAt = Date.now();
     syncBusy = false;
   }
 }
@@ -609,6 +692,15 @@ gamePanel.addEventListener("click", (event) => {
 
 pollEvents();
 syncTimer = window.setInterval(pollEvents, 750);
+sendTelemetry();
+window.setInterval(sendTelemetry, 5000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    resyncOnNextPoll = true;
+    pollEvents();
+  }
+  sendTelemetry();
+});
 
 function clearNormalEffects() {
   Array.from(effectLayer.children).forEach((child) => {

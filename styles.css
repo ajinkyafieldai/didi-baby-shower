@@ -1111,3 +1111,40 @@ button { -webkit-tap-highlight-color: transparent; }
   .game-form { grid-template-columns: 1fr; }
   .game-form button { min-height: 44px; }
 }
+
+.shared-photo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: clamp(16px, 4vw, 48px);
+  background: rgba(18, 12, 10, 0.88);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+.shared-photo-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.shared-photo-overlay img {
+  display: block;
+  max-width: min(94vw, 1600px);
+  max-height: 88vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 18px;
+  box-shadow: 0 28px 80px rgba(0,0,0,.45);
+  transform: scale(.96);
+  transition: transform 220ms ease;
+}
+.shared-photo-overlay.visible img {
+  transform: scale(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .shared-photo-overlay,
+  .shared-photo-overlay img { transition: none; }
+}

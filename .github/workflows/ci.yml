@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - devel
+  push:
+    branches:
+      - devel
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Syntax check
+        run: |
+          node --check app.js
+          node --check host.js
+          node --check projector.js
+          node --check photobooth.js
+          node --check zoom-client.js
+          node --check functions/api/events.js
+          node --check functions/api/photos.js
+          node --check functions/api/zoom-signature.js
+          node --check realtime/src/index.js
+
+      - name: Build and verify
+        run: npm run build

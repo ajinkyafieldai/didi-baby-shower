@@ -1,7 +1,47 @@
 const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate", "photo"]);
+const COMMANDS = new Set(["photo.capture", "photo.show"]);
+const SYSTEM_EVENTS = new Set(["photo.captured"]);
 const GROUP_WINDOW_MS = 10_000;
 const GROUP_THRESHOLD = 2;
 const GROUP_BURST_THRESHOLD = 2;
+const TELEMETRY_ACTIVE_MS = 15_000;
+const TELEMETRY_MAX_CLIENTS = 200;
+
+function percentile(values, q) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(q * sorted.length) - 1));
+  return sorted[index];
+}
+
+async function telemetrySnapshot(ctx) {
+  const stored = await ctx.storage.get("telemetryClients");
+  const clients = stored && typeof stored === "object" ? stored : {};
+  const now = Date.now();
+  const active = Object.values(clients).filter((entry) => now - Number(entry.lastSeen || 0) <= TELEMETRY_ACTIVE_MS);
+  const byRole = {};
+  const latencies = [];
+
+  for (const entry of active) {
+    const role = String(entry.role || "guest");
+    byRole[role] = (byRole[role] || 0) + 1;
+    const latency = Number(entry.latencyMs);
+    if (Number.isFinite(latency) && latency >= 0) latencies.push(latency);
+  }
+
+  const startedAt = Number(await ctx.storage.get("startedAt") || now);
+  return {
+    activeClients: active.length,
+    byRole,
+    latencyMs: {
+      p50: percentile(latencies, 0.50),
+      p95: percentile(latencies, 0.95),
+      samples: latencies.length
+    },
+    startedAt,
+    uptimeMs: Math.max(0, now - startedAt)
+  };
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -25,6 +65,10 @@ async function gameSnapshot(ctx) {
 export class CelebrationRoom {
   constructor(ctx) {
     this.ctx = ctx;
+    this.ctx.blockConcurrencyWhile(async () => {
+      const startedAt = await this.ctx.storage.get("startedAt");
+      if (!startedAt) await this.ctx.storage.put("startedAt", Date.now());
+    });
   }
 
   async fetch(request) {
@@ -40,7 +84,9 @@ export class CelebrationRoom {
       return json({
         seq: latest && Number(latest.seq) ? Number(latest.seq) : 0,
         events,
-        games: await gameSnapshot(this.ctx)
+        games: await gameSnapshot(this.ctx),
+        telemetry: await telemetrySnapshot(this.ctx),
+        latestPhoto: await this.ctx.storage.get("latestPhoto") || null
       });
     }
 
@@ -51,6 +97,27 @@ export class CelebrationRoom {
         body = await request.json();
       } catch {
         return json({ error: "Invalid JSON" }, 400);
+      }
+
+      if (body && body.type === "telemetry") {
+        const clientId = String(body.clientId || "").trim().slice(0, 100);
+        if (!clientId) return json({ error: "Invalid telemetry client" }, 400);
+
+        const stored = await this.ctx.storage.get("telemetryClients");
+        const clients = stored && typeof stored === "object" ? stored : {};
+        clients[clientId] = {
+          role: String(body.role || "guest").trim().slice(0, 30) || "guest",
+          lastSeen: Date.now(),
+          latencyMs: Number.isFinite(Number(body.latencyMs)) ? Math.max(0, Math.min(60_000, Number(body.latencyMs))) : null,
+          lastEventSeq: Math.max(0, Number(body.lastEventSeq || 0)),
+          visible: body.visible !== false
+        };
+
+        const entries = Object.entries(clients)
+          .sort((a, b) => Number(b[1].lastSeen || 0) - Number(a[1].lastSeen || 0))
+          .slice(0, TELEMETRY_MAX_CLIENTS);
+        await this.ctx.storage.put("telemetryClients", Object.fromEntries(entries));
+        return json({ ok: true, telemetry: await telemetrySnapshot(this.ctx) });
       }
 
       if (body && body.type === "name_suggestion") {
@@ -115,6 +182,63 @@ export class CelebrationRoom {
         quiz.push({ senderId, sender, answers, at: Date.now() });
         await this.ctx.storage.put("quizAnswers", quiz.slice(-80));
         return json({ ok: true, games: await gameSnapshot(this.ctx) });
+      }
+
+      if (body && body.type === "system" && SYSTEM_EVENTS.has(body.event)) {
+        const asset = String(body.asset || "").trim().slice(0, 500);
+        if (!asset) return json({ error: "Missing photo asset" }, 400);
+
+        const previous = await this.ctx.storage.get("latest");
+        const seq = previous && Number(previous.seq) ? Number(previous.seq) + 1 : 1;
+        const event = {
+          type: "system",
+          event: body.event,
+          asset,
+          sender: String(body.sender || "Photobooth").trim().slice(0, 60) || "Photobooth",
+          senderId: String(body.senderId || "photobooth").trim().slice(0, 100) || "photobooth",
+          id: crypto.randomUUID(),
+          at: Date.now(),
+          seq
+        };
+
+        const storedEvents = await this.ctx.storage.get("events");
+        const events = Array.isArray(storedEvents) ? storedEvents : [];
+        events.push(event);
+        const latestPhoto = { asset, at: event.at, seq, senderId: event.senderId };
+
+        await this.ctx.storage.put("latest", { seq, event });
+        await this.ctx.storage.put("latestPhoto", latestPhoto);
+        await this.ctx.storage.put("events", events.slice(-80));
+        return json({ seq, event, latestPhoto });
+      }
+
+      if (body && body.type === "command" && COMMANDS.has(body.command)) {
+        const latestPhoto = body.command === "photo.show"
+          ? await this.ctx.storage.get("latestPhoto")
+          : null;
+        if (body.command === "photo.show" && !latestPhoto?.asset) {
+          return json({ error: "No captured photo is available." }, 409);
+        }
+
+        const previous = await this.ctx.storage.get("latest");
+        const seq = previous && Number(previous.seq) ? Number(previous.seq) + 1 : 1;
+        const event = {
+          type: "command",
+          command: body.command,
+          asset: latestPhoto?.asset || undefined,
+          sender: String(body.sender || "Operator").trim().slice(0, 60) || "Operator",
+          senderId: String(body.senderId || "operator").trim().slice(0, 100) || "operator",
+          id: crypto.randomUUID(),
+          at: Date.now(),
+          seq
+        };
+
+        const storedEvents = await this.ctx.storage.get("events");
+        const events = Array.isArray(storedEvents) ? storedEvents : [];
+        events.push(event);
+        await this.ctx.storage.put("latest", { seq, event });
+        await this.ctx.storage.put("events", events.slice(-80));
+        return json({ seq, event });
       }
 
       if (!body || body.type !== "effect" || !EFFECTS.has(body.effect)) {
