@@ -250,7 +250,7 @@ joinForm.addEventListener("submit", async (event) => {
   joinMessage.textContent = "Your browser may ask for camera and microphone permission.";
   statusText.textContent = "Connecting to video call…";
 
-  frame.src = `/video.html?name=${encodeURIComponent(guestName)}`;
+  frame.src = `/whereby.html?name=${encodeURIComponent(guestName)}`;
   stage.classList.add("in-call");
 });
 
