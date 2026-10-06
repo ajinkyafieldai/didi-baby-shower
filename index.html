@@ -39,12 +39,15 @@
         <span id="status-text">Ready to join</span>
       </div>
 
-      <div class="game-actions" aria-label="Baby shower games">
+      <div class="game-actions" aria-label="Baby shower activities">
         <button class="game-launch" data-game="names" type="button">
           <span aria-hidden="true">👶</span><span>Baby Names</span>
         </button>
         <button class="game-launch" data-game="didi" type="button">
           <span aria-hidden="true">🏆</span><span>Didi Quiz</span>
+        </button>
+        <button class="game-launch blessing-launch" id="blessing-launch" type="button">
+          <span aria-hidden="true">💌</span><span>Blessings</span>
         </button>
       </div>
 
@@ -57,6 +60,33 @@
         <div class="game-card" role="dialog" aria-modal="true" aria-labelledby="game-title">
           <button id="game-close" class="game-close" type="button" aria-label="Close game">×</button>
           <div id="game-content"></div>
+        </div>
+      </div>
+
+      <div id="blessing-panel" class="blessing-panel" hidden>
+        <div class="blessing-card" role="dialog" aria-modal="true" aria-labelledby="blessing-title">
+          <button id="blessing-close" class="game-close" type="button" aria-label="Close blessings">×</button>
+          <div class="blessing-head">
+            <div>
+              <h2 id="blessing-title">💌 Blessings Wall</h2>
+              <p>Leave something for Didi or the baby to keep.</p>
+            </div>
+            <button id="blessing-export" class="blessing-export" type="button">Export keepsake</button>
+          </div>
+
+          <form id="blessing-form" class="blessing-form">
+            <div class="blessing-audience" role="group" aria-label="Blessing recipient">
+              <label><input type="radio" name="audience" value="baby" checked> <span>For the baby</span></label>
+              <label><input type="radio" name="audience" value="didi"> <span>For Didi</span></label>
+            </div>
+            <textarea id="blessing-message" name="message" maxlength="180" rows="3" placeholder="A little wish, memory, or blessing…" required></textarea>
+            <div class="blessing-form-foot">
+              <span id="blessing-count">0/180</span>
+              <button type="submit">Add to wall 💛</button>
+            </div>
+          </form>
+
+          <div id="blessing-wall" class="blessing-wall" aria-live="polite"></div>
         </div>
       </div>
     </section>
