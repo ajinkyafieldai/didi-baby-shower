@@ -23,9 +23,22 @@ async function startVideo() {
     const response = await fetch("/api/video-config", {
       cache: "no-store"
     });
-    const config = await response.json();
+    let config = await response.json();
 
-    if (!response.ok) {
+    if (!response.ok && response.status === 503) {
+      stage("Provisioning preview room…");
+      const provision = await fetch("/api/video-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hours: 2 }),
+        cache: "no-store"
+      });
+      config = await provision.json();
+
+      if (!provision.ok) {
+        throw new Error(config.error || "Unable to provision preview video room.");
+      }
+    } else if (!response.ok) {
       throw new Error(config.error || "Video room is not configured.");
     }
 
