@@ -18,7 +18,7 @@ const TRIGGERS=Object.freeze({
 
 function usage(){
   console.log(`Usage:
-  babyshower trigger <name> [--force]
+  babyshower trigger <name> [--force] [--dry-run]
   babyshower photobooth [run|capture|health]
 
 Allowed triggers:
@@ -33,23 +33,31 @@ function requireUrl(){
   }
 }
 
-async function trigger(name,force=false){
-  requireUrl();
+async function trigger(name,force=false,dryRun=false){
   const mapped=TRIGGERS[name];
   if(!mapped){
     console.error("Unknown trigger:",name);
     process.exit(2);
   }
 
+  const payload={
+    ...mapped,
+    sender:"Transcript",
+    senderId:clientId,
+    force:Boolean(force)
+  };
+
+  if(dryRun){
+    console.log(JSON.stringify({ok:true,dryRun:true,trigger:name,payload}));
+    return;
+  }
+
+  requireUrl();
+
   const response=await fetch(baseUrl+"/api/events",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      ...mapped,
-      sender:"Transcript",
-      senderId:clientId,
-      force:Boolean(force)
-    }),
+    body:JSON.stringify(payload),
     cache:"no-store"
   });
   const data=await response.json().catch(()=>({}));
@@ -68,7 +76,7 @@ function runPhotobooth(rest){
 
 try{
   if(args[0]==="trigger"){
-    await trigger(args[1],args.includes("--force"));
+    await trigger(args[1],args.includes("--force"),args.includes("--dry-run"));
   }else if(args[0]==="photobooth"){
     runPhotobooth(args.slice(1));
   }else{
