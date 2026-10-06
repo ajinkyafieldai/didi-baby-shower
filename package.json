@@ -10,14 +10,10 @@
     "photobooth:health": "node photobooth.js health",
     "transcript:map": "node scripts/phrase-map.mjs",
     "trigger": "node babyshower.js trigger",
-    "rtms:transcript": "node scripts/rtms-transcript.mjs",
-    "rtms:sim": "node scripts/rtms-transcript-sim.mjs",
-    "rtms:local": "bash scripts/run-transcript-local.sh",
     "transcript:local": "bash scripts/run-local-transcript.sh",
     "transcript:sources": "bash scripts/list-audio-sources.sh",
     "transcript:tmux": "bash scripts/transcript-tmux.sh"
   },
-  "dependencies": {},
   "devDependencies": {
     "vite": "^7.1.7"
   },
