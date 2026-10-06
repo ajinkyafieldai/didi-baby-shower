@@ -14,8 +14,9 @@ SAMPLE_BYTES = 2
 
 source = os.environ.get("BABYSHOWER_AUDIO_SOURCE", "default")
 model_name = os.environ.get("BABYSHOWER_WHISPER_MODEL", "small")
-language = os.environ.get("BABYSHOWER_WHISPER_LANGUAGE", "en").strip() or None
-chunk_seconds = float(os.environ.get("BABYSHOWER_WHISPER_CHUNK_SECONDS", "4"))
+language = os.environ.get("BABYSHOWER_WHISPER_LANGUAGE", "").strip() or None
+chunk_seconds = float(os.environ.get("BABYSHOWER_WHISPER_CHUNK_SECONDS", "2.5"))
+context_seconds = float(os.environ.get("BABYSHOWER_WHISPER_CONTEXT_SECONDS", "5"))
 device = os.environ.get("BABYSHOWER_WHISPER_DEVICE", "cpu")
 compute_type = os.environ.get("BABYSHOWER_WHISPER_COMPUTE_TYPE", "int8")
 
@@ -23,11 +24,18 @@ if not shutil.which("ffmpeg"):
     print("[local-transcript] ffmpeg is required.", file=sys.stderr)
     raise SystemExit(2)
 
-chunk_bytes = int(RATE * CHANNELS * SAMPLE_BYTES * chunk_seconds)
+if chunk_seconds <= 0:
+    raise SystemExit("BABYSHOWER_WHISPER_CHUNK_SECONDS must be > 0")
+
+context_seconds = max(context_seconds, chunk_seconds)
+chunk_samples = max(1, int(RATE * chunk_seconds))
+chunk_bytes = chunk_samples * CHANNELS * SAMPLE_BYTES
+context_samples = max(chunk_samples, int(RATE * context_seconds))
 
 print(
     f"[local-transcript] source={source} model={model_name} "
-    f"language={language or 'auto'} chunk={chunk_seconds:g}s",
+    f"language={language or 'auto'} chunk={chunk_seconds:g}s "
+    f"context={context_seconds:g}s",
     file=sys.stderr,
 )
 
@@ -60,6 +68,8 @@ ffmpeg = subprocess.Popen(
 
 assert ffmpeg.stdout is not None
 
+rolling = np.empty(0, dtype=np.float32)
+
 try:
     while True:
         data = ffmpeg.stdout.read(chunk_bytes)
@@ -68,18 +78,36 @@ try:
         if len(data) < RATE * SAMPLE_BYTES:
             continue
 
-        audio = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+        current = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+        rolling = np.concatenate((rolling, current))
+        if rolling.size > context_samples:
+            rolling = rolling[-context_samples:]
+
+        window_seconds = rolling.size / RATE
+        new_audio_start = max(0.0, window_seconds - (current.size / RATE))
 
         started = time.monotonic()
         segments, info = model.transcribe(
-            audio,
+            rolling,
             language=language,
             beam_size=1,
             vad_filter=True,
             condition_on_previous_text=False,
         )
-        text = " ".join(segment.text.strip() for segment in segments).strip()
+        segments = list(segments)
         elapsed = time.monotonic() - started
+
+        # The rolling window includes old audio for context. Only publish
+        # segments that reach into the newest chunk. A small boundary grace
+        # keeps commands spanning two chunks from being dropped; downstream
+        # duplicate/cooldown handling prevents repeated triggers.
+        boundary = max(0.0, new_audio_start - 0.35)
+        fresh = [
+            segment.text.strip()
+            for segment in segments
+            if segment.text.strip() and float(segment.end) > boundary
+        ]
+        text = " ".join(fresh).strip()
 
         if text:
             print(text, flush=True)
