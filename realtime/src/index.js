@@ -1,5 +1,5 @@
 const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate", "photo"]);
-const COMMANDS = new Set(["photo.capture"]);
+const COMMANDS = new Set(["photo.capture", "photo.show"]);
 const SYSTEM_EVENTS = new Set(["photo.captured"]);
 const GROUP_WINDOW_MS = 10_000;
 const GROUP_THRESHOLD = 2;
@@ -213,11 +213,19 @@ export class CelebrationRoom {
       }
 
       if (body && body.type === "command" && COMMANDS.has(body.command)) {
+        const latestPhoto = body.command === "photo.show"
+          ? await this.ctx.storage.get("latestPhoto")
+          : null;
+        if (body.command === "photo.show" && !latestPhoto?.asset) {
+          return json({ error: "No captured photo is available." }, 409);
+        }
+
         const previous = await this.ctx.storage.get("latest");
         const seq = previous && Number(previous.seq) ? Number(previous.seq) + 1 : 1;
         const event = {
           type: "command",
           command: body.command,
+          asset: latestPhoto?.asset || undefined,
           sender: String(body.sender || "Operator").trim().slice(0, 60) || "Operator",
           senderId: String(body.senderId || "operator").trim().slice(0, 100) || "operator",
           id: crypto.randomUUID(),
