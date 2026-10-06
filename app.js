@@ -357,6 +357,37 @@ let resyncOnNextPoll = false;
 const RESUME_GAP_MS = 5000;
 const MAX_EFFECT_AGE_MS = 4000;
 
+function photoAssetUrl(asset) {
+  return "/api/photos?key=" + encodeURIComponent(asset);
+}
+
+function showCapturedPhoto(asset) {
+  if (!asset) return;
+
+  let overlay = document.getElementById("shared-photo-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "shared-photo-overlay";
+    overlay.className = "shared-photo-overlay";
+
+    const image = document.createElement("img");
+    image.alt = "Latest family photo";
+    overlay.appendChild(image);
+    document.body.appendChild(overlay);
+  }
+
+  const image = overlay.querySelector("img");
+  image.src = photoAssetUrl(asset);
+  overlay.classList.remove("visible");
+  void overlay.offsetWidth;
+  overlay.classList.add("visible");
+
+  window.clearTimeout(overlay._hideTimer);
+  overlay._hideTimer = window.setTimeout(() => {
+    overlay.classList.remove("visible");
+  }, 5000);
+}
+
 async function pollEvents() {
   if (syncBusy) return;
   syncBusy = true;
@@ -392,6 +423,21 @@ async function pollEvents() {
       const events = Array.isArray(data.events)
         ? data.events
         : (data.event ? [data.event] : []);
+
+      events
+        .filter((event) =>
+          event &&
+          event.type === "command" &&
+          event.command === "photo.show" &&
+          event.asset &&
+          Number(event.seq || 0) > lastEventSeq &&
+          now - Number(event.at || 0) <= MAX_EFFECT_AGE_MS
+        )
+        .sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0))
+        .forEach((event) => {
+          latestRenderLatencyMs = Math.max(0, Date.now() - Number(event.at || Date.now()));
+          showCapturedPhoto(event.asset);
+        });
 
       events
         .filter((event) =>
