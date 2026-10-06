@@ -10,8 +10,8 @@ const rules=[
     cooldownMs:Number(process.env.BABYSHOWER_COOLDOWN_PHOTO_SHOW_MS||DEFAULT_COOLDOWN_MS),
     patterns:[
       /\b(?:show|put|bring)\s+(?:up\s+)?(?:the\s+)?(?:latest\s+)?(?:family\s+)?(?:photo|picture)\b/i,
-      /\b(?:start|take|do)\s+(?:the\s+)?(?:family\s+)?(?:photo|picture)\b/i,
-      /\b(?:let'?s|lets)\s+(?:start|take|do)\s+(?:the\s+)?(?:family\s+)?(?:photo|picture)\b/i,
+      /\b(?:start|take|do)\s+(?:(?:the|a)\s+)?(?:family\s+)?(?:photo|picture)\b/i,
+      /\b(?:let'?s|lets)\s+(?:start|take|do)\s+(?:(?:the|a)\s+)?(?:family\s+)?(?:photo|picture)\b/i,
       /\b(?:can|could|please)\s+(?:you\s+)?show\s+(?:us\s+)?(?:the\s+)?(?:photo|picture)\b/i
     ]
   },
