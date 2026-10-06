@@ -3,57 +3,38 @@ import { createInterface } from "node:readline";
 
 const DEFAULT_COOLDOWN_MS=Number(process.env.BABYSHOWER_PHRASE_COOLDOWN_MS||8000);
 const DUPLICATE_WINDOW_MS=Number(process.env.BABYSHOWER_TRANSCRIPT_DUPLICATE_MS||5000);
+const FUZZY_DISTANCE=Number(process.env.BABYSHOWER_KEYWORD_FUZZY_DISTANCE||1);
 
 const rules=[
   {
     trigger:"photo.show",
     cooldownMs:Number(process.env.BABYSHOWER_COOLDOWN_PHOTO_SHOW_MS||DEFAULT_COOLDOWN_MS),
-    patterns:[
-      /\b(?:show|put|bring)\s+(?:up\s+)?(?:the\s+)?(?:latest\s+)?(?:family\s+)?(?:photo|picture)\b/i,
-      /\b(?:start|take|do)\s+(?:(?:the|a)\s+)?(?:family\s+)?(?:photo|picture)\b/i,
-      /\b(?:let'?s|lets)\s+(?:start|take|do)\s+(?:(?:the|a)\s+)?(?:family\s+)?(?:photo|picture)\b/i,
-      /\b(?:can|could|please)\s+(?:you\s+)?show\s+(?:us\s+)?(?:the\s+)?(?:photo|picture)\b/i
-    ]
+    aliases:["photo","foto","poto","picture","फोटो"]
   },
   {
     trigger:"celebrate",
     cooldownMs:Number(process.env.BABYSHOWER_COOLDOWN_CELEBRATE_MS||DEFAULT_COOLDOWN_MS),
-    patterns:[
-      /\b(?:let'?s|lets)\s+celebrate\b/i,
-      /\bcelebration\s+time\b/i
-    ]
+    aliases:["celebrate","celebration","congratulations","congrats"]
   },
   {
     trigger:"flowers",
     cooldownMs:Number(process.env.BABYSHOWER_COOLDOWN_FLOWERS_MS||DEFAULT_COOLDOWN_MS),
-    patterns:[
-      /\b(?:send|throw|shower)(?:\s+(?:some|the))?\s+flowers?\b/i,
-      /\bflower\s+shower\b/i
-    ]
+    aliases:["flower","flowers","phool","फूल"]
   },
   {
     trigger:"oti",
     cooldownMs:Number(process.env.BABYSHOWER_COOLDOWN_OTI_MS||DEFAULT_COOLDOWN_MS),
-    patterns:[
-      /\b(?:do|start|begin)\s+(?:the\s+)?oti\b/i,
-      /\boti\s+(?:karu|kara|time)\b/i
-    ]
+    aliases:["oti","ओटी"]
   },
   {
     trigger:"haldi",
     cooldownMs:Number(process.env.BABYSHOWER_COOLDOWN_HALDI_MS||DEFAULT_COOLDOWN_MS),
-    patterns:[
-      /\b(?:do|start|begin|apply)\s+(?:the\s+)?haldi\b/i,
-      /\bhaldi\s+(?:lavu|lava|time)\b/i
-    ]
+    aliases:["haldi","hald","हळद","हल्दी"]
   },
   {
     trigger:"kunku",
     cooldownMs:Number(process.env.BABYSHOWER_COOLDOWN_KUNKU_MS||DEFAULT_COOLDOWN_MS),
-    patterns:[
-      /\b(?:do|start|begin|apply)\s+(?:the\s+)?(?:kunku|kumkum)\b/i,
-      /\b(?:kunku|kumkum)\s+(?:lavu|lava|time)\b/i
-    ]
+    aliases:["kunku","kumkum","कुंकू","कुमकुम"]
   }
 ];
 
@@ -63,7 +44,9 @@ const recentlySeen=new Map();
 function normalize(line){
   return String(line||"")
     .normalize("NFKC")
+    .toLowerCase()
     .replace(/[\u0000-\u001f]+/g," ")
+    .replace(/[^\p{L}\p{N}]+/gu," ")
     .replace(/\s+/g," ")
     .trim();
 }
@@ -89,15 +72,61 @@ function duplicate(text){
   return now-previous<DUPLICATE_WINDOW_MS;
 }
 
-function match(text){
-  if (/\b(?:do\s+not|don't|dont|never|please\s+don't|please\s+do\s+not)\s+(?:show|put|bring)\b/i.test(text)) {
-    return null;
+function levenshtein(a,b,maxDistance=Infinity){
+  if(Math.abs(a.length-b.length)>maxDistance)return maxDistance+1;
+
+  let previous=Array.from({length:b.length+1},(_,index)=>index);
+  for(let i=1;i<=a.length;i++){
+    const current=[i];
+    let rowMin=current[0];
+
+    for(let j=1;j<=b.length;j++){
+      const cost=a[i-1]===b[j-1]?0:1;
+      current[j]=Math.min(
+        current[j-1]+1,
+        previous[j]+1,
+        previous[j-1]+cost
+      );
+      rowMin=Math.min(rowMin,current[j]);
+    }
+
+    if(rowMin>maxDistance)return maxDistance+1;
+    previous=current;
   }
 
+  return previous[b.length];
+}
+
+function isLatin(value){
+  return /^[a-z0-9]+$/i.test(value);
+}
+
+function match(text){
+  const tokens=text.split(" ").filter(Boolean);
+
   for(const rule of rules){
-    const pattern=rule.patterns.find((candidate)=>candidate.test(text));
-    if(pattern)return {rule,pattern:String(pattern)};
+    for(const alias of rule.aliases){
+      for(const token of tokens){
+        if(token===alias){
+          return {rule,alias,token,distance:0};
+        }
+
+        if(
+          FUZZY_DISTANCE>0 &&
+          isLatin(token) &&
+          isLatin(alias) &&
+          alias.length>=4 &&
+          token.length>=4
+        ){
+          const distance=levenshtein(token,alias,FUZZY_DISTANCE);
+          if(distance<=FUZZY_DISTANCE){
+            return {rule,alias,token,distance};
+          }
+        }
+      }
+    }
   }
+
   return null;
 }
 
@@ -129,6 +158,9 @@ input.on("line",(line)=>{
     diagnostic("suppressed_cooldown",{
       text,
       trigger:result.rule.trigger,
+      alias:result.alias,
+      token:result.token,
+      distance:result.distance,
       cooldownMs:result.rule.cooldownMs
     });
     return;
@@ -137,7 +169,9 @@ input.on("line",(line)=>{
   diagnostic("matched",{
     text,
     trigger:result.rule.trigger,
-    pattern:result.pattern
+    alias:result.alias,
+    token:result.token,
+    distance:result.distance
   });
   process.stdout.write(result.rule.trigger+"\n");
 });
