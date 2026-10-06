@@ -32,12 +32,10 @@ jobs:
           node --check babyshower.js
           node --check photobooth.js
           node --check scripts/phrase-map.mjs
-          node --check scripts/rtms-transcript.mjs
-          node --check scripts/rtms-transcript-sim.mjs
-          node --check zoom-client.js
+          node --check video-client.js
           node --check functions/api/events.js
           node --check functions/api/photos.js
-          node --check functions/api/zoom-signature.js
+          node --check functions/api/video-config.js
           node --check realtime/src/index.js
 
       - name: Python syntax check
@@ -45,11 +43,8 @@ jobs:
 
       - name: Shell syntax check
         run: |
-          bash -n scripts/run-transcript-pipeline.sh
-          bash -n scripts/run-transcript-local.sh
           bash -n scripts/run-local-transcript.sh
           bash -n scripts/list-audio-sources.sh
-          bash -n scripts/install-rtms-service.sh
 
       - name: Transcript mapper test
         run: node scripts/test-phrase-map.mjs
