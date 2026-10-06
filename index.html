@@ -47,7 +47,7 @@
           <span aria-hidden="true">🏆</span><span>Didi Quiz</span>
         </button>
         <button class="game-launch blessing-launch" id="blessing-launch" type="button">
-          <span aria-hidden="true">💌</span><span>Blessings</span>
+          <span aria-hidden="true">🖼️</span><span>Family Wall</span>
         </button>
       </div>
 
@@ -65,26 +65,35 @@
 
       <div id="blessing-panel" class="blessing-panel" hidden>
         <div class="blessing-card" role="dialog" aria-modal="true" aria-labelledby="blessing-title">
-          <button id="blessing-close" class="game-close" type="button" aria-label="Close blessings">×</button>
+          <button id="blessing-close" class="game-close" type="button" aria-label="Close family wall">×</button>
           <div class="blessing-head">
             <div>
-              <h2 id="blessing-title">💌 Blessings Wall</h2>
-              <p>Leave something for Didi or the baby to keep.</p>
+              <h2 id="blessing-title">🖼️ Family Wall</h2>
+              <p>Notes, wishes, memories and photos for Didi and the baby.</p>
             </div>
             <button id="blessing-export" class="blessing-export" type="button">Export keepsake</button>
           </div>
 
           <form id="blessing-form" class="blessing-form">
-            <div class="blessing-audience" role="group" aria-label="Blessing recipient">
+            <div class="blessing-audience" role="group" aria-label="Message recipient">
               <label><input type="radio" name="audience" value="baby" checked> <span>For the baby</span></label>
               <label><input type="radio" name="audience" value="didi"> <span>For Didi</span></label>
             </div>
-            <textarea id="blessing-message" name="message" maxlength="180" rows="3" placeholder="A little wish, memory, or blessing…" required></textarea>
+            <textarea id="blessing-message" name="message" maxlength="180" rows="3" placeholder="A little wish, memory, or note…" required></textarea>
             <div class="blessing-form-foot">
               <span id="blessing-count">0/180</span>
-              <button type="submit">Add to wall 💛</button>
+              <button type="submit">Add note 💛</button>
             </div>
           </form>
+
+          <div class="wall-photo-form">
+            <label class="wall-photo-pick">
+              <input id="wall-photo-input" type="file" accept="image/*">
+              <span>📷 Share a photo</span>
+            </label>
+            <input id="wall-photo-caption" type="text" maxlength="80" placeholder="Optional caption">
+            <span id="wall-photo-status" class="wall-photo-status" aria-live="polite"></span>
+          </div>
 
           <div id="blessing-wall" class="blessing-wall" aria-live="polite"></div>
         </div>
