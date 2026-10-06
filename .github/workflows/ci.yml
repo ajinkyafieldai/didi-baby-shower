@@ -38,5 +38,8 @@ jobs:
           node --check functions/api/zoom-signature.js
           node --check realtime/src/index.js
 
+      - name: Transcript mapper test
+        run: node scripts/test-phrase-map.mjs
+
       - name: Build and verify
         run: npm run build
