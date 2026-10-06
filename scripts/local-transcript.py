@@ -16,8 +16,8 @@ source = os.environ.get("BABYSHOWER_AUDIO_SOURCE", "default")
 model_name = os.environ.get("BABYSHOWER_WHISPER_MODEL", "small")
 language = os.environ.get("BABYSHOWER_WHISPER_LANGUAGE", "en").strip() or None
 chunk_seconds = float(os.environ.get("BABYSHOWER_WHISPER_CHUNK_SECONDS", "4"))
-device = os.environ.get("BABYSHOWER_WHISPER_DEVICE", "auto")
-compute_type = os.environ.get("BABYSHOWER_WHISPER_COMPUTE_TYPE", "default")
+device = os.environ.get("BABYSHOWER_WHISPER_DEVICE", "cpu")
+compute_type = os.environ.get("BABYSHOWER_WHISPER_COMPUTE_TYPE", "int8")
 
 if not shutil.which("ffmpeg"):
     print("[local-transcript] ffmpeg is required.", file=sys.stderr)
