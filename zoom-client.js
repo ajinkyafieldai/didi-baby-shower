@@ -115,7 +115,7 @@
         throw new Error("Zoom CDN loaded but ZoomMtg was not created.");
       }
 
-      stage("Getting Zoom access…");
+      stage("Getting video access…");
 
       var controller = new AbortController();
       var signatureTimeout = setTimeout(function () {
@@ -138,24 +138,43 @@
         throw new Error(config.error || "Zoom is not configured.");
       }
 
-      stage("Loading Zoom video engine…");
+      stage("Loading video engine…");
 
       console.log("Zoom requirements", ZoomMtg.checkSystemRequirements());
 
       ZoomMtg.preLoadWasm();
       ZoomMtg.prepareWebSDK();
 
-      stage("Loading Zoom language…");
+      stage("Loading video call…");
 
       ZoomMtg.i18n.load("en-US");
       ZoomMtg.i18n.onLoad(function () {
-        stage("Starting Zoom…");
+        stage("Starting video call…");
 
         ZoomMtg.init({
           leaveUrl: location.origin + "/",
           disableCORP: !window.crossOriginIsolated,
           disablePreview: true,
           patchJsMedia: true,
+
+          // Keep the Meeting SDK as close as possible to a plain video surface.
+          // These are supported Client View options; no brittle DOM/CSS surgery.
+          disableZoomLogo: true,
+          disableInvite: true,
+          disableCallOut: true,
+          disableZoomPhone: true,
+          disableReport: true,
+          disableRecord: true,
+          disablePictureInPicture: true,
+          isSupportChat: false,
+          isSupportCC: false,
+          isSupportBreakout: false,
+          isSupportPolling: false,
+          isSupportQA: false,
+          isSupportNonverbal: false,
+          videoHeader: false,
+          meetingInfo: [],
+          theme: "dark",
           success: function () {
             stage("Joining the family call…");
 
@@ -174,8 +193,8 @@
                 console.error("Zoom join error", error);
                 var d = detail(error);
                 bootMessage.textContent = d
-                  ? "Could not join Zoom: " + d
-                  : "Could not join the Zoom meeting.";
+                  ? "Could not join video call: " + d
+                  : "Could not join the video call.";
                 report("zoom-status", bootMessage.textContent);
               }
             });
@@ -184,8 +203,8 @@
             console.error("Zoom init error", error);
             var d = detail(error);
             bootMessage.textContent = d
-              ? "Could not start Zoom: " + d
-              : "Could not start Zoom.";
+              ? "Could not start video call: " + d
+              : "Could not start video call.";
             report("zoom-status", bootMessage.textContent);
           }
         });
@@ -194,7 +213,7 @@
       console.error(error);
       var message = error && error.name === "AbortError"
         ? "Timed out while getting Zoom access."
-        : (error.message || "Zoom startup failed.");
+        : (error.message || "Video call startup failed.");
       bootMessage.textContent = message;
       report("zoom-config-error", message);
     }
