@@ -14,10 +14,19 @@ SAMPLE_BYTES = 2
 
 source = os.environ.get("BABYSHOWER_AUDIO_SOURCE", "default")
 model_name = os.environ.get("BABYSHOWER_WHISPER_MODEL", "small")
-language = os.environ.get("BABYSHOWER_WHISPER_LANGUAGE", "").strip() or None
+language_raw = os.environ.get("BABYSHOWER_WHISPER_LANGUAGE", "").strip()
+allowed_raw = os.environ.get("BABYSHOWER_WHISPER_ALLOWED_LANGUAGES", "en,mr,hi").strip()
+
+# Be forgiving if a comma-separated list is accidentally placed in
+# BABYSHOWER_WHISPER_LANGUAGE. Treat it as the allowed-language set.
+if "," in language_raw:
+    allowed_raw = language_raw
+    language_raw = ""
+
+language = language_raw or None
 allowed_languages = [
     value.strip()
-    for value in os.environ.get("BABYSHOWER_WHISPER_ALLOWED_LANGUAGES", "en,mr,hi").split(",")
+    for value in allowed_raw.split(",")
     if value.strip()
 ]
 chunk_seconds = float(os.environ.get("BABYSHOWER_WHISPER_CHUNK_SECONDS", "2.5"))
