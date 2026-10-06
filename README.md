@@ -42,3 +42,19 @@ The effects are currently local-only. The next implementation step is a Cloudfla
 ## Branching
 
 Development happens on `devel`. Do not commit directly to `main`.
+
+
+## Transcript trigger pipeline
+
+Transcript transport is intentionally separate from trigger semantics. Any source that emits one transcript line at a time can feed the mapper.
+
+```sh
+rtms-transcript \
+  | tee -a transcript.log /dev/stderr \
+  | node scripts/phrase-map.mjs \
+  | xargs -r -n1 node babyshower.js trigger
+```
+
+`phrase-map.mjs` emits only fixed symbolic trigger names from a hard-coded whitelist. Transcript text is never executed as shell input.
+
+Set `BABYSHOWER_URL` for the CLI target. The default per-trigger cooldown is 8 seconds and can be changed with `BABYSHOWER_PHRASE_COOLDOWN_MS`.
