@@ -74,18 +74,11 @@ function parseOption(name, fallback=null){
 }
 
 async function createRoom(dryRun=false){
-  const apiKey=process.env.WHEREBY_API_KEY||"";
   const hours=Number(parseOption("--hours","8"));
 
   if(!Number.isFinite(hours)||hours<=0||hours>24){
     throw new Error("--hours must be between 0 and 24.");
   }
-
-  const endDate=new Date(Date.now()+hours*60*60*1000).toISOString();
-  const payload={
-    endDate,
-    fields:["hostRoomUrl"]
-  };
 
   if(dryRun){
     console.log(JSON.stringify({
@@ -93,37 +86,26 @@ async function createRoom(dryRun=false){
       dryRun:true,
       provider:"whereby",
       hours,
-      payload
+      endpoint:"/api/video-config"
     },null,2));
     return;
   }
 
-  if(!apiKey){
-    throw new Error("WHEREBY_API_KEY is required.");
-  }
+  requireUrl();
 
-  const response=await fetch("https://api.whereby.dev/v1/meetings",{
+  const response=await fetch(baseUrl+"/api/video-config",{
     method:"POST",
-    headers:{
-      "Authorization":"Bearer "+apiKey,
-      "Content-Type":"application/json"
-    },
-    body:JSON.stringify(payload)
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({hours}),
+    cache:"no-store"
   });
 
   const data=await response.json().catch(()=>({}));
   if(!response.ok){
-    throw new Error(data.error||data.message||`Whereby HTTP ${response.status}`);
+    throw new Error(data.error||`HTTP ${response.status}`);
   }
 
-  console.log(JSON.stringify({
-    ok:true,
-    provider:"whereby",
-    meetingId:data.meetingId||null,
-    roomUrl:data.roomUrl||null,
-    hostRoomUrl:data.hostRoomUrl||null,
-    endDate
-  },null,2));
+  console.log(JSON.stringify(data,null,2));
 }
 
 function runPhotobooth(rest){
