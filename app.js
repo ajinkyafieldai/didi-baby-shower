@@ -226,6 +226,28 @@ const participantId = (() => {
   return id;
 })();
 
+let latestRenderLatencyMs = null;
+
+async function sendTelemetry() {
+  try {
+    await fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "telemetry",
+        clientId: participantId,
+        role: "guest",
+        latencyMs: latestRenderLatencyMs,
+        lastEventSeq,
+        visible: document.visibilityState === "visible"
+      }),
+      cache: "no-store"
+    });
+  } catch (error) {
+    console.debug("Telemetry heartbeat failed", error);
+  }
+}
+
 function updateJoinButtonState() {
   joinButton.disabled = !guestNameInput.value.trim();
 }
@@ -368,6 +390,7 @@ async function pollEvents() {
         .sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0))
         .forEach((event, index) => {
           window.setTimeout(() => {
+            latestRenderLatencyMs = Math.max(0, Date.now() - Number(event.at || Date.now()));
             playEffect(event.effect, event.sender || "Someone", event.effect === "photo" && photoHost);
             if (event.groupCelebration) {
               playGroupCelebration(event.effect, event.groupCount || 2, Boolean(event.groupBurst));
@@ -609,6 +632,9 @@ gamePanel.addEventListener("click", (event) => {
 
 pollEvents();
 syncTimer = window.setInterval(pollEvents, 750);
+sendTelemetry();
+window.setInterval(sendTelemetry, 5000);
+document.addEventListener("visibilitychange", sendTelemetry);
 
 function clearNormalEffects() {
   Array.from(effectLayer.children).forEach((child) => {
