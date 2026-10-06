@@ -94,10 +94,14 @@ try:
         started = time.monotonic()
         selected_language = language
         if selected_language is None and allowed_languages:
-            detected = model.detect_language_multi_segment(rolling)
+            _, _, all_language_probs = model.detect_language(
+                audio=rolling,
+                vad_filter=True,
+                language_detection_segments=1,
+            )
             candidates = {
                 code: probability
-                for code, probability in detected
+                for code, probability in all_language_probs
                 if code in allowed_languages
             }
             if candidates:
