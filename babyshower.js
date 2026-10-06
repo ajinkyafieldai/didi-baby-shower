@@ -76,7 +76,8 @@ function runPhotobooth(rest){
 
 try{
   if(args[0]==="trigger"){
-    await trigger(args[1],args.includes("--force"),args.includes("--dry-run"));
+    const triggerName=args.slice(1).find((arg)=>!arg.startsWith("--"));
+    await trigger(triggerName,args.includes("--force"),args.includes("--dry-run"));
   }else if(args[0]==="photobooth"){
     runPhotobooth(args.slice(1));
   }else{
