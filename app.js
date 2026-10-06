@@ -506,6 +506,74 @@ const didiQuestions = [
   "What always makes Didi laugh?"
 ];
 
+const bingoPrompts = [
+  "Someone says the baby will look like Didi",
+  "Aaji gives baby advice",
+  "Someone asks about names",
+  "A camera freezes",
+  "Someone joins while muted",
+  "Someone says “Can you hear me?”",
+  "A childhood story about Didi appears",
+  "Someone gets emotional",
+  "Someone mentions food",
+  "A cousin arrives late",
+  "Someone takes a screenshot",
+  "A pet appears on camera"
+];
+
+function hashString(value) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function seededShuffle(items, seed) {
+  const result = [...items];
+  let state = seed || 1;
+
+  function random() {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  }
+
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+
+  return result;
+}
+
+const bingoKey = "baby-shower-bingo-v1";
+const bingoSeed = hashString(participantId);
+const bingoBoard = seededShuffle(bingoPrompts, bingoSeed).slice(0, 8);
+bingoBoard.splice(4, 0, "FREE ✨");
+
+function loadBingoMarks() {
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(bingoKey) || "[]");
+    return new Set(Array.isArray(stored) ? stored : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveBingoMarks(marks) {
+  sessionStorage.setItem(bingoKey, JSON.stringify([...marks]));
+}
+
+function bingoLines(marks) {
+  const lines = [
+    [0,1,2], [3,4,5], [6,7,8],
+    [0,3,6], [1,4,7], [2,5,8],
+    [0,4,8], [2,4,6]
+  ];
+  return lines.filter((line) => line.every((index) => marks.has(index))).length;
+}
+
 async function sendGame(body) {
   const response = await fetch("/api/events", {
     method: "POST",
@@ -582,6 +650,54 @@ function renderGame(game) {
         }
       });
     });
+    return;
+  }
+
+  if (game === "bingo") {
+    const marks = loadBingoMarks();
+    marks.add(4);
+    saveBingoMarks(marks);
+    const completed = bingoLines(marks);
+
+    gameContent.innerHTML = `
+      <h2 id="game-title">🎯 Baby Shower Bingo</h2>
+      <p class="game-subtitle">Tap things as they happen during the call. Everyone gets a different card.</p>
+      <div class="bingo-grid">
+        ${bingoBoard.map((prompt, index) => `
+          <button
+            type="button"
+            class="bingo-cell ${marks.has(index) ? "marked" : ""}"
+            data-bingo-index="${index}"
+            ${index === 4 ? "disabled" : ""}
+          >
+            <span>${escapeHtml(prompt)}</span>
+            ${marks.has(index) ? '<strong>✓</strong>' : ""}
+          </button>
+        `).join("")}
+      </div>
+      <div class="bingo-footer">
+        <strong>${completed ? `Bingo! ×${completed} 🎉` : "No bingo yet"}</strong>
+        <button id="bingo-reset" type="button">New card</button>
+      </div>`;
+
+    gameContent.querySelectorAll("[data-bingo-index]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = Number(button.dataset.bingoIndex);
+        const next = loadBingoMarks();
+        if (next.has(index)) next.delete(index);
+        else next.add(index);
+        next.add(4);
+        saveBingoMarks(next);
+        renderGame("bingo");
+        if (bingoLines(next)) playChime("photo");
+      });
+    });
+
+    document.getElementById("bingo-reset").addEventListener("click", () => {
+      sessionStorage.removeItem(bingoKey);
+      renderGame("bingo");
+    });
+
     return;
   }
 
