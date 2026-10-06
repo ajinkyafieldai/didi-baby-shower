@@ -15,6 +15,11 @@ SAMPLE_BYTES = 2
 source = os.environ.get("BABYSHOWER_AUDIO_SOURCE", "default")
 model_name = os.environ.get("BABYSHOWER_WHISPER_MODEL", "small")
 language = os.environ.get("BABYSHOWER_WHISPER_LANGUAGE", "").strip() or None
+allowed_languages = [
+    value.strip()
+    for value in os.environ.get("BABYSHOWER_WHISPER_ALLOWED_LANGUAGES", "en,mr,hi").split(",")
+    if value.strip()
+]
 chunk_seconds = float(os.environ.get("BABYSHOWER_WHISPER_CHUNK_SECONDS", "2.5"))
 context_seconds = float(os.environ.get("BABYSHOWER_WHISPER_CONTEXT_SECONDS", "5"))
 device = os.environ.get("BABYSHOWER_WHISPER_DEVICE", "cpu")
@@ -87,9 +92,20 @@ try:
         new_audio_start = max(0.0, window_seconds - (current.size / RATE))
 
         started = time.monotonic()
+        selected_language = language
+        if selected_language is None and allowed_languages:
+            detected = model.detect_language_multi_segment(rolling)
+            candidates = {
+                code: probability
+                for code, probability in detected
+                if code in allowed_languages
+            }
+            if candidates:
+                selected_language = max(candidates, key=candidates.get)
+
         segments, info = model.transcribe(
             rolling,
-            language=language,
+            language=selected_language,
             beam_size=1,
             vad_filter=True,
             condition_on_previous_text=False,
