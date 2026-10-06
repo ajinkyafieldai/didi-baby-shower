@@ -1,0 +1,24 @@
+[Unit]
+Description=Babyshower Zoom RTMS transcript pipeline
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=babyshower
+Group=babyshower
+WorkingDirectory=/opt/babyshower/current
+EnvironmentFile=/etc/babyshower/rtms.env
+ExecStart=/usr/bin/bash /opt/babyshower/current/scripts/run-transcript-pipeline.sh
+Restart=on-failure
+RestartSec=3
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/babyshower
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

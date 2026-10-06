@@ -42,3 +42,148 @@ The effects are currently local-only. The next implementation step is a Cloudfla
 ## Branching
 
 Development happens on `devel`. Do not commit directly to `main`.
+
+
+## Transcript trigger pipeline
+
+Transcript transport is intentionally separate from trigger semantics. Any source that emits one transcript line at a time can feed the mapper.
+
+```sh
+rtms-transcript \
+  | tee -a transcript.log /dev/stderr \
+  | node scripts/phrase-map.mjs \
+  | xargs -r -n1 node babyshower.js trigger
+```
+
+`phrase-map.mjs` emits only fixed symbolic trigger names from a hard-coded whitelist. Transcript text is never executed as shell input.
+
+Set `BABYSHOWER_URL` for the CLI target. The default per-trigger cooldown is 8 seconds and can be changed with `BABYSHOWER_PHRASE_COOLDOWN_MS`.
+
+
+### Zoom RTMS transcript source
+
+The Node adapter uses Zoom's official `@zoom/rtms` SDK and writes transcript text only to stdout. Transport/status information goes to stderr, so stdout stays safe to pipe into `phrase-map.mjs`.
+
+Required environment:
+
+```sh
+export ZM_RTMS_CLIENT=...
+export ZM_RTMS_SECRET=...
+export ZM_RTMS_PORT=8080
+export ZM_RTMS_PATH=/webhook
+```
+
+Optional:
+
+```sh
+export BABYSHOWER_TRANSCRIPT_LANGUAGE=ENGLISH
+```
+
+Run the full pipeline:
+
+```sh
+BABYSHOWER_URL=https://your-event.example \
+npm run rtms:transcript \
+  | tee -a transcript.log /dev/stderr \
+  | npm run transcript:map --silent \
+  | xargs -r -n1 node babyshower.js trigger
+```
+
+Configure the Zoom app's RTMS webhook endpoint to the public URL serving `ZM_RTMS_PATH`.
+
+
+### Public RTMS webhook runtime
+
+The RTMS process binds locally and is intended to be exposed only through Cloudflare Tunnel.
+
+Runtime layout:
+
+```text
+Zoom RTMS webhook
+       |
+       v
+https://rtms.example.com/webhook
+       |
+Cloudflare Tunnel
+       |
+http://127.0.0.1:8080/webhook
+       |
+babyshower-rtms.service
+       |
+rtms-transcript -> phrase-map -> babyshower trigger
+```
+
+Install the local service:
+
+```sh
+sudo ./scripts/install-rtms-service.sh /opt/babyshower/current
+```
+
+Then edit:
+
+```text
+/etc/babyshower/rtms.env
+```
+
+and configure Cloudflare Tunnel from:
+
+```text
+deploy/cloudflared/config.yml.example
+```
+
+The application listens on localhost. No direct inbound RTMS port needs to be exposed.
+
+Secret storage is intentionally abstracted behind `/etc/babyshower/rtms.env` for now. A vault-backed mechanism can replace that later without changing the JS runtime or systemd unit.
+
+
+### Local .env setup
+
+For a single trusted machine, use a local `.env` file:
+
+```sh
+cp .env.example .env
+$EDITOR .env
+npm run rtms:local
+```
+
+`.env` and other `.env.*` files are gitignored; only `.env.example` is tracked.
+
+The local runner exports the values from `.env` for the whole Unix pipeline, so both the RTMS source and downstream `babyshower trigger` commands inherit the same configuration. Logs default to `./logs/transcript.log`.
+
+The systemd deployment path still uses `/etc/babyshower/rtms.env`; both paths expose the same environment-variable contract.
+
+
+For interactive simulator pipelines, prefer calling the simulator with `node scripts/rtms-transcript-sim.mjs` (or `npm run --silent rtms:sim`) so npm's script banner does not enter stdout and get inspected by the phrase mapper.
+
+
+### Local Whisper transcript source
+
+Zoom RTMS is optional. On an Ubuntu/PipeWire machine the event pipeline can transcribe audio locally:
+
+```text
+Pulse/PipeWire -> ffmpeg -> faster-whisper -> phrase-map -> babyshower trigger
+```
+
+Install once:
+
+```sh
+sudo apt install ffmpeg python3-venv pulseaudio-utils
+python3 -m venv .venv-whisper
+.venv-whisper/bin/pip install -r requirements-transcript.txt
+```
+
+List audio sources:
+
+```sh
+npm run transcript:sources
+```
+
+For Zoom audio, set `BABYSHOWER_AUDIO_SOURCE` in `.env` to the output source ending in `.monitor`. For microphone testing, `default` is usually sufficient.
+
+Then run:
+
+```sh
+npm run transcript:local
+```
+
+The default model is multilingual Whisper `small`; set `BABYSHOWER_WHISPER_MODEL` to `tiny`, `base`, `medium`, etc. The first run downloads the selected model. Set `BABYSHOWER_WHISPER_LANGUAGE=` (empty) for language auto-detection.

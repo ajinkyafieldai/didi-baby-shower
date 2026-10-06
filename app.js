@@ -38,14 +38,14 @@ function showPhotoButton() {
 function requestZoomPhoto() {
   return new Promise((resolve, reject) => {
     if (!frame.contentWindow) {
-      reject(new Error("Zoom frame is not ready."));
+      reject(new Error("Video frame is not ready."));
       return;
     }
 
     const requestId = crypto.randomUUID();
     const timeout = window.setTimeout(() => {
       zoomCaptureRequests.delete(requestId);
-      reject(new Error("Zoom photo capture timed out."));
+      reject(new Error("Video photo capture timed out."));
     }, 3500);
 
     zoomCaptureRequests.set(requestId, { resolve, reject, timeout });
@@ -289,7 +289,7 @@ joinForm.addEventListener("submit", async (event) => {
 
     joinMessage.textContent = "";
     joinButton.textContent = "Joining…";
-    statusText.textContent = "Connecting to Zoom…";
+    statusText.textContent = "Connecting to video call…";
 
     frame.src = `/zoom.html?name=${encodeURIComponent(guestName)}`;
     stage.classList.add("in-call");
@@ -327,13 +327,13 @@ window.addEventListener("message", (event) => {
       zoomCaptureRequests.delete(message.requestId);
       if (message.error) pending.reject(new Error(message.error));
       else if (message.blob instanceof Blob) pending.resolve(message.blob);
-      else pending.reject(new Error("Zoom returned an invalid photo."));
+      else pending.reject(new Error("Video call returned an invalid photo."));
     }
     return;
   }
 
   if (message.type === "zoom-status") {
-    statusText.textContent = message.text || "Zoom";
+    statusText.textContent = message.text || "Video call";
     callStatus.classList.toggle("compact", message.text === "Live");
     if (message.text === "Live") {
       showPhotoButton();
@@ -342,8 +342,8 @@ window.addEventListener("message", (event) => {
 
   if (message.type === "zoom-config-error") {
     stage.classList.remove("in-call");
-    joinMessage.textContent = message.text || "Zoom is not configured yet.";
-    statusText.textContent = "Zoom setup needed";
+    joinMessage.textContent = message.text || "Video call is not configured yet.";
+    statusText.textContent = "Video setup needed";
     callStatus.classList.remove("compact");
   }
 });
