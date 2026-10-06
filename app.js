@@ -786,10 +786,8 @@ function playEffect(effect, sender, capturePhoto = false) {
           if (capturePhoto) {
             // Only the designated desktop/laptop photo host stores the image.
             // Everyone else just participates in the synchronized countdown.
-            requestZoomPhoto()
-              .then((blob) => saveFamilyPhotoBlob(blob))
-              .catch(async (directError) => {
-                console.warn("Direct Zoom capture unavailable; falling back to tab capture", directError);
+            Promise.resolve()
+              .then(async () => {
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
                   throw new Error("Photo host browser does not support tab capture.");
                 }
