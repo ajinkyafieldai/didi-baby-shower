@@ -32,7 +32,7 @@ jobs:
           node --check babyshower.js
           node --check photobooth.js
           node --check scripts/phrase-map.mjs
-          node --check video-client.js
+          node --check whereby-client.js
           node --check functions/api/events.js
           node --check functions/api/photos.js
           node --check functions/api/video-config.js
