@@ -25,61 +25,36 @@ function validWherebyRoom(raw) {
 export async function onRequestGet(context) {
   const roomUrl = validWherebyRoom(context.env.BABYSHOWER_VIDEO_ROOM_URL);
 
-  if (!roomUrl) {
+  if (roomUrl) {
+    return json({ provider: "whereby", roomUrl });
+  }
+
+  const branch = String(context.env.CF_PAGES_BRANCH || "");
+  if (!branch || branch === "devel" || branch === "main") {
     return json({ error: "Video room is not configured." }, 503);
   }
 
-  return json({ provider: "whereby", roomUrl });
-}
-
-export async function onRequestPost(context) {
-  const branch = String(context.env.CF_PAGES_BRANCH || "");
-  if (!branch || branch === "devel" || branch === "main") {
-    return json({ error: "Preview room provisioning is disabled on this branch." }, 403);
-  }
-
-  const apiKey = String(context.env.WHEREBY_API_KEY || "").trim();
-  if (!apiKey) {
-    return json({ error: "WHEREBY_API_KEY is not configured for this Pages preview." }, 503);
-  }
-
-  let requested = {};
-  try {
-    requested = await context.request.json();
-  } catch {
-    requested = {};
-  }
-
-  const hours = Number(requested.hours ?? 2);
-  if (!Number.isFinite(hours) || hours <= 0 || hours > 24) {
-    return json({ error: "hours must be between 0 and 24." }, 400);
-  }
-
-  const endDate = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
-
-  const response = await fetch("https://api.whereby.dev/v1/meetings", {
+  const production = await fetch("https://didi-baby-shower.pages.dev/api/video-provision", {
     method: "POST",
-    headers: {
-      "authorization": "Bearer " + apiKey,
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({ endDate })
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ hours: 2 }),
+    cache: "no-store"
   });
 
-  const meeting = await response.json().catch(() => ({}));
-  if (!response.ok) {
+  const data = await production.json().catch(() => ({}));
+  if (!production.ok) {
     return json(
-      { error: meeting.error || meeting.message || `Whereby HTTP ${response.status}` },
-      response.status
+      { error: data.error || "Unable to provision preview video room." },
+      production.status
     );
   }
 
   return json({
-    ok: true,
     provider: "whereby",
-    roomUrl: meeting.roomUrl,
-    meetingId: meeting.meetingId || null,
-    endDate,
-    preview: true
+    roomUrl: data.roomUrl,
+    meetingId: data.meetingId || null,
+    endDate: data.endDate || null,
+    preview: true,
+    reused: Boolean(data.reused)
   });
 }
