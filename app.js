@@ -352,6 +352,10 @@ let lastEventSeq = 0;
 let eventsInitialized = false;
 let syncTimer = null;
 let syncBusy = false;
+let lastPollCompletedAt = Date.now();
+let resyncOnNextPoll = false;
+const RESUME_GAP_MS = 5000;
+const MAX_EFFECT_AGE_MS = 4000;
 
 async function pollEvents() {
   if (syncBusy) return;
@@ -369,24 +373,33 @@ async function pollEvents() {
     }
 
     const data = await response.json();
+    const now = Date.now();
+    const resumedAfterGap = now - lastPollCompletedAt > RESUME_GAP_MS;
+    const shouldResync = resyncOnNextPoll || resumedAfterGap;
 
     if (data.games) {
       gameState = data.games;
       if (activeGame) renderGame(activeGame);
     }
 
-    if (!eventsInitialized) {
+    if (!eventsInitialized || shouldResync) {
       if (typeof data.seq === "number") {
         lastEventSeq = data.seq;
       }
       eventsInitialized = true;
+      resyncOnNextPoll = false;
     } else {
       const events = Array.isArray(data.events)
         ? data.events
         : (data.event ? [data.event] : []);
 
       events
-        .filter((event) => event && event.type === "effect" && Number(event.seq || 0) > lastEventSeq)
+        .filter((event) =>
+          event &&
+          event.type === "effect" &&
+          Number(event.seq || 0) > lastEventSeq &&
+          now - Number(event.at || 0) <= MAX_EFFECT_AGE_MS
+        )
         .sort((a, b) => Number(a.seq || 0) - Number(b.seq || 0))
         .forEach((event, index) => {
           window.setTimeout(() => {
@@ -411,6 +424,7 @@ async function pollEvents() {
     callStatus.classList.remove("compact");
     statusText.textContent = "Celebration sync offline (" + (error.message || "error") + ")";
   } finally {
+    lastPollCompletedAt = Date.now();
     syncBusy = false;
   }
 }
@@ -634,7 +648,13 @@ pollEvents();
 syncTimer = window.setInterval(pollEvents, 750);
 sendTelemetry();
 window.setInterval(sendTelemetry, 5000);
-document.addEventListener("visibilitychange", sendTelemetry);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    resyncOnNextPoll = true;
+    pollEvents();
+  }
+  sendTelemetry();
+});
 
 function clearNormalEffects() {
   Array.from(effectLayer.children).forEach((child) => {
