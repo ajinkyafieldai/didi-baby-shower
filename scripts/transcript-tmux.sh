@@ -25,7 +25,15 @@ case "$action" in
       exit 0
     fi
 
-    tmux new-session -d -s "$session" -c "$repo_dir"       "bash -lc 'npm run transcript:local; code=\$?; echo; echo "[babyshower] transcript exited with code \$code"; exec bash'"
+    tmux new-session -d -s "$session" -c "$repo_dir"       "npm run transcript:local"
+
+    sleep 0.5
+
+    if ! exists; then
+      echo "Transcript session exited immediately." >&2
+      echo "Run 'npm run transcript:local' directly to see the startup error." >&2
+      exit 1
+    fi
 
     echo "Started transcript session: $session"
     echo "Attach: tmux attach -t $session"
