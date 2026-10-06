@@ -9,7 +9,7 @@ User=babyshower
 Group=babyshower
 WorkingDirectory=/opt/babyshower/current
 EnvironmentFile=/etc/babyshower/rtms.env
-ExecStart=/opt/babyshower/current/scripts/run-transcript-pipeline.sh
+ExecStart=/usr/bin/bash /opt/babyshower/current/scripts/run-transcript-pipeline.sh
 Restart=on-failure
 RestartSec=3
 
