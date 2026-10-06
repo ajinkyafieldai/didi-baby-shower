@@ -43,7 +43,7 @@ function prependEvent(event){
   const li=document.createElement("li");
   const time=document.createElement("time");
   time.textContent=new Date(event.at||Date.now()).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit"});
-  const name=document.createElement("span"); name.className="event-name"; name.textContent=event.effect||event.command||event.type||"event";
+  const name=document.createElement("span"); name.className="event-name"; name.textContent=event.effect||event.command||event.event||event.type||"event";
   const sender=document.createElement("span"); sender.className="event-sender"; sender.textContent=event.sender||"system";
   li.append(time,name,sender); els.log.prepend(li);
   while(els.log.children.length>20)els.log.lastElementChild.remove();
@@ -64,8 +64,16 @@ async function poll(){
     const data=await response.json();
     updateTelemetry(data.telemetry);
     const events=Array.isArray(data.events)?data.events:[];
+    if(data.latestPhoto?.asset){
+      els.status.textContent="Latest photo: "+data.latestPhoto.asset;
+    }
     if(initialized){
-      events.filter(e=>Number(e.seq||0)>lastEventSeq).sort((a,b)=>Number(a.seq||0)-Number(b.seq||0)).forEach(prependEvent);
+      events.filter(e=>Number(e.seq||0)>lastEventSeq).sort((a,b)=>Number(a.seq||0)-Number(b.seq||0)).forEach((event)=>{
+        prependEvent(event);
+        if(event.type==="system"&&event.event==="photo.captured"&&event.asset){
+          els.status.textContent="Photo captured: "+event.asset;
+        }
+      });
     }else{
       events.slice(-12).forEach(prependEvent);
       initialized=true;
