@@ -88,6 +88,10 @@ function duplicate(text){
 }
 
 function match(text){
+  if (/\b(?:do\s+not|don't|dont|never|please\s+don't|please\s+do\s+not)\s+(?:show|put|bring)\b/i.test(text)) {
+    return null;
+  }
+
   for(const rule of rules){
     const pattern=rule.patterns.find((candidate)=>candidate.test(text));
     if(pattern)return {rule,pattern:String(pattern)};
