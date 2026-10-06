@@ -95,3 +95,24 @@ document.querySelectorAll("[data-effect]").forEach(button=>{
   });
 });
 poll();heartbeat();setInterval(poll,1000);setInterval(heartbeat,5000);document.addEventListener("visibilitychange",heartbeat);
+document.querySelectorAll("[data-command]").forEach(button=>{
+  button.addEventListener("click",async()=>{
+    button.disabled=true;
+    const command=button.dataset.command;
+    els.status.textContent="Sending "+command+"…";
+    try{
+      const response=await fetch("/api/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        type:"command",command,sender:"Host",senderId:clientId,force:els.force.checked
+      }),cache:"no-store"});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||"Command failed");
+      if(data.event)prependEvent(data.event);
+      if(typeof data.seq==="number")lastEventSeq=Math.max(lastEventSeq,data.seq);
+      els.status.textContent=(els.force.checked?"Forced ":"")+"Sent "+command+".";
+    }catch(error){
+      els.status.textContent=error.message;
+    }finally{
+      window.setTimeout(()=>{button.disabled=false},300);
+    }
+  });
+});
