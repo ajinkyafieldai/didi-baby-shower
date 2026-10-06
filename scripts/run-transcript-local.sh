@@ -13,4 +13,4 @@ set -a
 . "$env_file"
 set +a
 
-exec ./scripts/run-transcript-pipeline.sh
+exec bash ./scripts/run-transcript-pipeline.sh
