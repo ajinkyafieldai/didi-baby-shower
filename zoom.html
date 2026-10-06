@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="format-detection" content="telephone=no">
-  <title>Baby Shower Zoom</title>
+  <title>Family Video Call</title>
   <style>
     html, body, #zmmtg-root { margin: 0; width: 100%; height: 100%; background: #161215; }
     body { overflow: hidden; }
@@ -28,13 +28,13 @@
   <script>
     window.addEventListener("error", function (event) {
       var el = document.getElementById("boot-message");
-      if (el) el.textContent = "Zoom startup error: " + (event.message || "unknown script error");
+      if (el) el.textContent = "Video call startup error: " + (event.message || "unknown script error");
     });
 
     window.addEventListener("unhandledrejection", function (event) {
       var el = document.getElementById("boot-message");
       var reason = event.reason && (event.reason.message || String(event.reason));
-      if (el) el.textContent = "Zoom startup error: " + (reason || "unhandled promise rejection");
+      if (el) el.textContent = "Video call startup error: " + (reason || "unhandled promise rejection");
     });
   </script>
 
