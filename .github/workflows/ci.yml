@@ -43,6 +43,7 @@ jobs:
       - name: Shell syntax check
         run: |
           bash -n scripts/run-transcript-pipeline.sh
+          bash -n scripts/run-transcript-local.sh
           bash -n scripts/install-rtms-service.sh
 
       - name: Transcript mapper test
