@@ -32,6 +32,10 @@ async function poll(){
     statusEl.textContent="Live · "+lastLatency+" ms";statusEl.className="projector-status good";
     if(!initialized||shouldResync){lastEventSeq=Number(data.seq||0);initialized=true;resyncOnNextPoll=false;lastPollCompletedAt=Date.now();return;}
     const events=Array.isArray(data.events)?data.events:[];
+    events.filter(e=>e&&e.type==="system"&&e.event==="photo.captured"&&Number(e.seq||0)>lastEventSeq).forEach(()=>{
+      titleEl.textContent="Photo ready 📸";
+      subtitleEl.textContent="The latest family photo is ready.";
+    });
     events.filter(e=>e&&e.type==="effect"&&Number(e.seq||0)>lastEventSeq&&now-Number(e.at||0)<=MAX_EFFECT_AGE_MS).sort((a,b)=>Number(a.seq||0)-Number(b.seq||0)).forEach((event,index)=>setTimeout(()=>showEvent(event),index*350));
     if(typeof data.seq==="number")lastEventSeq=Math.max(lastEventSeq,data.seq);
   }catch(error){statusEl.textContent="Offline";statusEl.className="projector-status bad";}finally{lastPollCompletedAt=Date.now();}
