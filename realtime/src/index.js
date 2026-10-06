@@ -1,5 +1,6 @@
 const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate", "photo"]);
 const COMMANDS = new Set(["photo.capture"]);
+const SYSTEM_EVENTS = new Set(["photo.captured"]);
 const GROUP_WINDOW_MS = 10_000;
 const GROUP_THRESHOLD = 2;
 const GROUP_BURST_THRESHOLD = 2;
@@ -84,7 +85,8 @@ export class CelebrationRoom {
         seq: latest && Number(latest.seq) ? Number(latest.seq) : 0,
         events,
         games: await gameSnapshot(this.ctx),
-        telemetry: await telemetrySnapshot(this.ctx)
+        telemetry: await telemetrySnapshot(this.ctx),
+        latestPhoto: await this.ctx.storage.get("latestPhoto") || null
       });
     }
 
@@ -180,6 +182,34 @@ export class CelebrationRoom {
         quiz.push({ senderId, sender, answers, at: Date.now() });
         await this.ctx.storage.put("quizAnswers", quiz.slice(-80));
         return json({ ok: true, games: await gameSnapshot(this.ctx) });
+      }
+
+      if (body && body.type === "system" && SYSTEM_EVENTS.has(body.event)) {
+        const asset = String(body.asset || "").trim().slice(0, 500);
+        if (!asset) return json({ error: "Missing photo asset" }, 400);
+
+        const previous = await this.ctx.storage.get("latest");
+        const seq = previous && Number(previous.seq) ? Number(previous.seq) + 1 : 1;
+        const event = {
+          type: "system",
+          event: body.event,
+          asset,
+          sender: String(body.sender || "Photobooth").trim().slice(0, 60) || "Photobooth",
+          senderId: String(body.senderId || "photobooth").trim().slice(0, 100) || "photobooth",
+          id: crypto.randomUUID(),
+          at: Date.now(),
+          seq
+        };
+
+        const storedEvents = await this.ctx.storage.get("events");
+        const events = Array.isArray(storedEvents) ? storedEvents : [];
+        events.push(event);
+        const latestPhoto = { asset, at: event.at, seq, senderId: event.senderId };
+
+        await this.ctx.storage.put("latest", { seq, event });
+        await this.ctx.storage.put("latestPhoto", latestPhoto);
+        await this.ctx.storage.put("events", events.slice(-80));
+        return json({ seq, event, latestPhoto });
       }
 
       if (body && body.type === "command" && COMMANDS.has(body.command)) {
