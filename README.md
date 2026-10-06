@@ -58,3 +58,35 @@ rtms-transcript \
 `phrase-map.mjs` emits only fixed symbolic trigger names from a hard-coded whitelist. Transcript text is never executed as shell input.
 
 Set `BABYSHOWER_URL` for the CLI target. The default per-trigger cooldown is 8 seconds and can be changed with `BABYSHOWER_PHRASE_COOLDOWN_MS`.
+
+
+### Zoom RTMS transcript source
+
+The Node adapter uses Zoom's official `@zoom/rtms` SDK and writes transcript text only to stdout. Transport/status information goes to stderr, so stdout stays safe to pipe into `phrase-map.mjs`.
+
+Required environment:
+
+```sh
+export ZM_RTMS_CLIENT=...
+export ZM_RTMS_SECRET=...
+export ZM_RTMS_PORT=8080
+export ZM_RTMS_PATH=/webhook
+```
+
+Optional:
+
+```sh
+export BABYSHOWER_TRANSCRIPT_LANGUAGE=ENGLISH
+```
+
+Run the full pipeline:
+
+```sh
+BABYSHOWER_URL=https://your-event.example \
+npm run rtms:transcript \
+  | tee -a transcript.log /dev/stderr \
+  | npm run transcript:map --silent \
+  | xargs -r -n1 node babyshower.js trigger
+```
+
+Configure the Zoom app's RTMS webhook endpoint to the public URL serving `ZM_RTMS_PATH`.
