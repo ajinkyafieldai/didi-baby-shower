@@ -33,6 +33,7 @@ jobs:
           node --check photobooth.js
           node --check scripts/phrase-map.mjs
           node --check scripts/rtms-transcript.mjs
+          node --check scripts/rtms-transcript-sim.mjs
           node --check zoom-client.js
           node --check functions/api/events.js
           node --check functions/api/photos.js
