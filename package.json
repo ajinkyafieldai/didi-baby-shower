@@ -17,10 +17,7 @@
     "transcript:sources": "bash scripts/list-audio-sources.sh",
     "transcript:tmux": "bash scripts/transcript-tmux.sh"
   },
-  "dependencies": {
-    "@zoom/meetingsdk": "^6.5.0",
-    "@zoom/rtms": "^1.1.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "vite": "^7.1.7"
   },
