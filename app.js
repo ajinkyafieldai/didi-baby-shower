@@ -14,9 +14,55 @@ const photoHost = new URLSearchParams(location.search).get("photoHost") === "1";
 const gamePanel = document.getElementById("game-panel");
 const gameContent = document.getElementById("game-content");
 const gameClose = document.getElementById("game-close");
+const blessingLaunch = document.getElementById("blessing-launch");
+const blessingPanel = document.getElementById("blessing-panel");
+const blessingClose = document.getElementById("blessing-close");
+const blessingForm = document.getElementById("blessing-form");
+const blessingMessage = document.getElementById("blessing-message");
+const blessingCount = document.getElementById("blessing-count");
+const blessingWall = document.getElementById("blessing-wall");
+const blessingExport = document.getElementById("blessing-export");
 
 let gameState = { names: [], quiz: [] };
 let activeGame = null;
+
+const blessingStore = (() => {
+  const key = "baby-shower-blessings-v1";
+
+  function read() {
+    try {
+      const value = JSON.parse(localStorage.getItem(key) || "[]");
+      return Array.isArray(value) ? value : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function write(items) {
+    localStorage.setItem(key, JSON.stringify(items.slice(-200)));
+  }
+
+  return {
+    list() {
+      return read().sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+    },
+    add(entry) {
+      const items = read();
+      items.push(entry);
+      write(items);
+      return entry;
+    },
+    react(id, emoji) {
+      const items = read();
+      const entry = items.find((item) => item.id === id);
+      if (!entry) return;
+
+      entry.reactions = entry.reactions || {};
+      entry.reactions[emoji] = Number(entry.reactions[emoji] || 0) + 1;
+      write(items);
+    }
+  };
+})();
 
 let guestName = "";
 let effectTimer = null;
@@ -631,6 +677,157 @@ function renderGame(game) {
     }
   });
 }
+
+
+function renderBlessings() {
+  const items = blessingStore.list();
+
+  if (!items.length) {
+    blessingWall.innerHTML = '<p class="blessing-empty">The wall is waiting for its first blessing ✨</p>';
+    return;
+  }
+
+  blessingWall.innerHTML = items.map((item) => {
+    const forWhom = item.audience === "didi" ? "For Didi" : "For the baby";
+    const reactions = item.reactions || {};
+    return `
+      <article class="blessing-note" data-blessing-id="${escapeHtml(item.id)}">
+        <div class="blessing-note-top">
+          <span>${item.audience === "didi" ? "🌸" : "👶"} ${forWhom}</span>
+          <time>${new Date(item.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+        </div>
+        <p>${escapeHtml(item.message)}</p>
+        <footer>
+          <strong>— ${escapeHtml(item.sender || "Someone")}</strong>
+          <div class="blessing-reactions">
+            ${["❤️","🥹","😂"].map((emoji) => `
+              <button type="button" data-blessing-react="${emoji}">
+                <span>${emoji}</span>
+                <small>${Number(reactions[emoji] || 0) || ""}</small>
+              </button>
+            `).join("")}
+          </div>
+        </footer>
+      </article>
+    `;
+  }).join("");
+
+  blessingWall.querySelectorAll("[data-blessing-react]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const note = button.closest("[data-blessing-id]");
+      if (!note) return;
+      blessingStore.react(note.dataset.blessingId, button.dataset.blessingReact);
+      renderBlessings();
+      playChime();
+    });
+  });
+}
+
+function showBlessingFloat(entry) {
+  const note = document.createElement("div");
+  note.className = "blessing-float";
+  note.innerHTML = `
+    <span>${entry.audience === "didi" ? "🌸" : "👶"}</span>
+    <div>
+      <strong>${escapeHtml(entry.sender || "Someone")}</strong>
+      <p>${escapeHtml(entry.message)}</p>
+    </div>
+  `;
+  effectLayer.appendChild(note);
+  window.setTimeout(() => note.remove(), 5200);
+}
+
+function exportBlessingsKeepsake() {
+  const items = blessingStore.list().slice().reverse();
+  const rows = items.map((item) => {
+    const title = item.audience === "didi" ? "For Didi" : "For the baby";
+    return `
+      <article>
+        <div class="meta">${title} · ${new Date(item.at).toLocaleString()}</div>
+        <blockquote>${escapeHtml(item.message)}</blockquote>
+        <div class="from">— ${escapeHtml(item.sender || "Someone")}</div>
+      </article>
+    `;
+  }).join("");
+
+  const html = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Didi's Baby Shower — Blessings</title>
+<style>
+  body{font-family:Georgia,serif;margin:0;padding:48px;background:#fffaf7;color:#422f35}
+  main{max-width:820px;margin:auto}
+  h1{font-size:42px;margin:0 0 8px}
+  .sub{color:#7a6970;margin-bottom:36px}
+  article{break-inside:avoid;margin:0 0 18px;padding:22px;border:1px solid #eadfdc;border-radius:18px;background:white}
+  .meta{font:700 12px system-ui;color:#a94762;text-transform:uppercase;letter-spacing:.06em}
+  blockquote{margin:12px 0;font-size:22px;line-height:1.45}
+  .from{text-align:right;font-weight:700}
+  @media print{body{padding:0}article{box-shadow:none}}
+</style>
+</head>
+<body><main>
+<h1>Didi's Baby Shower</h1>
+<p class="sub">Blessings from the family 💛</p>
+${rows || "<p>No blessings yet.</p>"}
+</main></body></html>`;
+
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "didi-baby-shower-blessings.html";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+blessingLaunch.addEventListener("click", () => {
+  ensureAudioContext();
+  blessingPanel.hidden = false;
+  renderBlessings();
+  blessingMessage.focus();
+});
+
+blessingClose.addEventListener("click", () => {
+  blessingPanel.hidden = true;
+});
+
+blessingPanel.addEventListener("click", (event) => {
+  if (event.target === blessingPanel) blessingPanel.hidden = true;
+});
+
+blessingMessage.addEventListener("input", () => {
+  blessingCount.textContent = `${blessingMessage.value.length}/180`;
+});
+
+blessingForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const data = new FormData(blessingForm);
+  const message = String(data.get("message") || "").trim();
+  if (!message) return;
+
+  const entry = {
+    id: crypto.randomUUID(),
+    sender: guestName || guestNameInput.value.trim() || "Someone",
+    audience: data.get("audience") === "didi" ? "didi" : "baby",
+    message,
+    at: Date.now(),
+    reactions: {}
+  };
+
+  blessingStore.add(entry);
+  blessingForm.reset();
+  blessingMessage.value = "";
+  blessingCount.textContent = "0/180";
+  renderBlessings();
+  showBlessingFloat(entry);
+  playChime("photo");
+});
+
+blessingExport.addEventListener("click", exportBlessingsKeepsake);
 
 document.querySelectorAll("[data-game]").forEach((button) => {
   button.addEventListener("click", () => {
