@@ -54,6 +54,14 @@ assert(primary.logs.some((entry)=>entry.kind==="suppressed_duplicate"));
 assert(primary.logs.some((entry)=>entry.kind==="suppressed_cooldown"));
 assert(primary.logs.some((entry)=>entry.kind==="matched"&&entry.trigger==="photo.show"));
 
+const photoVariants=await runMapper([
+  "Let's start the photo."
+],{
+  BABYSHOWER_PHRASE_COOLDOWN_MS:"0",
+  BABYSHOWER_TRANSCRIPT_DUPLICATE_MS:"0"
+});
+assert.deepEqual(photoVariants.tokens,["photo.show"]);
+
 const falsePositives=await runMapper([
   "We took a photo yesterday.",
   "That picture was nice.",
