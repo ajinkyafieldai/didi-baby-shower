@@ -49,6 +49,16 @@ async function getJson(path) {
   return data;
 }
 
+async function publishCaptured(asset) {
+  return postJson("/api/events", {
+    type: "system",
+    event: "photo.captured",
+    asset,
+    sender: "Photobooth",
+    senderId: clientId
+  });
+}
+
 async function heartbeat(lastEventSeq = 0, latencyMs = null, status = "ready") {
   return postJson("/api/events", {
     type: "telemetry",
@@ -111,6 +121,7 @@ async function captureOnce() {
   try {
     const result = await captureImage();
     const latencyMs = Date.now() - started;
+    await publishCaptured(result.key);
     await heartbeat(0, latencyMs, "ready");
     console.log(`Uploaded ${result.key} in ${latencyMs} ms`);
     return result;
@@ -153,8 +164,10 @@ async function runPhotobooth() {
             try {
               const started = Date.now();
               const result = await captureImage();
+              const captured = await publishCaptured(result.key);
+              lastEventSeq = Math.max(lastEventSeq, Number(captured.seq || seq));
               console.log(`Uploaded ${result.key} in ${Date.now() - started} ms`);
-              await heartbeat(seq, Date.now() - started, "ready");
+              await heartbeat(lastEventSeq, Date.now() - started, "ready");
             } catch (error) {
               console.error("Capture failed:", error.message);
               await heartbeat(seq, null, "error").catch(() => {});
