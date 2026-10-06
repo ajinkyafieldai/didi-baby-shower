@@ -43,7 +43,7 @@ function prependEvent(event){
   const li=document.createElement("li");
   const time=document.createElement("time");
   time.textContent=new Date(event.at||Date.now()).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit"});
-  const name=document.createElement("span"); name.className="event-name"; name.textContent=event.effect||event.type||"event";
+  const name=document.createElement("span"); name.className="event-name"; name.textContent=event.effect||event.command||event.type||"event";
   const sender=document.createElement("span"); sender.className="event-sender"; sender.textContent=event.sender||"system";
   li.append(time,name,sender); els.log.prepend(li);
   while(els.log.children.length>20)els.log.lastElementChild.remove();
