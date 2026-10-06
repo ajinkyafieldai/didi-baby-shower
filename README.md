@@ -154,3 +154,36 @@ The systemd deployment path still uses `/etc/babyshower/rtms.env`; both paths ex
 
 
 For interactive simulator pipelines, prefer calling the simulator with `node scripts/rtms-transcript-sim.mjs` (or `npm run --silent rtms:sim`) so npm's script banner does not enter stdout and get inspected by the phrase mapper.
+
+
+### Local Whisper transcript source
+
+Zoom RTMS is optional. On an Ubuntu/PipeWire machine the event pipeline can transcribe audio locally:
+
+```text
+Pulse/PipeWire -> ffmpeg -> faster-whisper -> phrase-map -> babyshower trigger
+```
+
+Install once:
+
+```sh
+sudo apt install ffmpeg python3-venv pulseaudio-utils
+python3 -m venv .venv-whisper
+.venv-whisper/bin/pip install -r requirements-transcript.txt
+```
+
+List audio sources:
+
+```sh
+npm run transcript:sources
+```
+
+For Zoom audio, set `BABYSHOWER_AUDIO_SOURCE` in `.env` to the output source ending in `.monitor`. For microphone testing, `default` is usually sufficient.
+
+Then run:
+
+```sh
+npm run transcript:local
+```
+
+The default model is multilingual Whisper `small`; set `BABYSHOWER_WHISPER_MODEL` to `tiny`, `base`, `medium`, etc. The first run downloads the selected model. Set `BABYSHOWER_WHISPER_LANGUAGE=` (empty) for language auto-detection.
