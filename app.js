@@ -267,52 +267,13 @@ joinForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    joinMessage.textContent = "This browser cannot access the camera and microphone.";
-    return;
-  }
-
   joinButton.disabled = true;
   joinButton.textContent = "Joining…";
-  joinMessage.textContent = "When your browser asks, tap Allow for camera and microphone.";
-  statusText.textContent = "Requesting camera & microphone…";
+  joinMessage.textContent = "Your browser may ask for camera and microphone permission.";
+  statusText.textContent = "Connecting to video call…";
 
-  let stream;
-
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true
-    });
-
-    stream.getTracks().forEach((track) => track.stop());
-
-    joinMessage.textContent = "";
-    joinButton.textContent = "Joining…";
-    statusText.textContent = "Connecting to video call…";
-
-    frame.src = `/zoom.html?name=${encodeURIComponent(guestName)}`;
-    stage.classList.add("in-call");
-  } catch (error) {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-    }
-
-    console.error("Camera/microphone permission error", error);
-
-    const denied = error && (
-      error.name === "NotAllowedError" ||
-      error.name === "SecurityError"
-    );
-
-    joinMessage.textContent = denied
-      ? "Camera and microphone permission was not allowed. Please enable it in your browser and try again."
-      : "Could not access the camera and microphone. Please check your device settings and try again.";
-
-    statusText.textContent = "Camera & microphone permission needed";
-    joinButton.disabled = false;
-    joinButton.textContent = "Join";
-  }
+  frame.src = `/zoom.html?name=${encodeURIComponent(guestName)}`;
+  stage.classList.add("in-call");
 });
 
 window.addEventListener("message", (event) => {
