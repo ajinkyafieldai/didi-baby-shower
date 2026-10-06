@@ -7,6 +7,19 @@ let lastEventSeq=0,initialized=false,lastLatency=null,effectTimer=null,lastPollC
 const RESUME_GAP_MS=5000,MAX_EFFECT_AGE_MS=4000;
 const visuals={ovalni:"🪔",flowers:"🌸",ashirwad:"🙌",supari:"🌰",haldi:"🟡",kunku:"🔴",oti:"🥥",celebrate:"🎉",photo:"📸"};
 const labels={ovalni:"Ovalni",flowers:"Flowers",ashirwad:"Ashirwad",supari:"Supari",haldi:"Haldi",kunku:"Kunku",oti:"Oti",celebrate:"Celebrate",photo:"Family photo"};
+function photoAssetUrl(asset){return "/api/photos?key="+encodeURIComponent(asset);}
+function showPhoto(asset){
+  clearTimeout(effectTimer);
+  effectEl.innerHTML="";
+  const image=document.createElement("img");
+  image.alt="Latest family photo";
+  image.src=photoAssetUrl(asset);
+  effectEl.appendChild(image);
+  effectEl.className="projector-effect show photo-image";
+  titleEl.textContent="Family photo 📸";
+  subtitleEl.textContent="A moment from today.";
+  effectTimer=setTimeout(()=>{effectEl.className="projector-effect";effectEl.innerHTML="";},5000);
+}
 function showEvent(event){
   clearTimeout(effectTimer);
   const effect=event.effect||"";
@@ -32,6 +45,7 @@ async function poll(){
     statusEl.textContent="Live · "+lastLatency+" ms";statusEl.className="projector-status good";
     if(!initialized||shouldResync){lastEventSeq=Number(data.seq||0);initialized=true;resyncOnNextPoll=false;lastPollCompletedAt=Date.now();return;}
     const events=Array.isArray(data.events)?data.events:[];
+    events.filter(e=>e&&e.type==="command"&&e.command==="photo.show"&&e.asset&&Number(e.seq||0)>lastEventSeq&&now-Number(e.at||0)<=MAX_EFFECT_AGE_MS).forEach((event)=>showPhoto(event.asset));
     events.filter(e=>e&&e.type==="system"&&e.event==="photo.captured"&&Number(e.seq||0)>lastEventSeq).forEach(()=>{
       titleEl.textContent="Photo ready 📸";
       subtitleEl.textContent="The latest family photo is ready.";
