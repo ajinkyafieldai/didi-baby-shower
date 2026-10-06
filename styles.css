@@ -1148,3 +1148,74 @@ button { -webkit-tap-highlight-color: transparent; }
   .shared-photo-overlay,
   .shared-photo-overlay img { transition: none; }
 }
+
+
+.bingo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.bingo-cell {
+  min-height: 94px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+  color: var(--ink);
+  font-size: .78rem;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+}
+
+.bingo-cell.marked {
+  border-color: rgba(169,71,98,.55);
+  background: rgba(244,199,207,.3);
+}
+
+.bingo-cell strong {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  color: var(--rose-deep);
+  font-size: 1rem;
+}
+
+.bingo-cell:disabled {
+  cursor: default;
+  opacity: 1;
+  background: rgba(255,242,217,.9);
+}
+
+.bingo-footer {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bingo-footer button {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 11px;
+  background: white;
+  color: var(--ink);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (max-width: 380px) {
+  .bingo-cell {
+    min-height: 82px;
+    font-size: .7rem;
+    padding: 7px;
+  }
+}
