@@ -29,6 +29,7 @@ jobs:
           node --check app.js
           node --check host.js
           node --check projector.js
+          node --check photobooth.js
           node --check zoom-client.js
           node --check functions/api/events.js
           node --check functions/api/photos.js
