@@ -39,3 +39,18 @@ for(const args of [
 }
 
 console.log("Verified: trigger dry-run accepts flags before or after the trigger name.");
+
+
+const room = spawnSync(process.execPath, [cli, "room", "create", "--hours", "8", "--dry-run"], {
+  env: { ...process.env },
+  encoding: "utf8"
+});
+
+assert.equal(room.status, 0, room.stderr);
+const roomPayload = JSON.parse(room.stdout);
+assert.equal(roomPayload.ok, true);
+assert.equal(roomPayload.dryRun, true);
+assert.equal(roomPayload.provider, "whereby");
+assert.equal(roomPayload.hours, 8);
+assert.deepEqual(roomPayload.payload.fields, ["hostRoomUrl"]);
+assert.match(roomPayload.payload.endDate, /^\d{4}-\d{2}-\d{2}T/);
