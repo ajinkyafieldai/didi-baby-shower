@@ -86,7 +86,8 @@ export class CelebrationRoom {
         events,
         games: await gameSnapshot(this.ctx),
         telemetry: await telemetrySnapshot(this.ctx),
-        latestPhoto: await this.ctx.storage.get("latestPhoto") || null
+        latestPhoto: await this.ctx.storage.get("latestPhoto") || null,
+        videoRoom: await this.ctx.storage.get("videoRoom") || null
       });
     }
 
@@ -97,6 +98,37 @@ export class CelebrationRoom {
         body = await request.json();
       } catch {
         return json({ error: "Invalid JSON" }, 400);
+      }
+
+      if (body && body.type === "video_room_set") {
+        const roomUrl = String(body.roomUrl || "").trim().slice(0, 500);
+        const meetingId = String(body.meetingId || "").trim().slice(0, 200);
+        const endDate = String(body.endDate || "").trim().slice(0, 100);
+
+        let parsed;
+        try {
+          parsed = new URL(roomUrl);
+        } catch {
+          return json({ error: "Invalid video room URL" }, 400);
+        }
+
+        if (
+          parsed.protocol !== "https:" ||
+          !(parsed.hostname === "whereby.com" || parsed.hostname.endsWith(".whereby.com"))
+        ) {
+          return json({ error: "Invalid Whereby room URL" }, 400);
+        }
+
+        const videoRoom = {
+          provider: "whereby",
+          roomUrl: parsed.toString(),
+          meetingId: meetingId || null,
+          endDate: endDate || null,
+          updatedAt: Date.now()
+        };
+
+        await this.ctx.storage.put("videoRoom", videoRoom);
+        return json({ ok: true, videoRoom });
       }
 
       if (body && body.type === "telemetry") {
