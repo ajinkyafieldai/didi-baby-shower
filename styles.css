@@ -1148,3 +1148,234 @@ button { -webkit-tap-highlight-color: transparent; }
   .shared-photo-overlay,
   .shared-photo-overlay img { transition: none; }
 }
+
+
+.blessing-panel[hidden] { display: none; }
+
+.blessing-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 21;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(22,18,21,.56);
+  backdrop-filter: blur(8px);
+}
+
+.blessing-card {
+  position: relative;
+  width: min(100%, 680px);
+  max-height: min(86dvh, 760px);
+  overflow: auto;
+  border-radius: 24px;
+  padding: 24px;
+  background: #fffaf7;
+  color: var(--ink);
+  box-shadow: 0 22px 70px rgba(0,0,0,.34);
+}
+
+.blessing-head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-right: 40px;
+}
+
+.blessing-head h2 { margin: 0 0 4px; }
+.blessing-head p { margin: 0; color: var(--muted); }
+
+.blessing-export {
+  flex: 0 0 auto;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 0 12px;
+  background: white;
+  color: var(--ink);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.blessing-form {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 20px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255,255,255,.72);
+}
+
+.blessing-audience {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.blessing-audience label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(244,199,207,.22);
+  font-size: .85rem;
+  font-weight: 800;
+}
+
+.blessing-form textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 82px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 11px 12px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.blessing-form-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.blessing-form-foot span {
+  color: var(--muted);
+  font-size: .8rem;
+}
+
+.blessing-form-foot button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 12px;
+  padding: 0 14px;
+  background: var(--rose-deep);
+  color: white;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.blessing-wall {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 10px;
+}
+
+.blessing-note {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(66,47,53,.10);
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.98), rgba(255,242,217,.65));
+  box-shadow: 0 7px 24px rgba(70,44,52,.07);
+}
+
+.blessing-note-top,
+.blessing-note footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.blessing-note-top {
+  color: var(--rose-deep);
+  font-size: .72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.blessing-note-top time { color: var(--muted); font-weight: 700; }
+
+.blessing-note p {
+  margin: 12px 0 14px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.03rem;
+  line-height: 1.45;
+}
+
+.blessing-note footer strong {
+  min-width: 0;
+  font-size: .82rem;
+}
+
+.blessing-reactions {
+  display: flex;
+  gap: 3px;
+}
+
+.blessing-reactions button {
+  min-width: 34px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(66,47,53,.06);
+  cursor: pointer;
+}
+
+.blessing-reactions small {
+  color: var(--muted);
+  font-size: .67rem;
+  font-weight: 900;
+}
+
+.blessing-empty {
+  grid-column: 1 / -1;
+  padding: 28px 10px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.blessing-float {
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  bottom: 14%;
+  width: min(calc(100% - 34px), 390px);
+  display: flex;
+  gap: 10px;
+  padding: 13px 15px;
+  border-radius: 18px;
+  background: rgba(255,250,247,.96);
+  color: var(--ink);
+  box-shadow: 0 14px 44px rgba(0,0,0,.24);
+  transform: translateX(-50%);
+  animation: blessing-float 5s ease both;
+  pointer-events: none;
+}
+
+.blessing-float > span { font-size: 1.45rem; }
+.blessing-float strong { font-size: .78rem; color: var(--rose-deep); }
+.blessing-float p {
+  margin: 2px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.35;
+}
+
+@keyframes blessing-float {
+  0% { opacity: 0; transform: translate(-50%, 18px) scale(.96); }
+  12%, 78% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -22px) scale(.98); }
+}
+
+@media (max-width: 560px) {
+  .blessing-card { padding: 18px; }
+  .blessing-head { display: grid; margin-right: 34px; }
+  .blessing-export { justify-self: start; }
+  .blessing-wall { grid-template-columns: 1fr; }
+  .blessing-form-foot { align-items: flex-end; }
+}
