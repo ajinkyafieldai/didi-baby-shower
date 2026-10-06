@@ -2,6 +2,12 @@
 import rtms from "@zoom/rtms";
 
 const clients=new Map();
+const allowedSpeakers=new Set(
+  String(process.env.BABYSHOWER_ALLOWED_SPEAKERS||"")
+    .split(",")
+    .map((value)=>value.trim().toLowerCase())
+    .filter(Boolean)
+);
 
 function normalize(value){
   return String(value??"")
@@ -49,9 +55,13 @@ function attachClient(payload){
     const text=normalize(Buffer.isBuffer(data)?data.toString("utf8"):data);
     if(!text)return;
 
-    process.stdout.write(text+"\n");
-
     const speaker=normalize(metadata?.userName)||"unknown";
+    if(allowedSpeakers.size&& !allowedSpeakers.has(speaker.toLowerCase())){
+      log("ignored-speaker",String(timestamp??""),speaker+":",text);
+      return;
+    }
+
+    process.stdout.write(text+"\n");
     log("transcript",String(timestamp??""),speaker+":",text);
   });
 
@@ -104,3 +114,4 @@ process.on("SIGTERM",()=>shutdown("SIGTERM"));
 
 log("Listening for Zoom RTMS webhooks");
 log("port="+(process.env.ZM_RTMS_PORT||"8080"),"path="+(process.env.ZM_RTMS_PATH||"/webhook"));
+if(allowedSpeakers.size)log("allowed-speakers="+[...allowedSpeakers].join(","));
