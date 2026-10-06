@@ -10,7 +10,8 @@
     "photobooth:health": "node photobooth.js health",
     "transcript:map": "node scripts/phrase-map.mjs",
     "trigger": "node babyshower.js trigger",
-    "rtms:transcript": "node scripts/rtms-transcript.mjs"
+    "rtms:transcript": "node scripts/rtms-transcript.mjs",
+    "rtms:sim": "node scripts/rtms-transcript-sim.mjs"
   },
   "dependencies": {
     "@zoom/meetingsdk": "^6.5.0",
