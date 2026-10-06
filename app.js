@@ -521,6 +521,104 @@ const bingoPrompts = [
   "A pet appears on camera"
 ];
 
+const gameCatalog = [
+  ["names", "👶", "Baby Names", "Suggest + vote"],
+  ["didi", "🏆", "Know Didi?", "Didi judges"],
+  ["bingo", "🎯", "Call Bingo", "Spot moments"],
+  ["predictions", "🔮", "Baby Predictions", "Make your guesses"],
+  ["charades", "🎭", "Charades", "Act it out"],
+  ["emoji", "🧩", "Emoji Decoder", "Guess the phrase"],
+  ["scavenger", "🕵️", "Scavenger Hunt", "Race around home"],
+  ["forbidden", "🤐", "Forbidden Word", "Don't say baby"],
+  ["memory", "💭", "Memory Lane", "Tell a Didi story"],
+  ["advice", "💌", "Advice Roulette", "One tiny wisdom"],
+  ["thisorthat", "⚡", "This or That", "Rapid-fire picks"],
+  ["items", "🍼", "Guess the Item", "Emoji baby gear"]
+];
+
+const charadePrompts = [
+  "Changing a diaper for the first time",
+  "Trying to make a baby burp",
+  "A baby refusing to sleep",
+  "Pushing a stroller uphill",
+  "Reading a bedtime story",
+  "Tiptoeing away from a sleeping baby",
+  "Packing a diaper bag in a hurry",
+  "Taking 47 photos of one yawn",
+  "Baby tasting lemon for the first time",
+  "Grandparents fighting over who gets to hold the baby"
+];
+
+const emojiPuzzles = [
+  ["👶🌙😴", "Baby sleeping through the night"],
+  ["🍼⏰😭", "Midnight feeding"],
+  ["👶🛁🫧", "Baby bath time"],
+  ["📸👶📸📸", "Too many baby photos"],
+  ["👵❤️👶", "Aaji's favourite person"],
+  ["🧸🌙📖", "Bedtime story"],
+  ["🚗👶💤", "Baby falls asleep in the car"],
+  ["🍼➡️💨", "Burp after feeding"]
+];
+
+const scavengerItems = [
+  "Something yellow",
+  "A childhood photo",
+  "The smallest sock you can find",
+  "Something with a baby on it",
+  "A soft toy",
+  "Something older than Didi",
+  "A spoon",
+  "Something that makes noise"
+];
+
+const memoryPrompts = [
+  "Tell us the funniest thing Didi did as a child.",
+  "What is your earliest memory of Didi?",
+  "What is one thing Didi was weirdly competitive about?",
+  "Tell us about a trip with Didi that went slightly wrong.",
+  "What food immediately reminds you of Didi?",
+  "What is the most Didi sentence you have ever heard?",
+  "What did Didi believe as a child that was completely wrong?",
+  "What is one thing you hope the baby inherits from Didi?"
+];
+
+const advicePrompts = [
+  "One thing worth ignoring when everyone gives parenting advice.",
+  "One tiny habit that makes family life easier.",
+  "A sentence to remember at 3 AM with a crying baby.",
+  "One tradition worth passing on.",
+  "One thing the baby should definitely learn from Didi.",
+  "One thing new parents should never feel guilty about.",
+  "Your best five-word parenting advice.",
+  "A wish for the baby's first year."
+];
+
+const thisOrThatRounds = [
+  ["Early bird", "Night owl"],
+  ["Sweet", "Spicy"],
+  ["Mountains", "Beach"],
+  ["Books", "Movies"],
+  ["Messy play", "Quiet play"],
+  ["Lullaby", "Dance party"],
+  ["Matching outfits", "Absolute chaos"],
+  ["Plan everything", "Figure it out live"]
+];
+
+const babyItemPuzzles = [
+  ["🍼", "Bottle"],
+  ["🧷👶", "Diaper pin"],
+  ["🚼🛒", "Stroller"],
+  ["🌡️👶", "Baby thermometer"],
+  ["🧸🎵", "Musical toy"],
+  ["👶🛏️", "Crib"],
+  ["🫧🛁👶", "Baby bath"],
+  ["🎒🍼🧷", "Diaper bag"]
+];
+
+function randomItem(items) {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
 function hashString(value) {
   let hash = 2166136261;
   for (let i = 0; i < value.length; i += 1) {
@@ -603,6 +701,25 @@ function escapeHtml(value) {
 function renderGame(game) {
   activeGame = game;
   gamePanel.hidden = false;
+
+  if (game === "hub") {
+    gameContent.innerHTML = `
+      <h2 id="game-title">🎮 Baby Shower Games</h2>
+      <p class="game-subtitle">Pick something. Most of these work entirely in your browser, so they won't care what the backend is doing.</p>
+      <div class="game-hub">
+        ${gameCatalog.map(([id, icon, title, subtitle]) => `
+          <button class="game-tile" type="button" data-open-game="${id}">
+            <span class="game-tile-icon">${icon}</span>
+            <span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(subtitle)}</small></span>
+          </button>
+        `).join("")}
+      </div>`;
+
+    gameContent.querySelectorAll("[data-open-game]").forEach((button) => {
+      button.addEventListener("click", () => renderGame(button.dataset.openGame));
+    });
+    return;
+  }
 
   if (game === "names") {
     const names = Array.isArray(gameState.names) ? gameState.names : [];
@@ -701,6 +818,187 @@ function renderGame(game) {
     return;
   }
 
+
+  if (game === "predictions") {
+    const key = "baby-shower-predictions-v1";
+    const saved = JSON.parse(sessionStorage.getItem(key) || "{}");
+    gameContent.innerHTML = `
+      <h2 id="game-title">🔮 Baby Predictions</h2>
+      <p class="game-subtitle">Lock in your guesses. Screenshot them later when the baby arrives.</p>
+      <form id="prediction-form" class="quiz-form">
+        <label><span>Birthday guess</span><input name="date" type="date" value="${escapeHtml(saved.date || "")}" required></label>
+        <label><span>Birth time guess</span><input name="time" type="time" value="${escapeHtml(saved.time || "")}" required></label>
+        <label><span>Weight guess</span><input name="weight" maxlength="30" value="${escapeHtml(saved.weight || "")}" placeholder="e.g. 3.1 kg" required></label>
+        <label><span>First feature everyone notices</span><input name="feature" maxlength="60" value="${escapeHtml(saved.feature || "")}" placeholder="Hair? Eyes? Cheeks?" required></label>
+        <button type="submit">Save my predictions</button>
+      </form>
+      ${saved.saved ? '<div class="quiz-done">Predictions saved 🔒</div>' : ""}`;
+
+    document.getElementById("prediction-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(event.currentTarget));
+      data.saved = true;
+      sessionStorage.setItem(key, JSON.stringify(data));
+      playChime("photo");
+      renderGame("predictions");
+    });
+    return;
+  }
+
+  if (game === "charades") {
+    const prompt = randomItem(charadePrompts);
+    gameContent.innerHTML = `
+      <h2 id="game-title">🎭 Baby Charades</h2>
+      <p class="game-subtitle">Only the actor looks at the screen. Everyone else guesses.</p>
+      <div class="big-prompt">${escapeHtml(prompt)}</div>
+      <div class="game-row">
+        <button class="game-primary" id="charade-next" type="button">New prompt</button>
+        <button class="game-secondary" id="charade-hide" type="button">Hide prompt</button>
+      </div>`;
+    document.getElementById("charade-next").addEventListener("click", () => renderGame("charades"));
+    document.getElementById("charade-hide").addEventListener("click", (event) => {
+      const box = gameContent.querySelector(".big-prompt");
+      box.textContent = "🙈 Hidden — start acting!";
+      event.currentTarget.disabled = true;
+    });
+    return;
+  }
+
+  if (game === "emoji") {
+    const puzzle = randomItem(emojiPuzzles);
+    gameContent.innerHTML = `
+      <h2 id="game-title">🧩 Emoji Decoder</h2>
+      <p class="game-subtitle">Shout out what these emojis mean.</p>
+      <div class="emoji-puzzle">${puzzle[0]}</div>
+      <div id="emoji-answer" class="reveal-answer" hidden>${escapeHtml(puzzle[1])}</div>
+      <div class="game-row">
+        <button class="game-primary" id="emoji-reveal" type="button">Reveal answer</button>
+        <button class="game-secondary" id="emoji-next" type="button">Next</button>
+      </div>`;
+    document.getElementById("emoji-reveal").addEventListener("click", () => {
+      document.getElementById("emoji-answer").hidden = false;
+    });
+    document.getElementById("emoji-next").addEventListener("click", () => renderGame("emoji"));
+    return;
+  }
+
+  if (game === "scavenger") {
+    const key = "baby-shower-scavenger-v1";
+    const found = new Set(JSON.parse(sessionStorage.getItem(key) || "[]"));
+    gameContent.innerHTML = `
+      <h2 id="game-title">🕵️ Scavenger Hunt</h2>
+      <p class="game-subtitle">First one back on camera with the item gets bragging rights.</p>
+      <div class="check-list">
+        ${scavengerItems.map((item, index) => `
+          <button type="button" class="check-item ${found.has(index) ? "done" : ""}" data-scavenge="${index}">
+            <span>${found.has(index) ? "✓" : "○"}</span><strong>${escapeHtml(item)}</strong>
+          </button>
+        `).join("")}
+      </div>
+      <p class="quiz-count">${found.size}/${scavengerItems.length} found</p>`;
+    gameContent.querySelectorAll("[data-scavenge]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const next = new Set(JSON.parse(sessionStorage.getItem(key) || "[]"));
+        const index = Number(button.dataset.scavenge);
+        if (next.has(index)) next.delete(index); else next.add(index);
+        sessionStorage.setItem(key, JSON.stringify([...next]));
+        if (next.size === scavengerItems.length) playChime("photo");
+        renderGame("scavenger");
+      });
+    });
+    return;
+  }
+
+  if (game === "forbidden") {
+    const key = "baby-shower-forbidden-v1";
+    const state = JSON.parse(sessionStorage.getItem(key) || '{"slips":0}');
+    gameContent.innerHTML = `
+      <h2 id="game-title">🤐 Forbidden Word</h2>
+      <p class="game-subtitle">Your forbidden word is:</p>
+      <div class="forbidden-word">BABY</div>
+      <p class="game-subtitle">If you say it during the call, own up and tap the button.</p>
+      <button class="slip-button" id="forbidden-slip" type="button">Oops, I said it 😭 <strong>${Number(state.slips || 0)}</strong></button>
+      <button class="tiny-reset" id="forbidden-reset" type="button">Reset my count</button>`;
+    document.getElementById("forbidden-slip").addEventListener("click", () => {
+      state.slips = Number(state.slips || 0) + 1;
+      sessionStorage.setItem(key, JSON.stringify(state));
+      playChime();
+      renderGame("forbidden");
+    });
+    document.getElementById("forbidden-reset").addEventListener("click", () => {
+      sessionStorage.removeItem(key);
+      renderGame("forbidden");
+    });
+    return;
+  }
+
+  if (game === "memory") {
+    const prompt = randomItem(memoryPrompts);
+    gameContent.innerHTML = `
+      <h2 id="game-title">💭 Memory Lane</h2>
+      <p class="game-subtitle">Pick someone on the call to answer this one.</p>
+      <div class="big-prompt">${escapeHtml(prompt)}</div>
+      <button class="game-primary full" id="memory-next" type="button">Another memory prompt</button>`;
+    document.getElementById("memory-next").addEventListener("click", () => renderGame("memory"));
+    return;
+  }
+
+  if (game === "advice") {
+    const prompt = randomItem(advicePrompts);
+    gameContent.innerHTML = `
+      <h2 id="game-title">💌 Advice Roulette</h2>
+      <p class="game-subtitle">Short answers only. Nobody gets to give a TED Talk.</p>
+      <div class="big-prompt">${escapeHtml(prompt)}</div>
+      <button class="game-primary full" id="advice-next" type="button">Spin again</button>`;
+    document.getElementById("advice-next").addEventListener("click", () => renderGame("advice"));
+    return;
+  }
+
+  if (game === "thisorthat") {
+    const key = "baby-shower-this-or-that-index";
+    let index = Number(sessionStorage.getItem(key) || 0) % thisOrThatRounds.length;
+    const [left, right] = thisOrThatRounds[index];
+    gameContent.innerHTML = `
+      <h2 id="game-title">⚡ This or That</h2>
+      <p class="game-subtitle">Everyone points left or right on camera. No explanations until after.</p>
+      <div class="versus">
+        <button type="button" data-pick="left">${escapeHtml(left)}</button>
+        <span>OR</span>
+        <button type="button" data-pick="right">${escapeHtml(right)}</button>
+      </div>
+      <p class="quiz-count">Round ${index + 1} of ${thisOrThatRounds.length}</p>`;
+    gameContent.querySelectorAll("[data-pick]").forEach((button) => {
+      button.addEventListener("click", () => {
+        button.classList.add("picked");
+        playChime();
+        window.setTimeout(() => {
+          index = (index + 1) % thisOrThatRounds.length;
+          sessionStorage.setItem(key, String(index));
+          renderGame("thisorthat");
+        }, 650);
+      });
+    });
+    return;
+  }
+
+  if (game === "items") {
+    const puzzle = randomItem(babyItemPuzzles);
+    gameContent.innerHTML = `
+      <h2 id="game-title">🍼 Guess the Baby Item</h2>
+      <p class="game-subtitle">What baby item do the emojis describe?</p>
+      <div class="emoji-puzzle">${puzzle[0]}</div>
+      <div id="item-answer" class="reveal-answer" hidden>${escapeHtml(puzzle[1])}</div>
+      <div class="game-row">
+        <button class="game-primary" id="item-reveal" type="button">Reveal</button>
+        <button class="game-secondary" id="item-next" type="button">Next</button>
+      </div>`;
+    document.getElementById("item-reveal").addEventListener("click", () => {
+      document.getElementById("item-answer").hidden = false;
+    });
+    document.getElementById("item-next").addEventListener("click", () => renderGame("items"));
+    return;
+  }
+
   const existing = Array.isArray(gameState.quiz)
     ? gameState.quiz.find((entry) => entry.senderId === participantId)
     : null;
@@ -762,6 +1060,13 @@ gameClose.addEventListener("click", () => {
 
 gamePanel.addEventListener("click", (event) => {
   if (event.target === gamePanel) {
+    activeGame = null;
+    gamePanel.hidden = true;
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !gamePanel.hidden) {
     activeGame = null;
     gamePanel.hidden = true;
   }
