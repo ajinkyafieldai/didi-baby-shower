@@ -3,40 +3,73 @@ import { strict as assert } from "node:assert";
 import { fileURLToPath } from "node:url";
 
 const mapper=fileURLToPath(new URL("./phrase-map.mjs",import.meta.url));
-const child=spawn(process.execPath,[mapper],{
-  env:{...process.env,BABYSHOWER_PHRASE_COOLDOWN_MS:"60000"},
-  stdio:["pipe","pipe","inherit"]
-});
 
-let output="";
-child.stdout.setEncoding("utf8");
-child.stdout.on("data",(chunk)=>{output+=chunk;});
+async function runMapper(lines,extraEnv={}){
+  const child=spawn(process.execPath,[mapper],{
+    env:{
+      ...process.env,
+      BABYSHOWER_PHRASE_COOLDOWN_MS:"60000",
+      BABYSHOWER_TRANSCRIPT_DUPLICATE_MS:"60000",
+      ...extraEnv
+    },
+    stdio:["pipe","pipe","pipe"]
+  });
 
-child.stdin.end([
-  "Can someone take a photo please?",
-  "photo again immediately",
-  "Bring the flowers",
-  "Nothing interesting here",
+  let stdout="",stderr="";
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  child.stdout.on("data",(chunk)=>{stdout+=chunk;});
+  child.stderr.on("data",(chunk)=>{stderr+=chunk;});
+
+  child.stdin.end(lines.join("\n"));
+  const code=await new Promise((resolve)=>child.on("exit",resolve));
+  assert.equal(code,0);
+
+  return {
+    tokens:stdout.trim().split(/\n+/).filter(Boolean),
+    logs:stderr.trim().split(/\n+/).filter(Boolean).map((line)=>JSON.parse(line))
+  };
+}
+
+const primary=await runMapper([
+  "Can you show the photo please?",
+  "Can you show the photo please?",
+  "show the latest family picture",
+  "Send some flowers",
   "oti karu ya",
-  "haldi kunku",
-  "celebrate!",
-  "photo; rm -rf /"
-].join("\n"));
+  "apply haldi",
+  "apply kunku",
+  "let's celebrate"
+]);
 
-const code=await new Promise((resolve)=>child.on("exit",resolve));
-assert.equal(code,0);
-
-const tokens=output.trim().split(/\n+/).filter(Boolean);
-assert.deepEqual(tokens,[
+assert.deepEqual(primary.tokens,[
   "photo.show",
   "flowers",
   "oti",
   "haldi",
+  "kunku",
   "celebrate"
 ]);
+assert(primary.logs.some((entry)=>entry.kind==="suppressed_duplicate"));
+assert(primary.logs.some((entry)=>entry.kind==="suppressed_cooldown"));
+assert(primary.logs.some((entry)=>entry.kind==="matched"&&entry.trigger==="photo.show"));
 
-for(const token of tokens){
+const falsePositives=await runMapper([
+  "We took a photo yesterday.",
+  "That picture was nice.",
+  "My favourite flowers are roses.",
+  "The haldi was beautiful.",
+  "Kunku is on the table.",
+  "Congratulations on the promotion.",
+  "Please do not show the photo.",
+  "photo; rm -rf /"
+]);
+
+assert.deepEqual(falsePositives.tokens,[]);
+assert(falsePositives.logs.every((entry)=>entry.kind==="no_match"));
+
+for(const token of primary.tokens){
   assert.match(token,/^[a-z]+(?:[.-][a-z]+)*$/);
 }
 
-console.log("Verified: transcript mapper emits only expected whitelisted triggers.");
+console.log("Verified: transcript matcher is intent-based, deduplicated, cooldown-safe, and rejects false positives.");
