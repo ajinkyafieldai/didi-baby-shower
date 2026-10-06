@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17120f">
+  <title>Baby Shower Host</title>
+  <link rel="stylesheet" href="/host.css">
+</head>
+<body>
+  <main class="host-shell">
+    <header class="host-header">
+      <div>
+        <p class="eyebrow">Didi's Baby Shower</p>
+        <h1>Host console</h1>
+      </div>
+      <div id="overall-health" class="health-pill">Connecting…</div>
+    </header>
+
+    <section class="metrics" aria-label="Event health">
+      <article><span>Clients</span><strong id="metric-clients">—</strong></article>
+      <article><span>Guest</span><strong id="metric-guests">—</strong></article>
+      <article><span>Projector</span><strong id="metric-projectors">—</strong></article>
+      <article><span>p50 latency</span><strong id="metric-p50">—</strong></article>
+      <article><span>p95 latency</span><strong id="metric-p95">—</strong></article>
+      <article><span>Uptime</span><strong id="metric-uptime">—</strong></article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><p class="eyebrow">Control plane</p><h2>Fire an event</h2></div>
+        <label class="force-toggle"><input id="force" type="checkbox"> <span>Force</span></label>
+      </div>
+      <div class="control-grid">
+        <button data-effect="photo">📸 Photo</button>
+        <button data-effect="haldi">🟡 Haldi</button>
+        <button data-effect="kunku">🔴 Kunku</button>
+        <button data-effect="oti">🥥 Oti</button>
+        <button data-effect="flowers">🌸 Flowers</button>
+        <button data-effect="celebrate">🎉 Celebrate</button>
+      </div>
+      <p id="action-status" class="status-line" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><p class="eyebrow">Live</p><h2>Recent events</h2></div>
+        <a href="/projector.html" target="_blank" rel="noreferrer">Open projector ↗</a>
+      </div>
+      <ol id="event-log" class="event-log"></ol>
+    </section>
+  </main>
+  <script src="/host.js" defer></script>
+</body>
+</html>
