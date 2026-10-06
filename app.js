@@ -22,6 +22,9 @@ const blessingMessage = document.getElementById("blessing-message");
 const blessingCount = document.getElementById("blessing-count");
 const blessingWall = document.getElementById("blessing-wall");
 const blessingExport = document.getElementById("blessing-export");
+const wallPhotoInput = document.getElementById("wall-photo-input");
+const wallPhotoCaption = document.getElementById("wall-photo-caption");
+const wallPhotoStatus = document.getElementById("wall-photo-status");
 
 let gameState = { names: [], quiz: [] };
 let activeGame = null;
@@ -60,6 +63,50 @@ const blessingStore = (() => {
       entry.reactions = entry.reactions || {};
       entry.reactions[emoji] = Number(entry.reactions[emoji] || 0) + 1;
       write(items);
+    }
+  };
+})();
+
+const wallPhotoStore = (() => {
+  const dbName = "didi-baby-shower-family-wall";
+  const storeName = "photos";
+
+  function open() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(dbName, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(storeName)) {
+          db.createObjectStore(storeName);
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error("Could not open photo storage."));
+    });
+  }
+
+  async function transact(mode, callback) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, mode);
+      const store = tx.objectStore(storeName);
+      const request = callback(store);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error("Photo storage failed."));
+      tx.oncomplete = () => db.close();
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error || new Error("Photo storage failed."));
+      };
+    });
+  }
+
+  return {
+    put(id, blob) {
+      return transact("readwrite", (store) => store.put(blob, id));
+    },
+    get(id) {
+      return transact("readonly", (store) => store.get(id));
     }
   };
 })();
@@ -679,24 +726,66 @@ function renderGame(game) {
 }
 
 
-function renderBlessings() {
+
+let wallObjectUrls = [];
+
+function clearWallObjectUrls() {
+  wallObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+  wallObjectUrls = [];
+}
+
+async function renderBlessings() {
   const items = blessingStore.list();
+  clearWallObjectUrls();
 
   if (!items.length) {
-    blessingWall.innerHTML = '<p class="blessing-empty">The wall is waiting for its first blessing ✨</p>';
+    blessingWall.innerHTML = '<p class="blessing-empty">The family wall is waiting for its first note or photo ✨</p>';
     return;
   }
 
-  blessingWall.innerHTML = items.map((item) => {
-    const forWhom = item.audience === "didi" ? "For Didi" : "For the baby";
+  const rows = await Promise.all(items.map(async (item) => {
     const reactions = item.reactions || {};
+
+    if (item.kind === "photo" && item.photoId) {
+      let imageHtml = '<div class="wall-photo-missing">Photo unavailable on this device</div>';
+      try {
+        const blob = await wallPhotoStore.get(item.photoId);
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          wallObjectUrls.push(url);
+          imageHtml = `<img class="wall-photo" src="${url}" alt="${escapeHtml(item.caption || "Shared family photo")}">`;
+        }
+      } catch (error) {
+        console.warn("Could not load wall photo", error);
+      }
+
+      return `
+        <article class="blessing-note wall-photo-note" data-blessing-id="${escapeHtml(item.id)}">
+          ${imageHtml}
+          ${item.caption ? `<p class="wall-photo-caption">${escapeHtml(item.caption)}</p>` : ""}
+          <footer>
+            <strong>📷 ${escapeHtml(item.sender || "Someone")}</strong>
+            <div class="blessing-reactions">
+              ${["❤️","🥹","😂"].map((emoji) => `
+                <button type="button" data-blessing-react="${emoji}">
+                  <span>${emoji}</span>
+                  <small>${Number(reactions[emoji] || 0) || ""}</small>
+                </button>
+              `).join("")}
+            </div>
+          </footer>
+        </article>
+      `;
+    }
+
+    const forWhom = item.audience === "didi" ? "For Didi" : "For the baby";
     return `
       <article class="blessing-note" data-blessing-id="${escapeHtml(item.id)}">
         <div class="blessing-note-top">
           <span>${item.audience === "didi" ? "🌸" : "👶"} ${forWhom}</span>
           <time>${new Date(item.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
         </div>
-        <p>${escapeHtml(item.message)}</p>
+        <p>${escapeHtml(item.message || "")}</p>
         <footer>
           <strong>— ${escapeHtml(item.sender || "Someone")}</strong>
           <div class="blessing-reactions">
@@ -710,7 +799,9 @@ function renderBlessings() {
         </footer>
       </article>
     `;
-  }).join("");
+  }));
+
+  blessingWall.innerHTML = rows.join("");
 
   blessingWall.querySelectorAll("[data-blessing-react]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -727,40 +818,110 @@ function showBlessingFloat(entry) {
   const note = document.createElement("div");
   note.className = "blessing-float";
   note.innerHTML = `
-    <span>${entry.audience === "didi" ? "🌸" : "👶"}</span>
+    <span>${entry.kind === "photo" ? "📷" : (entry.audience === "didi" ? "🌸" : "👶")}</span>
     <div>
       <strong>${escapeHtml(entry.sender || "Someone")}</strong>
-      <p>${escapeHtml(entry.message)}</p>
+      <p>${escapeHtml(entry.kind === "photo" ? (entry.caption || "shared a photo") : entry.message)}</p>
     </div>
   `;
   effectLayer.appendChild(note);
   window.setTimeout(() => note.remove(), 5200);
 }
 
-function exportBlessingsKeepsake() {
-  const items = blessingStore.list().slice().reverse();
-  const rows = items.map((item) => {
-    const title = item.audience === "didi" ? "For Didi" : "For the baby";
-    return `
-      <article>
-        <div class="meta">${title} · ${new Date(item.at).toLocaleString()}</div>
-        <blockquote>${escapeHtml(item.message)}</blockquote>
-        <div class="from">— ${escapeHtml(item.sender || "Someone")}</div>
-      </article>
-    `;
-  }).join("");
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error("Could not read photo."));
+    reader.readAsDataURL(blob);
+  });
+}
 
-  const html = `<!doctype html>
+async function compressWallPhoto(file) {
+  if (!file || !file.type.startsWith("image/")) {
+    throw new Error("Choose an image.");
+  }
+
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.decoding = "async";
+    image.src = sourceUrl;
+    await image.decode();
+
+    const maxEdge = 1600;
+    const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(image, 0, 0, width, height);
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.84));
+    if (!blob) throw new Error("Could not prepare photo.");
+    return blob;
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+
+async function exportBlessingsKeepsake() {
+  blessingExport.disabled = true;
+  blessingExport.textContent = "Preparing…";
+
+  try {
+    const items = blessingStore.list().slice().reverse();
+    const rows = [];
+
+    for (const item of items) {
+      if (item.kind === "photo" && item.photoId) {
+        let photoHtml = "";
+        try {
+          const blob = await wallPhotoStore.get(item.photoId);
+          if (blob) {
+            const dataUrl = await blobToDataUrl(blob);
+            photoHtml = `<img src="${dataUrl}" alt="${escapeHtml(item.caption || "Family photo")}">`;
+          }
+        } catch (error) {
+          console.warn("Could not export wall photo", error);
+        }
+
+        rows.push(`
+          <article>
+            <div class="meta">Family photo · ${new Date(item.at).toLocaleString()}</div>
+            ${photoHtml}
+            ${item.caption ? `<blockquote>${escapeHtml(item.caption)}</blockquote>` : ""}
+            <div class="from">— ${escapeHtml(item.sender || "Someone")}</div>
+          </article>
+        `);
+        continue;
+      }
+
+      const title = item.audience === "didi" ? "For Didi" : "For the baby";
+      rows.push(`
+        <article>
+          <div class="meta">${title} · ${new Date(item.at).toLocaleString()}</div>
+          <blockquote>${escapeHtml(item.message || "")}</blockquote>
+          <div class="from">— ${escapeHtml(item.sender || "Someone")}</div>
+        </article>
+      `);
+    }
+
+    const html = `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>Didi's Baby Shower — Blessings</title>
+<title>Didi's Baby Shower — Family Wall</title>
 <style>
   body{font-family:Georgia,serif;margin:0;padding:48px;background:#fffaf7;color:#422f35}
   main{max-width:820px;margin:auto}
   h1{font-size:42px;margin:0 0 8px}
   .sub{color:#7a6970;margin-bottom:36px}
   article{break-inside:avoid;margin:0 0 18px;padding:22px;border:1px solid #eadfdc;border-radius:18px;background:white}
+  article img{display:block;width:100%;max-height:620px;object-fit:contain;border-radius:14px;margin:10px 0}
   .meta{font:700 12px system-ui;color:#a94762;text-transform:uppercase;letter-spacing:.06em}
   blockquote{margin:12px 0;font-size:22px;line-height:1.45}
   .from{text-align:right;font-weight:700}
@@ -769,19 +930,23 @@ function exportBlessingsKeepsake() {
 </head>
 <body><main>
 <h1>Didi's Baby Shower</h1>
-<p class="sub">Blessings from the family 💛</p>
-${rows || "<p>No blessings yet.</p>"}
+<p class="sub">Family Wall — notes, memories and photos 💛</p>
+${rows.join("") || "<p>The wall is empty.</p>"}
 </main></body></html>`;
 
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "didi-baby-shower-blessings.html";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "didi-baby-shower-family-wall.html";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } finally {
+    blessingExport.disabled = false;
+    blessingExport.textContent = "Export keepsake";
+  }
 }
 
 blessingLaunch.addEventListener("click", () => {
@@ -811,6 +976,7 @@ blessingForm.addEventListener("submit", (event) => {
 
   const entry = {
     id: crypto.randomUUID(),
+    kind: "note",
     sender: guestName || guestNameInput.value.trim() || "Someone",
     audience: data.get("audience") === "didi" ? "didi" : "baby",
     message,
@@ -825,6 +991,46 @@ blessingForm.addEventListener("submit", (event) => {
   renderBlessings();
   showBlessingFloat(entry);
   playChime("photo");
+});
+
+wallPhotoInput.addEventListener("change", async () => {
+  const [file] = wallPhotoInput.files || [];
+  if (!file) return;
+
+  wallPhotoInput.disabled = true;
+  wallPhotoStatus.textContent = "Preparing photo…";
+
+  try {
+    const blob = await compressWallPhoto(file);
+    const photoId = crypto.randomUUID();
+    await wallPhotoStore.put(photoId, blob);
+
+    const entry = {
+      id: crypto.randomUUID(),
+      kind: "photo",
+      photoId,
+      sender: guestName || guestNameInput.value.trim() || "Someone",
+      caption: wallPhotoCaption.value.trim().slice(0, 80),
+      at: Date.now(),
+      reactions: {}
+    };
+
+    blessingStore.add(entry);
+    wallPhotoInput.value = "";
+    wallPhotoCaption.value = "";
+    wallPhotoStatus.textContent = "Added ✓";
+    await renderBlessings();
+    showBlessingFloat(entry);
+    playChime("photo");
+    window.setTimeout(() => {
+      wallPhotoStatus.textContent = "";
+    }, 2200);
+  } catch (error) {
+    console.error("Family wall photo failed", error);
+    wallPhotoStatus.textContent = error.message || "Could not add photo.";
+  } finally {
+    wallPhotoInput.disabled = false;
+  }
 });
 
 blessingExport.addEventListener("click", exportBlessingsKeepsake);
