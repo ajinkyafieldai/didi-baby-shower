@@ -8,64 +8,39 @@ function json(data, status = 200) {
   });
 }
 
-function realtimeRequest(env, method, body) {
-  const url = String(env.REALTIME_URL || "").trim();
-  const secret = String(env.REALTIME_SHARED_SECRET || "").trim();
-
-  if (!url || !secret) {
-    throw new Error("Realtime proxy is not configured.");
+function validWherebyRoom(raw) {
+  if (!raw) return null;
+  try {
+    const roomUrl = new URL(String(raw).trim());
+    if (
+      roomUrl.protocol !== "https:" ||
+      !(roomUrl.hostname === "whereby.com" || roomUrl.hostname.endsWith(".whereby.com"))
+    ) return null;
+    return roomUrl.toString();
+  } catch {
+    return null;
   }
-
-  const headers = {
-    "x-realtime-secret": secret
-  };
-
-  if (body !== undefined) headers["content-type"] = "application/json";
-
-  return fetch(url, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    cache: "no-store"
-  });
 }
 
 export async function onRequestGet(context) {
-  try {
-    const response = await realtimeRequest(context.env, "GET");
-    const data = await response.json().catch(() => ({}));
+  const roomUrl = validWherebyRoom(context.env.BABYSHOWER_VIDEO_ROOM_URL);
 
-    if (!response.ok) {
-      return json({ error: data.error || "Unable to read video room." }, response.status);
-    }
-
-    const room = data.videoRoom;
-    if (!room?.roomUrl) {
-      return json({ error: "Video room is not configured." }, 503);
-    }
-
-    if (room.endDate) {
-      const end = Date.parse(room.endDate);
-      if (Number.isFinite(end) && end <= Date.now()) {
-        return json({ error: "Video room has expired." }, 410);
-      }
-    }
-
-    return json({
-      provider: "whereby",
-      roomUrl: room.roomUrl,
-      meetingId: room.meetingId || null,
-      endDate: room.endDate || null
-    });
-  } catch (error) {
-    return json({ error: error.message || "Unable to read video room." }, 503);
+  if (!roomUrl) {
+    return json({ error: "Video room is not configured." }, 503);
   }
+
+  return json({ provider: "whereby", roomUrl });
 }
 
 export async function onRequestPost(context) {
+  const branch = String(context.env.CF_PAGES_BRANCH || "");
+  if (!branch || branch === "devel" || branch === "main") {
+    return json({ error: "Preview room provisioning is disabled on this branch." }, 403);
+  }
+
   const apiKey = String(context.env.WHEREBY_API_KEY || "").trim();
   if (!apiKey) {
-    return json({ error: "WHEREBY_API_KEY is not configured." }, 503);
+    return json({ error: "WHEREBY_API_KEY is not configured for this Pages preview." }, 503);
   }
 
   let requested = {};
@@ -75,55 +50,36 @@ export async function onRequestPost(context) {
     requested = {};
   }
 
-  const hours = Number(requested.hours ?? 8);
+  const hours = Number(requested.hours ?? 2);
   if (!Number.isFinite(hours) || hours <= 0 || hours > 24) {
     return json({ error: "hours must be between 0 and 24." }, 400);
   }
 
   const endDate = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 
-  const whereby = await fetch("https://api.whereby.dev/v1/meetings", {
+  const response = await fetch("https://api.whereby.dev/v1/meetings", {
     method: "POST",
     headers: {
       "authorization": "Bearer " + apiKey,
       "content-type": "application/json"
     },
-    body: JSON.stringify({
-      endDate,
-      fields: ["hostRoomUrl"]
-    })
+    body: JSON.stringify({ endDate })
   });
 
-  const meeting = await whereby.json().catch(() => ({}));
-  if (!whereby.ok) {
+  const meeting = await response.json().catch(() => ({}));
+  if (!response.ok) {
     return json(
-      { error: meeting.error || meeting.message || `Whereby HTTP ${whereby.status}` },
-      whereby.status
+      { error: meeting.error || meeting.message || `Whereby HTTP ${response.status}` },
+      response.status
     );
-  }
-
-  try {
-    const stored = await realtimeRequest(context.env, "POST", {
-      type: "video_room_set",
-      roomUrl: meeting.roomUrl,
-      meetingId: meeting.meetingId || null,
-      endDate
-    });
-    const storedData = await stored.json().catch(() => ({}));
-
-    if (!stored.ok) {
-      return json({ error: storedData.error || "Unable to store video room." }, stored.status);
-    }
-  } catch (error) {
-    return json({ error: error.message || "Unable to store video room." }, 503);
   }
 
   return json({
     ok: true,
     provider: "whereby",
     roomUrl: meeting.roomUrl,
-    hostRoomUrl: meeting.hostRoomUrl || null,
     meetingId: meeting.meetingId || null,
-    endDate
+    endDate,
+    preview: true
   });
 }
