@@ -151,3 +151,6 @@ npm run rtms:local
 The local runner exports the values from `.env` for the whole Unix pipeline, so both the RTMS source and downstream `babyshower trigger` commands inherit the same configuration. Logs default to `./logs/transcript.log`.
 
 The systemd deployment path still uses `/etc/babyshower/rtms.env`; both paths expose the same environment-variable contract.
+
+
+For interactive simulator pipelines, prefer calling the simulator with `node scripts/rtms-transcript-sim.mjs` (or `npm run --silent rtms:sim`) so npm's script banner does not enter stdout and get inspected by the phrase mapper.
