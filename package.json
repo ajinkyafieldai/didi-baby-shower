@@ -12,7 +12,9 @@
     "trigger": "node babyshower.js trigger",
     "rtms:transcript": "node scripts/rtms-transcript.mjs",
     "rtms:sim": "node scripts/rtms-transcript-sim.mjs",
-    "rtms:local": "bash scripts/run-transcript-local.sh"
+    "rtms:local": "bash scripts/run-transcript-local.sh",
+    "transcript:local": "bash scripts/run-local-transcript.sh",
+    "transcript:sources": "bash scripts/list-audio-sources.sh"
   },
   "dependencies": {
     "@zoom/meetingsdk": "^6.5.0",
