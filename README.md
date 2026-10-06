@@ -10,6 +10,12 @@ A phone-first remote baby-shower experience: Zoom stays embedded in the page whi
 - Ceremony animation layer stays outside Zoom so it can overlay the call cleanly
 - Shared realtime event channel is the next layer; the UI already exposes `window.babyShower.playEffect(effect, sender)` as the receiving boundary
 
+## Event runtime design
+
+The current photobooth, transcript-trigger, operator-control, recording, and post-production plan is documented in [docs/event-runtime.md](docs/event-runtime.md).
+
+The design deliberately keeps the Didi event specific while defining reusable runtime boundaries for a possible future live-event interaction product.
+
 ## Cloudflare Pages configuration
 
 Set these under **Workers & Pages -> didi-baby-shower -> Settings -> Variables and Secrets**.
