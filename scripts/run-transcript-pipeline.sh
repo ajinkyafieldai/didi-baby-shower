@@ -3,7 +3,7 @@ set -euo pipefail
 
 : "${BABYSHOWER_URL:?BABYSHOWER_URL is required}"
 
-log_dir="${BABYSHOWER_LOG_DIR:-/var/log/babyshower}"
+log_dir="${BABYSHOWER_LOG_DIR:-./logs}"
 mkdir -p "$log_dir"
 
 node scripts/rtms-transcript.mjs \
