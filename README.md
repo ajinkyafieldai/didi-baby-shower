@@ -134,3 +134,20 @@ deploy/cloudflared/config.yml.example
 The application listens on localhost. No direct inbound RTMS port needs to be exposed.
 
 Secret storage is intentionally abstracted behind `/etc/babyshower/rtms.env` for now. A vault-backed mechanism can replace that later without changing the JS runtime or systemd unit.
+
+
+### Local .env setup
+
+For a single trusted machine, use a local `.env` file:
+
+```sh
+cp .env.example .env
+$EDITOR .env
+npm run rtms:local
+```
+
+`.env` and other `.env.*` files are gitignored; only `.env.example` is tracked.
+
+The local runner exports the values from `.env` for the whole Unix pipeline, so both the RTMS source and downstream `babyshower trigger` commands inherit the same configuration. Logs default to `./logs/transcript.log`.
+
+The systemd deployment path still uses `/etc/babyshower/rtms.env`; both paths expose the same environment-variable contract.
