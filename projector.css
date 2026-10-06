@@ -7,3 +7,16 @@ h1{font-size:clamp(3rem,8vw,8rem);line-height:.95;margin:.25em 0 .2em}p{font-siz
 .projector-effect.show{opacity:1;transform:scale(1)}.projector-effect.photo{background:rgba(0,0,0,.75);font-size:clamp(4rem,12vw,12rem)}
 .projector-status{position:absolute;right:24px;bottom:18px;font-size:14px;color:#a8958d;z-index:4}.projector-status.good{color:#a6d9b9}.projector-status.bad{color:#ffb5b5}
 @media(prefers-reduced-motion:reduce){.projector-effect{transition:none}}
+.projector-effect.photo-image {
+  background: rgba(0,0,0,.82);
+  padding: 4vh 4vw;
+}
+.projector-effect.photo-image img {
+  max-width: 92vw;
+  max-height: 88vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 22px;
+  box-shadow: 0 30px 90px rgba(0,0,0,.5);
+}
