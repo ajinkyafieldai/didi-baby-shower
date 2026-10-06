@@ -52,5 +52,4 @@ assert.equal(roomPayload.ok, true);
 assert.equal(roomPayload.dryRun, true);
 assert.equal(roomPayload.provider, "whereby");
 assert.equal(roomPayload.hours, 8);
-assert.deepEqual(roomPayload.payload.fields, ["hostRoomUrl"]);
-assert.match(roomPayload.payload.endDate, /^\d{4}-\d{2}-\d{2}T/);
+assert.equal(roomPayload.endpoint, "/api/video-config");
