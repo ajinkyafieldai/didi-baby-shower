@@ -1937,3 +1937,109 @@ button { -webkit-tap-highlight-color: transparent; }
     border: 0;
   }
 }
+
+
+/* Snappy interaction pass */
+button,
+.game-launch,
+.ritual-button,
+.family-hub-tabs button,
+.blessing-export,
+.wall-photo-pick,
+.hub-form > button,
+.afterparty-preview {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:active,
+.game-launch:active,
+.ritual-button:active,
+.family-hub-tabs button:active,
+.blessing-export:active,
+.hub-form > button:active,
+.afterparty-preview:active {
+  transform: scale(.97);
+}
+
+button,
+.game-launch,
+.ritual-button,
+.family-hub-tabs button,
+.blessing-export,
+.hub-form > button,
+.afterparty-preview {
+  transition:
+    transform 90ms ease,
+    opacity 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+button.is-busy {
+  opacity: .7;
+  cursor: progress;
+}
+
+.game-panel,
+.blessing-panel {
+  contain: layout paint;
+}
+
+.game-card,
+.blessing-card,
+.timeline-card,
+.recipe-card,
+.blessing-note,
+.arrival-card,
+.capsule-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 180px;
+}
+
+.blessing-panel {
+  opacity: 1;
+  transition: opacity 120ms ease;
+}
+
+.blessing-panel.opening {
+  opacity: .98;
+}
+
+.family-hub-tabs {
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+}
+
+.family-hub-tabs button {
+  scroll-snap-align: start;
+}
+
+.hub-view.active {
+  animation: hub-view-in 120ms ease-out both;
+}
+
+@keyframes hub-view-in {
+  from { opacity: .82; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.wall-photo,
+.timeline-card img,
+.recipe-card > img,
+.photo-mosaic img {
+  background: rgba(66,47,53,.05);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-view.active { animation: none; }
+  button,
+  .game-launch,
+  .ritual-button,
+  .family-hub-tabs button,
+  .blessing-export,
+  .hub-form > button,
+  .afterparty-preview {
+    transition: none;
+  }
+}
