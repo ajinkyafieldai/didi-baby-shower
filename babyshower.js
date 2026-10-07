@@ -84,7 +84,7 @@ async function createRoom(dryRun=false){
     console.log(JSON.stringify({
       ok:true,
       dryRun:true,
-      provider:"whereby",
+      provider:"daily",
       hours,
       endpoint:"/api/video-provision"
     },null,2));

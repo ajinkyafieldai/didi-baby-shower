@@ -18,7 +18,7 @@ function fail(message) {
 
 async function startVideo() {
   try {
-    stage("Getting Whereby room…");
+    stage("Getting Daily room…");
 
     const response = await fetch("/api/video-config", {
       cache: "no-store"
@@ -29,33 +29,42 @@ async function startVideo() {
       throw new Error(config.error || "Video room is not configured.");
     }
 
-    stage("Loading Whereby…");
-    await customElements.whenDefined("whereby-embed");
+    if (config.provider !== "daily") {
+      throw new Error("Configured video provider is not Daily.");
+    }
 
-    const meeting = document.createElement("whereby-embed");
-    meeting.setAttribute("room", config.roomUrl);
-    meeting.setAttribute("display-name", name);
-    meeting.setAttribute("minimal", "");
-    meeting.setAttribute("chat", "off");
-    meeting.setAttribute("screenshare", "off");
-    meeting.setAttribute("people", "off");
-    meeting.setAttribute("room-integrations", "off");
+    if (!window.Daily || typeof window.Daily.createFrame !== "function") {
+      throw new Error("Daily client failed to load.");
+    }
 
-    meeting.addEventListener("ready", () => {
+    stage("Loading Daily…");
+
+    const callFrame = window.Daily.createFrame(root, {
+      showLeaveButton: true,
+      iframeStyle: {
+        width: "100%",
+        height: "100%",
+        border: "0"
+      }
+    });
+
+    callFrame.on("joined-meeting", async () => {
+      try {
+        await callFrame.setUserName(name);
+      } catch {}
       if (bootMessage) bootMessage.remove();
       report("video-status", "Live");
-    }, { once: true });
+    });
 
-    root.appendChild(meeting);
+    callFrame.on("error", (event) => {
+      const message = event?.errorMsg || event?.error?.msg || "Daily call failed.";
+      fail(message);
+    });
 
-    // The component can be usable before a browser emits the ready event.
-    // Remove the boot overlay after a short grace period rather than blocking.
-    window.setTimeout(() => {
-      if (bootMessage && bootMessage.isConnected) {
-        bootMessage.remove();
-        report("video-status", "Live");
-      }
-    }, 3000);
+    await callFrame.join({
+      url: config.roomUrl,
+      userName: name
+    });
   } catch (error) {
     console.error(error);
     fail(error.message || "Video call startup failed.");

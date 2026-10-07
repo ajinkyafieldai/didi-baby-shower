@@ -2,13 +2,13 @@
 
 A phone-first remote baby-shower experience and Apsila prototype.
 
-The video transport is embedded Whereby. Ceremony effects, games, photo workflow, realtime state, and transcript-driven triggers are owned by this application.
+The video transport is embedded Daily. Ceremony effects, games, photo workflow, realtime state, and transcript-driven triggers are owned by this application.
 
 ## Architecture
 
 - Cloudflare Pages frontend
-- provider-neutral video shell at `/whereby.html`
-- Whereby Embedded for live audio/video
+- provider-neutral video shell at `/daily.html`
+- Daily Embedded for live audio/video
 - Cloudflare Pages Functions for frontend-facing APIs
 - Cloudflare Worker + Durable Object for shared realtime event state
 - native photobooth client for family-photo capture
@@ -16,7 +16,7 @@ The video transport is embedded Whereby. Ceremony effects, games, photo workflow
 
 Video transport is intentionally separate from Apsila interaction logic.
 
-## Whereby
+## Daily
 
 Room creation is deliberate and does not require a Pages redeploy.
 
@@ -25,9 +25,9 @@ node babyshower.js room create --hours 8 --dry-run
 node babyshower.js room create --hours 8
 ```
 
-The CLI calls `/api/video-provision`. The Pages Function uses the server-side `WHEREBY_API_KEY`, creates or reuses a Whereby meeting, and stores the current room in the existing realtime Durable Object.
+The CLI calls `/api/video-provision`. The Pages Function uses the server-side `DAILY_API_KEY`, creates or reuses a Daily meeting, and stores the current room in the existing realtime Durable Object.
 
-Guests call `/api/video-config`, which reads that stored room from realtime state and returns only the guest room URL and metadata needed by the browser. The Whereby API key is never exposed to the client.
+Guests call `/api/video-config`, which reads that stored room from realtime state and returns only the guest room URL and metadata needed by the browser. The Daily API key is never exposed to the client.
 
 A new room therefore changes runtime event state rather than deployment configuration.
 
