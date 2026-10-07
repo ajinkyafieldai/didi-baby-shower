@@ -8,53 +8,41 @@ function json(data, status = 200) {
   });
 }
 
-function validWherebyRoom(raw) {
-  if (!raw) return null;
-  try {
-    const roomUrl = new URL(String(raw).trim());
-    if (
-      roomUrl.protocol !== "https:" ||
-      !(roomUrl.hostname === "whereby.com" || roomUrl.hostname.endsWith(".whereby.com"))
-    ) return null;
-    return roomUrl.toString();
-  } catch {
-    return null;
-  }
-}
-
 export async function onRequestGet(context) {
-  const roomUrl = validWherebyRoom(context.env.BABYSHOWER_VIDEO_ROOM_URL);
+  const url = String(context.env.REALTIME_URL || "").trim();
+  const secret = String(context.env.REALTIME_SHARED_SECRET || "").trim();
 
-  if (roomUrl) {
-    return json({ provider: "whereby", roomUrl });
+  if (!url || !secret) {
+    return json({ error: "Realtime proxy is not configured." }, 503);
   }
 
-  const branch = String(context.env.CF_PAGES_BRANCH || "");
-  if (!branch || branch === "devel" || branch === "main") {
-    return json({ error: "Video room is not configured." }, 503);
-  }
-
-  const production = await fetch("https://didi-baby-shower.pages.dev/api/video-provision", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ hours: 2 }),
+  const response = await fetch(url, {
+    method: "GET",
+    headers: { "x-realtime-secret": secret },
     cache: "no-store"
   });
 
-  const data = await production.json().catch(() => ({}));
-  if (!production.ok) {
-    return json(
-      { error: data.error || "Unable to provision preview video room." },
-      production.status
-    );
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    return json({ error: data.error || "Unable to read video room." }, response.status);
+  }
+
+  const room = data.videoRoom;
+  if (!room?.roomUrl) {
+    return json({ error: "Video room is not configured." }, 503);
+  }
+
+  if (room.endDate) {
+    const end = Date.parse(room.endDate);
+    if (Number.isFinite(end) && end <= Date.now()) {
+      return json({ error: "Video room has expired." }, 410);
+    }
   }
 
   return json({
     provider: "whereby",
-    roomUrl: data.roomUrl,
-    meetingId: data.meetingId || null,
-    endDate: data.endDate || null,
-    preview: true,
-    reused: Boolean(data.reused)
+    roomUrl: room.roomUrl,
+    meetingId: room.meetingId || null,
+    endDate: room.endDate || null
   });
 }
