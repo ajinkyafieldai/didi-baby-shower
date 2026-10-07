@@ -42,7 +42,7 @@ button { -webkit-tap-highlight-color: transparent; }
   background: #161215;
 }
 
-#zoom-frame {
+#video-frame {
   display: none;
   width: 100%;
   height: 100%;
@@ -51,7 +51,7 @@ button { -webkit-tap-highlight-color: transparent; }
   background: #161215;
 }
 
-.video-stage.in-call #zoom-frame { display: block; }
+.video-stage.in-call #video-frame { display: block; }
 
 .video-placeholder {
   position: absolute;
@@ -1878,7 +1878,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .afterparty-mode .game-actions,
 .afterparty-mode .call-status,
 .afterparty-mode #video-placeholder,
-.afterparty-mode #zoom-frame {
+.afterparty-mode #video-frame {
   display: none !important;
 }
 
