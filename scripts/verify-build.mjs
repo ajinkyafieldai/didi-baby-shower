@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 
-const requiredPages = ["index.html", "whereby.html", "host.html", "projector.html"];
+const requiredPages = ["index.html", "daily.html", "host.html", "projector.html"];
 
 for (const page of requiredPages) {
   const path = `dist/${page}`;
@@ -10,9 +10,9 @@ for (const page of requiredPages) {
   }
 }
 
-const videoHtml = readFileSync("dist/whereby.html", "utf8");
+const videoHtml = readFileSync("dist/daily.html", "utf8");
 if (!videoHtml.includes("/assets/")) {
-  console.error("ERROR: dist/whereby.html does not reference a bundled Vite asset.");
+  console.error("ERROR: dist/daily.html does not reference a bundled Vite asset.");
   process.exit(1);
 }
 
@@ -24,4 +24,4 @@ for (const page of ["host.html", "projector.html"]) {
   }
 }
 
-console.log("Verified: guest, Whereby, host, and projector pages are built.");
+console.log("Verified: guest, Daily, host, and projector pages are built.");
