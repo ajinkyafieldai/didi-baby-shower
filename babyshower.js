@@ -86,14 +86,14 @@ async function createRoom(dryRun=false){
       dryRun:true,
       provider:"whereby",
       hours,
-      endpoint:"/api/video-config"
+      endpoint:"/api/video-provision"
     },null,2));
     return;
   }
 
   requireUrl();
 
-  const response=await fetch(baseUrl+"/api/video-config",{
+  const response=await fetch(baseUrl+"/api/video-provision",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({hours}),
