@@ -34,7 +34,7 @@ function warmLocalUi() {
 requestAnimationFrame(() => warmLocalUi());
 
 const stage = document.querySelector(".video-stage");
-const frame = document.getElementById("zoom-frame");
+const frame = document.getElementById("video-frame");
 const joinForm = document.getElementById("join-form");
 const joinMessage = document.getElementById("join-message");
 const statusText = document.getElementById("status-text");
@@ -227,7 +227,6 @@ let effectTimer = null;
 let groupEffectTimer = null;
 let audioContext = null;
 let photoCaptureStream = null;
-const zoomCaptureRequests = new Map();
 
 function showPhotoButton() {
   if (!featureEnabled("familyPhoto") || !photoButton) return;
@@ -237,27 +236,6 @@ function showPhotoButton() {
   photoButton.style.top = "auto";
   photoButton.style.right = "14px";
   photoButton.style.bottom = "14px";
-}
-
-function requestZoomPhoto() {
-  return new Promise((resolve, reject) => {
-    if (!frame.contentWindow) {
-      reject(new Error("Video frame is not ready."));
-      return;
-    }
-
-    const requestId = crypto.randomUUID();
-    const timeout = window.setTimeout(() => {
-      zoomCaptureRequests.delete(requestId);
-      reject(new Error("Video photo capture timed out."));
-    }, 3500);
-
-    zoomCaptureRequests.set(requestId, { resolve, reject, timeout });
-    frame.contentWindow.postMessage({
-      type: "zoom-capture-request",
-      requestId
-    }, location.origin);
-  });
 }
 
 async function saveFamilyPhotoBlob(blob) {
@@ -476,7 +454,7 @@ joinForm.addEventListener("submit", async (event) => {
   joinMessage.textContent = "Your browser may ask for camera and microphone permission.";
   statusText.textContent = "Connecting to video call…";
 
-  frame.src = `/zoom.html?name=${encodeURIComponent(guestName)}`;
+  frame.src = `/whereby.html?name=${encodeURIComponent(guestName)}`;
   stage.classList.add("in-call");
   if (featureEnabled("guestRibbon")) recordArrival(guestName, "");
 });
@@ -486,19 +464,7 @@ window.addEventListener("message", (event) => {
 
   const message = event.data || {};
 
-  if (message.type === "zoom-capture-result" && message.requestId) {
-    const pending = zoomCaptureRequests.get(message.requestId);
-    if (pending) {
-      window.clearTimeout(pending.timeout);
-      zoomCaptureRequests.delete(message.requestId);
-      if (message.error) pending.reject(new Error(message.error));
-      else if (message.blob instanceof Blob) pending.resolve(message.blob);
-      else pending.reject(new Error("Video call returned an invalid photo."));
-    }
-    return;
-  }
-
-  if (message.type === "zoom-status") {
+  if (message.type === "video-status") {
     statusText.textContent = message.text || "Video call";
     callStatus.classList.toggle("compact", message.text === "Live");
     if (message.text === "Live") {
@@ -506,7 +472,7 @@ window.addEventListener("message", (event) => {
     }
   }
 
-  if (message.type === "zoom-config-error") {
+  if (message.type === "video-config-error") {
     stage.classList.remove("in-call");
     joinMessage.textContent = message.text || "Video call is not configured yet.";
     statusText.textContent = "Video setup needed";
@@ -1765,10 +1731,8 @@ function playEffect(effect, sender, capturePhoto = false) {
           if (capturePhoto) {
             // Only the designated desktop/laptop photo host stores the image.
             // Everyone else just participates in the synchronized countdown.
-            requestZoomPhoto()
-              .then((blob) => saveFamilyPhotoBlob(blob))
-              .catch(async (directError) => {
-                console.warn("Direct Zoom capture unavailable; falling back to tab capture", directError);
+            Promise.resolve()
+              .then(async () => {
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
                   throw new Error("Photo host browser does not support tab capture.");
                 }
