@@ -3,6 +3,36 @@ import { FEATURES, featureEnabled, applyFeatureVisibility } from "./frontend/fea
 applyFeatureVisibility();
 window.__DIDI_FEATURES__ = FEATURES;
 
+const uiTask = window.scheduler?.postTask
+  ? (callback, priority = "user-visible") => window.scheduler.postTask(callback, { priority })
+  : (callback) => Promise.resolve().then(callback);
+
+function nextFrame() {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+function setBusy(button, busy, label = "") {
+  if (!button) return;
+  if (!button.dataset.originalLabel) button.dataset.originalLabel = button.textContent;
+  button.disabled = busy;
+  button.classList.toggle("is-busy", busy);
+  button.setAttribute("aria-busy", busy ? "true" : "false");
+  if (busy && label) button.textContent = label;
+  if (!busy) button.textContent = button.dataset.originalLabel || button.textContent;
+}
+
+function warmLocalUi() {
+  // Touch frequently used local stores after first paint so opening panels feels instant.
+  uiTask(() => {
+    try {
+      localStorage.getItem("baby-shower-blessings-v1");
+      localStorage.getItem("baby-shower-family-hub-v1");
+    } catch {}
+  }, "background");
+}
+
+requestAnimationFrame(() => warmLocalUi());
+
 const stage = document.querySelector(".video-stage");
 const frame = document.getElementById("zoom-frame");
 const joinForm = document.getElementById("join-form");
@@ -525,6 +555,7 @@ function showCapturedPhoto(asset) {
 }
 
 async function pollEvents() {
+  if (document.visibilityState === "hidden") return;
   if (syncBusy) return;
   syncBusy = true;
 
@@ -545,8 +576,9 @@ async function pollEvents() {
     const shouldResync = resyncOnNextPoll || resumedAfterGap;
 
     if (data.games) {
+      const previous = JSON.stringify(gameState);
       gameState = data.games;
-      if (activeGame) renderGame(activeGame);
+      if (activeGame && JSON.stringify(gameState) !== previous) renderGame(activeGame);
     }
 
     if (!eventsInitialized || shouldResync) {
@@ -740,10 +772,14 @@ function renderGame(game) {
       const input = event.currentTarget.elements.babyName;
       const name = input.value.trim();
       if (!name) return;
+      const submit = event.currentTarget.querySelector("button");
       input.disabled = true;
+      setBusy(submit, true, "Adding…");
       try {
         await sendGame({ type: "name_suggestion", name });
       } catch (error) {
+        input.disabled = false;
+        setBusy(submit, false);
         eventLabel.textContent = error.message;
         eventLabel.classList.add("visible");
       }
@@ -797,12 +833,13 @@ function renderGame(game) {
     event.preventDefault();
     const answers = didiQuestions.map((_, index) => event.currentTarget.elements[`q${index}`].value.trim());
     if (answers.some((value) => !value)) return;
-    event.currentTarget.querySelector("button").disabled = true;
+    const submit = event.currentTarget.querySelector("button");
+    setBusy(submit, true, "Locking…");
     try {
       await sendGame({ type: "quiz_submit", answers });
       playChime("photo");
     } catch (error) {
-      event.currentTarget.querySelector("button").disabled = false;
+      setBusy(submit, false);
       eventLabel.textContent = error.message;
       eventLabel.classList.add("visible");
     }
@@ -855,7 +892,9 @@ function switchHubView(view) {
     section.classList.toggle("active", active);
     section.hidden = !active;
   });
-  renderHubView(view);
+
+  // Let the selected tab paint first; load images/content right after.
+  requestAnimationFrame(() => renderHubView(view));
 }
 
 function worldPoint(lon, lat) {
@@ -1145,6 +1184,7 @@ timelineForm.addEventListener("submit", async (event) => {\n  if (!featureEnable
     at: Date.now()
   });
   event.currentTarget.reset();
+  setBusy(submit, false);
   playChime("photo");
   renderTimeline();
 });
@@ -1194,6 +1234,7 @@ recipeForm.addEventListener("submit", async (event) => {\n  if (!featureEnabled(
     at: Date.now()
   });
   event.currentTarget.reset();
+  setBusy(submit, false);
   playChime("photo");
   renderRecipes();
 });
@@ -1335,7 +1376,7 @@ async function compressWallPhoto(file) {
     image.src = sourceUrl;
     await image.decode();
 
-    const maxEdge = 1600;
+    const maxEdge = 1280;
     const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
     const width = Math.max(1, Math.round(image.naturalWidth * scale));
     const height = Math.max(1, Math.round(image.naturalHeight * scale));
@@ -1346,7 +1387,7 @@ async function compressWallPhoto(file) {
     const ctx = canvas.getContext("2d");
     ctx.drawImage(image, 0, 0, width, height);
 
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.84));
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.8));
     if (!blob) throw new Error("Could not prepare photo.");
     return blob;
   } finally {
@@ -1439,8 +1480,12 @@ blessingLaunch.addEventListener("click", () => {
   if (!featureEnabled("familyHub")) return;
   ensureAudioContext();
   blessingPanel.hidden = false;
-  switchHubView(activeHubView);
-  if (activeHubView === "wall") blessingMessage.focus();
+  blessingPanel.classList.add("opening");
+  requestAnimationFrame(() => {
+    blessingPanel.classList.remove("opening");
+    switchHubView(activeHubView);
+    if (activeHubView === "wall") blessingMessage.focus({ preventScroll: true });
+  });
 });
 
 blessingClose.addEventListener("click", () => {
@@ -1476,9 +1521,9 @@ blessingForm.addEventListener("submit", (event) => {
   blessingForm.reset();
   blessingMessage.value = "";
   blessingCount.textContent = "0/180";
-  renderBlessings();
   showBlessingFloat(entry);
   playChime("photo");
+  requestAnimationFrame(() => renderBlessings());
 });
 
 wallPhotoInput.addEventListener("change", async () => {
@@ -1488,6 +1533,7 @@ wallPhotoInput.addEventListener("change", async () => {
 
   wallPhotoInput.disabled = true;
   wallPhotoStatus.textContent = "Preparing photo…";
+  await nextFrame();
 
   try {
     const blob = await compressWallPhoto(file);
