@@ -102,7 +102,7 @@ export class CelebrationRoom {
 
       if (body && body.type === "video_room_set") {
         const roomUrl = String(body.roomUrl || "").trim().slice(0, 500);
-        const meetingId = String(body.meetingId || "").trim().slice(0, 200);
+        const roomId = String(body.roomId || "").trim().slice(0, 200);
         const endDate = String(body.endDate || "").trim().slice(0, 100);
 
         let parsed;
@@ -114,15 +114,15 @@ export class CelebrationRoom {
 
         if (
           parsed.protocol !== "https:" ||
-          !(parsed.hostname === "whereby.com" || parsed.hostname.endsWith(".whereby.com"))
+          !(parsed.hostname === "daily.co" || parsed.hostname.endsWith(".daily.co"))
         ) {
-          return json({ error: "Invalid Whereby room URL" }, 400);
+          return json({ error: "Invalid Daily room URL" }, 400);
         }
 
         const videoRoom = {
-          provider: "whereby",
+          provider: "daily",
           roomUrl: parsed.toString(),
-          meetingId: meetingId || null,
+          roomId: roomId || null,
           endDate: endDate || null,
           updatedAt: Date.now()
         };
