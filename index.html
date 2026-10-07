@@ -64,38 +64,133 @@
       </div>
 
       <div id="blessing-panel" class="blessing-panel" hidden>
-        <div class="blessing-card" role="dialog" aria-modal="true" aria-labelledby="blessing-title">
-          <button id="blessing-close" class="game-close" type="button" aria-label="Close family wall">×</button>
+        <div class="blessing-card family-hub-card" role="dialog" aria-modal="true" aria-labelledby="blessing-title">
+          <button id="blessing-close" class="game-close" type="button" aria-label="Close family hub">×</button>
           <div class="blessing-head">
             <div>
-              <h2 id="blessing-title">🖼️ Family Wall</h2>
-              <p>Notes, wishes, memories and photos for Didi and the baby.</p>
+              <h2 id="blessing-title">🖼️ Family Hub</h2>
+              <p>Everything the family leaves behind for Didi and the baby.</p>
             </div>
             <button id="blessing-export" class="blessing-export" type="button">Export keepsake</button>
           </div>
 
-          <form id="blessing-form" class="blessing-form">
-            <div class="blessing-audience" role="group" aria-label="Message recipient">
-              <label><input type="radio" name="audience" value="baby" checked> <span>For the baby</span></label>
-              <label><input type="radio" name="audience" value="didi"> <span>For Didi</span></label>
-            </div>
-            <textarea id="blessing-message" name="message" maxlength="180" rows="3" placeholder="A little wish, memory, or note…" required></textarea>
-            <div class="blessing-form-foot">
-              <span id="blessing-count">0/180</span>
-              <button type="submit">Add note 💛</button>
-            </div>
-          </form>
+          <nav class="family-hub-tabs" aria-label="Family keepsake sections">
+            <button type="button" data-hub-tab="wall" class="active">🖼️ Wall</button>
+            <button type="button" data-hub-tab="timeline">🕰️ Timeline</button>
+            <button type="button" data-hub-tab="map">🌍 Map</button>
+            <button type="button" data-hub-tab="capsule">💌 Capsule</button>
+            <button type="button" data-hub-tab="recipes">🍲 Recipes</button>
+            <button type="button" data-hub-tab="mosaic">🧩 Mosaic</button>
+            <button type="button" data-hub-tab="guests">👋 Who was here</button>
+            <button type="button" data-hub-tab="keepsake">✨ Keepsake</button>
+          </nav>
 
-          <div class="wall-photo-form">
-            <label class="wall-photo-pick">
-              <input id="wall-photo-input" type="file" accept="image/*">
-              <span>📷 Share a photo</span>
-            </label>
-            <input id="wall-photo-caption" type="text" maxlength="80" placeholder="Optional caption">
-            <span id="wall-photo-status" class="wall-photo-status" aria-live="polite"></span>
-          </div>
+          <section class="hub-view active" data-hub-view="wall">
+            <form id="blessing-form" class="blessing-form">
+              <div class="blessing-audience" role="group" aria-label="Message recipient">
+                <label><input type="radio" name="audience" value="baby" checked> <span>For the baby</span></label>
+                <label><input type="radio" name="audience" value="didi"> <span>For Didi</span></label>
+              </div>
+              <textarea id="blessing-message" name="message" maxlength="180" rows="3" placeholder="A little wish, memory, or note…" required></textarea>
+              <div class="blessing-form-foot">
+                <span id="blessing-count">0/180</span>
+                <button type="submit">Add note 💛</button>
+              </div>
+            </form>
 
-          <div id="blessing-wall" class="blessing-wall" aria-live="polite"></div>
+            <div class="wall-photo-form">
+              <label class="wall-photo-pick">
+                <input id="wall-photo-input" type="file" accept="image/*">
+                <span>📷 Share a photo</span>
+              </label>
+              <input id="wall-photo-caption" type="text" maxlength="80" placeholder="Optional caption">
+              <span id="wall-photo-status" class="wall-photo-status" aria-live="polite"></span>
+            </div>
+
+            <div id="blessing-wall" class="blessing-wall" aria-live="polite"></div>
+          </section>
+
+          <section class="hub-view" data-hub-view="timeline" hidden>
+            <form id="timeline-form" class="hub-form">
+              <h3>Add a Didi memory</h3>
+              <div class="hub-form-row">
+                <input name="when" maxlength="20" placeholder="Year or age, e.g. 2002 / Age 8" required>
+                <input name="title" maxlength="70" placeholder="Tiny title" required>
+              </div>
+              <textarea name="story" maxlength="280" rows="3" placeholder="What happened?" required></textarea>
+              <label class="hub-file"><input name="photo" type="file" accept="image/*"> 📷 Optional photo</label>
+              <button type="submit">Add to timeline</button>
+            </form>
+            <div id="timeline-list" class="timeline-list"></div>
+          </section>
+
+          <section class="hub-view" data-hub-view="map" hidden>
+            <form id="map-form" class="hub-form compact">
+              <h3>Where is everyone joining from?</h3>
+              <div class="hub-form-row">
+                <input name="name" maxlength="60" placeholder="Name" required>
+                <input name="city" maxlength="60" placeholder="City, e.g. Mumbai" required>
+              </div>
+              <button type="submit">Add a family pin</button>
+            </form>
+            <div id="family-map" class="family-map"></div>
+            <div id="map-list" class="map-list"></div>
+          </section>
+
+          <section class="hub-view" data-hub-view="capsule" hidden>
+            <form id="capsule-form" class="hub-form">
+              <h3>Baby Time Capsule</h3>
+              <div class="hub-form-row">
+                <select name="openAt" required>
+                  <option value="1">Open at age 1</option>
+                  <option value="5">Open at age 5</option>
+                  <option value="10">Open at age 10</option>
+                  <option value="18">Open at age 18</option>
+                  <option value="21">Open at age 21</option>
+                </select>
+                <input name="title" maxlength="60" placeholder="Tiny label, optional">
+              </div>
+              <textarea name="message" maxlength="500" rows="4" placeholder="Write something for future-you…" required></textarea>
+              <button type="submit">Seal message 🔒</button>
+            </form>
+            <div id="capsule-list" class="capsule-list"></div>
+          </section>
+
+          <section class="hub-view" data-hub-view="recipes" hidden>
+            <form id="recipe-form" class="hub-form">
+              <h3>Family Recipe Book</h3>
+              <input name="name" maxlength="80" placeholder="Dish name" required>
+              <textarea name="why" maxlength="180" rows="2" placeholder="Why should the baby grow up eating this?"></textarea>
+              <textarea name="recipe" maxlength="900" rows="5" placeholder="Ingredients + rough method" required></textarea>
+              <label class="hub-file"><input name="photo" type="file" accept="image/*"> 📷 Optional dish photo</label>
+              <button type="submit">Add recipe</button>
+            </form>
+            <div id="recipe-list" class="recipe-list"></div>
+          </section>
+
+          <section class="hub-view" data-hub-view="mosaic" hidden>
+            <div class="hub-section-head">
+              <div><h3>Family Photo Mosaic</h3><p>Every shared photo becomes one tile of the day.</p></div>
+            </div>
+            <div id="photo-mosaic" class="photo-mosaic"></div>
+          </section>
+
+          <section class="hub-view" data-hub-view="guests" hidden>
+            <form id="guest-form" class="hub-form compact">
+              <h3>Who was here</h3>
+              <div class="hub-form-row">
+                <input name="name" maxlength="60" placeholder="Name" required>
+                <input name="city" maxlength="60" placeholder="Joining from…">
+              </div>
+              <button type="submit">Add arrival 👋</button>
+            </form>
+            <div id="arrival-ribbon" class="arrival-ribbon"></div>
+          </section>
+
+          <section class="hub-view" data-hub-view="keepsake" hidden>
+            <div id="keepsake-summary" class="keepsake-summary"></div>
+            <button id="afterparty-preview" class="afterparty-preview" type="button">Preview afterparty page ✨</button>
+          </section>
         </div>
       </div>
     </section>
