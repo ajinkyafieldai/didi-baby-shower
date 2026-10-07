@@ -7,7 +7,7 @@ The video transport is embedded Whereby. Ceremony effects, games, photo workflow
 ## Architecture
 
 - Cloudflare Pages frontend
-- provider-neutral video shell at `/video.html`
+- provider-neutral video shell at `/whereby.html`
 - Whereby Embedded for live audio/video
 - Cloudflare Pages Functions for frontend-facing APIs
 - Cloudflare Worker + Durable Object for shared realtime event state
@@ -18,24 +18,18 @@ Video transport is intentionally separate from Apsila interaction logic.
 
 ## Whereby
 
-The browser obtains the configured room from `/api/video-config` and embeds it inside the existing celebration UI.
-
-For the current prototype, set:
-
-```text
-BABYSHOWER_VIDEO_ROOM_URL=https://your-subdomain.whereby.com/your-room
-```
-
-Room provisioning can be done deliberately from the operator CLI:
+Room creation is deliberate and does not require a Pages redeploy.
 
 ```sh
 node babyshower.js room create --hours 8 --dry-run
 node babyshower.js room create --hours 8
 ```
 
-The live provisioning command requires `WHEREBY_API_KEY` in the operator environment and prints the guest room URL, host room URL, meeting ID, and expiry.
+The CLI calls `/api/video-provision`. The Pages Function uses the server-side `WHEREBY_API_KEY`, creates or reuses a Whereby meeting, and stores the current room in the existing realtime Durable Object.
 
-The intended next step is to move room provisioning and room state into the existing realtime Durable Object so new rooms do not require a Pages configuration change or redeploy.
+Guests call `/api/video-config`, which reads that stored room from realtime state and returns only the guest room URL and metadata needed by the browser. The Whereby API key is never exposed to the client.
+
+A new room therefore changes runtime event state rather than deployment configuration.
 
 ## Realtime event layer
 
