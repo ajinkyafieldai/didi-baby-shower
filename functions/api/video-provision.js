@@ -30,44 +30,20 @@ async function realtime(env, method = "GET", body) {
   return { response, data };
 }
 
-function currentRoom(snapshot) {
-  const room = snapshot?.videoRoom;
-  if (!room?.roomUrl) return null;
-
-  if (room.endDate) {
-    const end = Date.parse(room.endDate);
-    if (Number.isFinite(end) && end <= Date.now()) return null;
-  }
-
-  return room;
+async function releaseClaim(env, claimToken) {
+  if (!claimToken) return;
+  try {
+    await realtime(env, "POST", {
+      type: "video_room_release",
+      claimToken
+    });
+  } catch {}
 }
 
 export async function onRequestPost(context) {
   const apiKey = String(context.env.WHEREBY_API_KEY || "").trim();
   if (!apiKey) {
     return json({ error: "WHEREBY_API_KEY is not configured." }, 503);
-  }
-
-  let existing;
-  try {
-    const { response, data } = await realtime(context.env);
-    if (!response.ok) {
-      return json({ error: data.error || "Unable to read event state." }, response.status);
-    }
-    existing = currentRoom(data);
-  } catch (error) {
-    return json({ error: error.message || "Unable to read event state." }, 503);
-  }
-
-  if (existing) {
-    return json({
-      ok: true,
-      reused: true,
-      provider: "whereby",
-      roomUrl: existing.roomUrl,
-      meetingId: existing.meetingId || null,
-      endDate: existing.endDate || null
-    });
   }
 
   let requested = {};
@@ -78,49 +54,99 @@ export async function onRequestPost(context) {
   }
 
   const hours = Number(requested.hours ?? 8);
+  const force = requested.force === true;
+
   if (!Number.isFinite(hours) || hours <= 0 || hours > 24) {
     return json({ error: "hours must be between 0 and 24." }, 400);
   }
 
+  let claimToken = null;
+  try {
+    const { response, data } = await realtime(context.env, "POST", {
+      type: "video_room_claim",
+      force
+    });
+
+    if (!response.ok) {
+      return json(
+        { error: data.error || "Unable to claim video room provisioning." },
+        response.status
+      );
+    }
+
+    if (data.action === "reuse" && data.videoRoom?.roomUrl) {
+      return json({
+        ok: true,
+        reused: true,
+        provider: "whereby",
+        roomUrl: data.videoRoom.roomUrl,
+        meetingId: data.videoRoom.meetingId || null,
+        endDate: data.videoRoom.endDate || null
+      });
+    }
+
+    claimToken = String(data.claimToken || "");
+    if (!claimToken) {
+      return json({ error: "Video room provisioning claim was not returned." }, 502);
+    }
+  } catch (error) {
+    return json({ error: error.message || "Unable to claim video room provisioning." }, 503);
+  }
+
   const endDate = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 
-  const whereby = await fetch("https://api.whereby.dev/v1/meetings", {
-    method: "POST",
-    headers: {
-      "authorization": "Bearer " + apiKey,
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({ endDate })
-  });
+  let meeting;
+  try {
+    const whereby = await fetch("https://api.whereby.dev/v1/meetings", {
+      method: "POST",
+      headers: {
+        "authorization": "Bearer " + apiKey,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        endDate,
+        fields: ["hostRoomUrl"]
+      })
+    });
 
-  const meeting = await whereby.json().catch(() => ({}));
-  if (!whereby.ok) {
-    return json(
-      { error: meeting.error || meeting.message || `Whereby HTTP ${whereby.status}` },
-      whereby.status
-    );
+    meeting = await whereby.json().catch(() => ({}));
+    if (!whereby.ok) {
+      await releaseClaim(context.env, claimToken);
+      return json(
+        { error: meeting.error || meeting.message || `Whereby HTTP ${whereby.status}` },
+        whereby.status
+      );
+    }
+  } catch (error) {
+    await releaseClaim(context.env, claimToken);
+    return json({ error: error.message || "Unable to create Whereby meeting." }, 502);
   }
 
   try {
     const { response, data } = await realtime(context.env, "POST", {
       type: "video_room_set",
+      claimToken,
       roomUrl: meeting.roomUrl,
       meetingId: meeting.meetingId || null,
       endDate
     });
 
     if (!response.ok) {
+      await releaseClaim(context.env, claimToken);
       return json({ error: data.error || "Unable to store video room." }, response.status);
     }
   } catch (error) {
+    await releaseClaim(context.env, claimToken);
     return json({ error: error.message || "Unable to store video room." }, 503);
   }
 
   return json({
     ok: true,
     reused: false,
+    rotated: force,
     provider: "whereby",
     roomUrl: meeting.roomUrl,
+    hostRoomUrl: meeting.hostRoomUrl || null,
     meetingId: meeting.meetingId || null,
     endDate
   });
