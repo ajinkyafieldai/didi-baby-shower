@@ -32,6 +32,10 @@ export async function onRequestGet(context) {
     return json({ error: "Video room is not configured." }, 503);
   }
 
+  if (room.provider !== "daily") {
+    return json({ error: "Stored video room uses a different provider. Create a fresh Daily room." }, 409);
+  }
+
   if (room.endDate) {
     const end = Date.parse(room.endDate);
     if (Number.isFinite(end) && end <= Date.now()) {
