@@ -82,9 +82,7 @@
             <button type="button" data-feature="familyMap" data-hub-tab="map">🌍 Map</button>
             <button type="button" data-feature="timeCapsule" data-hub-tab="capsule">💌 Capsule</button>
             <button type="button" data-feature="recipeBook" data-hub-tab="recipes">🍲 Recipes</button>
-            <button type="button" data-feature="photoMosaic" data-hub-tab="mosaic">🧩 Mosaic</button>
-            <button type="button" data-feature="guestRibbon" data-hub-tab="guests">👋 Who was here</button>
-            <button type="button" data-feature="keepsake" data-hub-tab="keepsake">✨ Keepsake</button>
+            <button type="button" data-feature="photoMosaic" data-hub-tab="mosaic">🧩 Mosaic</button>            <button type="button" data-feature="keepsake" data-hub-tab="keepsake">✨ Keepsake</button>
           </nav>
 
           <section class="hub-view active" data-feature="familyWall" data-hub-view="wall">
@@ -137,6 +135,10 @@
             </form>
             <div id="family-map" class="family-map"></div>
             <div id="map-list" class="map-list"></div>
+            <div class="hub-section-head map-arrivals-head">
+              <div><h3>👋 Who was here</h3><p>Everyone who joined, with their city when available.</p></div>
+            </div>
+            <div id="arrival-ribbon" class="arrival-ribbon"></div>
           </section>
 
           <section class="hub-view" data-feature="timeCapsule" data-hub-view="capsule" hidden>
@@ -175,18 +177,6 @@
               <div><h3>Family Photo Mosaic</h3><p>Every shared photo becomes one tile of the day.</p></div>
             </div>
             <div id="photo-mosaic" class="photo-mosaic"></div>
-          </section>
-
-          <section class="hub-view" data-feature="guestRibbon" data-hub-view="guests" hidden>
-            <form id="guest-form" class="hub-form compact">
-              <h3>Who was here</h3>
-              <div class="hub-form-row">
-                <input name="name" maxlength="60" placeholder="Name" required>
-                <input name="city" maxlength="60" placeholder="Joining from…">
-              </div>
-              <button type="submit">Add arrival 👋</button>
-            </form>
-            <div id="arrival-ribbon" class="arrival-ribbon"></div>
           </section>
 
           <section class="hub-view" data-feature="keepsake" data-hub-view="keepsake" hidden>
