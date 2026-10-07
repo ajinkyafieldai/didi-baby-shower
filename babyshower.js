@@ -19,7 +19,8 @@ const TRIGGERS=Object.freeze({
 function usage(){
   console.log(`Usage:
   babyshower trigger <name> [--force] [--dry-run]
-  babyshower room create [--hours <n>] [--dry-run]
+  babyshower room create [--hours <n>] [--force] [--dry-run]
+  babyshower room status
   babyshower photobooth [run|capture|health]
 
 Allowed triggers:
@@ -75,6 +76,7 @@ function parseOption(name, fallback=null){
 
 async function createRoom(dryRun=false){
   const hours=Number(parseOption("--hours","8"));
+  const force=args.includes("--force");
 
   if(!Number.isFinite(hours)||hours<=0||hours>24){
     throw new Error("--hours must be between 0 and 24.");
@@ -86,6 +88,7 @@ async function createRoom(dryRun=false){
       dryRun:true,
       provider:"whereby",
       hours,
+      force,
       endpoint:"/api/video-provision"
     },null,2));
     return;
@@ -96,7 +99,7 @@ async function createRoom(dryRun=false){
   const response=await fetch(baseUrl+"/api/video-provision",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({hours}),
+    body:JSON.stringify({hours,force}),
     cache:"no-store"
   });
 
@@ -106,6 +109,35 @@ async function createRoom(dryRun=false){
   }
 
   console.log(JSON.stringify(data,null,2));
+}
+
+async function roomStatus(){
+  requireUrl();
+
+  const response=await fetch(baseUrl+"/api/video-config",{
+    method:"GET",
+    cache:"no-store"
+  });
+
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok){
+    console.log(JSON.stringify({
+      ok:false,
+      status:response.status,
+      error:data.error||`HTTP ${response.status}`
+    },null,2));
+    process.exitCode=1;
+    return;
+  }
+
+  console.log(JSON.stringify({
+    ok:true,
+    configured:true,
+    provider:data.provider||"whereby",
+    roomUrl:data.roomUrl||null,
+    meetingId:data.meetingId||null,
+    endDate:data.endDate||null
+  },null,2));
 }
 
 function runPhotobooth(rest){
@@ -123,6 +155,8 @@ try{
     await trigger(triggerName,args.includes("--force"),args.includes("--dry-run"));
   }else if(args[0]==="room"&&args[1]==="create"){
     await createRoom(args.includes("--dry-run"));
+  }else if(args[0]==="room"&&args[1]==="status"){
+    await roomStatus();
   }else if(args[0]==="photobooth"){
     runPhotobooth(args.slice(1));
   }else{
