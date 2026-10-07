@@ -70,7 +70,6 @@ const capsuleList = document.getElementById("capsule-list");
 const recipeForm = document.getElementById("recipe-form");
 const recipeList = document.getElementById("recipe-list");
 const photoMosaic = document.getElementById("photo-mosaic");
-const guestForm = document.getElementById("guest-form");
 const arrivalRibbon = document.getElementById("arrival-ribbon");
 const keepsakeSummary = document.getElementById("keepsake-summary");
 const afterpartyPreview = document.getElementById("afterparty-preview");
@@ -456,7 +455,7 @@ joinForm.addEventListener("submit", async (event) => {
 
   frame.src = `/daily.html?name=${encodeURIComponent(guestName)}`;
   stage.classList.add("in-call");
-  if (featureEnabled("guestRibbon")) recordArrival(guestName, "");
+  if (featureEnabled("familyMap")) recordArrival(guestName, "");
   if (featureEnabled("familyMap")) hydrateMapForm();
 });
 
@@ -885,7 +884,6 @@ function switchHubView(view) {
       ["capsule", "timeCapsule"],
       ["recipes", "recipeBook"],
       ["mosaic", "photoMosaic"],
-      ["guests", "guestRibbon"],
       ["keepsake", "keepsake"]
     ].find(([, feature]) => featureEnabled(feature));
 
@@ -1041,6 +1039,8 @@ function renderMap() {
     note.textContent = "Some cities are listed below but are not in the tiny offline map dictionary yet.";
     mapList.appendChild(note);
   }
+
+  renderGuests();
 }
 
 function renderCapsules() {
@@ -1173,7 +1173,6 @@ function renderHubView(view) {
   if (view === "capsule" && featureEnabled("timeCapsule")) renderCapsules();
   if (view === "recipes" && featureEnabled("recipeBook")) renderRecipes();
   if (view === "mosaic" && featureEnabled("photoMosaic")) renderMosaic();
-  if (view === "guests" && featureEnabled("guestRibbon")) renderGuests();
   if (view === "keepsake" && featureEnabled("keepsake")) renderKeepsakeSummary();
 }
 
@@ -1262,15 +1261,6 @@ recipeForm.addEventListener("submit", async (event) => {
   renderRecipes();
 });
 
-guestForm.addEventListener("submit", (event) => {
-  if (!featureEnabled("guestRibbon")) return;
-  event.preventDefault();
-  const data = new FormData(event.currentTarget);
-  recordArrival(String(data.get("name") || "").trim(), String(data.get("city") || "").trim());
-  event.currentTarget.reset();
-  playChime();
-  renderGuests();
-});
 
 afterpartyPreview.addEventListener("click", () => {
   const url = new URL(location.href);
