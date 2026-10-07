@@ -46,7 +46,7 @@ function normalize(line){
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[\u0000-\u001f]+/g," ")
-    .replace(/[^\p{L}\p{N}]+/gu," ")
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu," ")
     .replace(/\s+/g," ")
     .trim();
 }

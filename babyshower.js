@@ -19,6 +19,7 @@ const TRIGGERS=Object.freeze({
 function usage(){
   console.log(`Usage:
   babyshower trigger <name> [--force] [--dry-run]
+  babyshower room create [--hours <n>] [--dry-run]
   babyshower photobooth [run|capture|health]
 
 Allowed triggers:
@@ -65,6 +66,48 @@ async function trigger(name,force=false,dryRun=false){
   console.log(JSON.stringify({ok:true,trigger:name,seq:data.seq??null}));
 }
 
+function parseOption(name, fallback=null){
+  const index=args.indexOf(name);
+  if(index<0)return fallback;
+  const value=args[index+1];
+  return value && !value.startsWith("--") ? value : fallback;
+}
+
+async function createRoom(dryRun=false){
+  const hours=Number(parseOption("--hours","8"));
+
+  if(!Number.isFinite(hours)||hours<=0||hours>24){
+    throw new Error("--hours must be between 0 and 24.");
+  }
+
+  if(dryRun){
+    console.log(JSON.stringify({
+      ok:true,
+      dryRun:true,
+      provider:"whereby",
+      hours,
+      endpoint:"/api/video-provision"
+    },null,2));
+    return;
+  }
+
+  requireUrl();
+
+  const response=await fetch(baseUrl+"/api/video-provision",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({hours}),
+    cache:"no-store"
+  });
+
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok){
+    throw new Error(data.error||`HTTP ${response.status}`);
+  }
+
+  console.log(JSON.stringify(data,null,2));
+}
+
 function runPhotobooth(rest){
   const script=fileURLToPath(new URL("./photobooth.js",import.meta.url));
   const child=spawn(process.execPath,[script,...(rest.length?rest:["run"])],{stdio:"inherit",env:process.env});
@@ -78,6 +121,8 @@ try{
   if(args[0]==="trigger"){
     const triggerName=args.slice(1).find((arg)=>!arg.startsWith("--"));
     await trigger(triggerName,args.includes("--force"),args.includes("--dry-run"));
+  }else if(args[0]==="room"&&args[1]==="create"){
+    await createRoom(args.includes("--dry-run"));
   }else if(args[0]==="photobooth"){
     runPhotobooth(args.slice(1));
   }else{

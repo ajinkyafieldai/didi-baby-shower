@@ -1,4 +1,8 @@
-/zoom.html
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: require-corp
-  Cross-Origin-Resource-Policy: cross-origin
+/
+  Cache-Control: no-store
+
+/index.html
+  Cache-Control: no-store
+
+/whereby.html
+  Cache-Control: no-store

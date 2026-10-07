@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { strict as assert } from "node:assert";
 import { fileURLToPath } from "node:url";
 
@@ -39,3 +39,17 @@ for(const args of [
 }
 
 console.log("Verified: trigger dry-run accepts flags before or after the trigger name.");
+
+
+const room = spawnSync(process.execPath, [cli, "room", "create", "--hours", "8", "--dry-run"], {
+  env: { ...process.env },
+  encoding: "utf8"
+});
+
+assert.equal(room.status, 0, room.stderr);
+const roomPayload = JSON.parse(room.stdout);
+assert.equal(roomPayload.ok, true);
+assert.equal(roomPayload.dryRun, true);
+assert.equal(roomPayload.provider, "whereby");
+assert.equal(roomPayload.hours, 8);
+assert.equal(roomPayload.endpoint, "/api/video-provision");

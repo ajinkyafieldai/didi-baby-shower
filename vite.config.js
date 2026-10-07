@@ -6,7 +6,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, "index.html"),
-        zoom: resolve(__dirname, "zoom.html"),
+        whereby: resolve(__dirname, "whereby.html"),
         host: resolve(__dirname, "host.html"),
         projector: resolve(__dirname, "projector.html")
       }

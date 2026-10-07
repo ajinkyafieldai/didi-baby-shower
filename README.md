@@ -1,170 +1,65 @@
 # didi-baby-shower
 
-A phone-first remote baby-shower experience: Zoom stays embedded in the page while guests trigger shared ceremony animations over the live call.
+A phone-first remote baby-shower experience and Apsila prototype.
+
+The video transport is embedded Whereby. Ceremony effects, games, photo workflow, realtime state, and transcript-driven triggers are owned by this application.
 
 ## Architecture
 
-- Static Cloudflare Pages frontend
-- Zoom Meeting SDK Web **Client View**, isolated inside a same-origin iframe
-- Cloudflare Pages Function generates participant-only Meeting SDK JWTs
-- Ceremony animation layer stays outside Zoom so it can overlay the call cleanly
-- Shared realtime event channel is the next layer; the UI already exposes `window.babyShower.playEffect(effect, sender)` as the receiving boundary
+- Cloudflare Pages frontend
+- provider-neutral video shell at `/whereby.html`
+- Whereby Embedded for live audio/video
+- Cloudflare Pages Functions for frontend-facing APIs
+- Cloudflare Worker + Durable Object for shared realtime event state
+- native photobooth client for family-photo capture
+- optional local GPU transcript pipeline for keyword-driven ceremony triggers
 
-## Cloudflare Pages configuration
+Video transport is intentionally separate from Apsila interaction logic.
 
-Set these under **Workers & Pages -> didi-baby-shower -> Settings -> Variables and Secrets**.
+## Whereby
 
-Secrets:
-
-- `ZOOM_CLIENT_SECRET`
-
-Variables (or secrets if preferred):
-
-- `ZOOM_CLIENT_ID`
-- `ZOOM_MEETING_NUMBER`
-- `ZOOM_MEETING_PASSCODE`
-
-Do not commit Zoom credentials.
-
-The signature endpoint is intentionally locked to one server-configured meeting and always generates `role: 0` participant tokens.
-
-## Current flow
-
-1. Guest opens the Pages URL on a phone.
-2. Guest enters a display name and taps **Join celebration**.
-3. The same-origin `zoom.html` iframe obtains a short-lived participant JWT from `/api/zoom-signature`.
-4. Zoom handles the live audio/video call.
-5. Baby-shower controls remain outside the iframe.
-6. Tapping **Ovalni**, **Flowers**, **Blessings**, or **Celebrate** renders the animation over the call.
-
-The effects are currently local-only. The next implementation step is a Cloudflare-backed realtime broadcast channel so a tap by any guest triggers `playEffect()` on every connected guest.
-
-## Branching
-
-Development happens on `devel`. Do not commit directly to `main`.
-
-
-## Transcript trigger pipeline
-
-Transcript transport is intentionally separate from trigger semantics. Any source that emits one transcript line at a time can feed the mapper.
+Room creation is deliberate and does not require a Pages redeploy.
 
 ```sh
-rtms-transcript \
-  | tee -a transcript.log /dev/stderr \
-  | node scripts/phrase-map.mjs \
-  | xargs -r -n1 node babyshower.js trigger
+node babyshower.js room create --hours 8 --dry-run
+node babyshower.js room create --hours 8
 ```
 
-`phrase-map.mjs` emits only fixed symbolic trigger names from a hard-coded whitelist. Transcript text is never executed as shell input.
+The CLI calls `/api/video-provision`. The Pages Function uses the server-side `WHEREBY_API_KEY`, creates or reuses a Whereby meeting, and stores the current room in the existing realtime Durable Object.
 
-Set `BABYSHOWER_URL` for the CLI target. The default per-trigger cooldown is 8 seconds and can be changed with `BABYSHOWER_PHRASE_COOLDOWN_MS`.
+Guests call `/api/video-config`, which reads that stored room from realtime state and returns only the guest room URL and metadata needed by the browser. The Whereby API key is never exposed to the client.
 
+A new room therefore changes runtime event state rather than deployment configuration.
 
-### Zoom RTMS transcript source
+## Realtime event layer
 
-The Node adapter uses Zoom's official `@zoom/rtms` SDK and writes transcript text only to stdout. Transport/status information goes to stderr, so stdout stays safe to pipe into `phrase-map.mjs`.
+Shared ceremony effects, games, telemetry, photo state, and commands are handled by the realtime Worker.
 
-Required environment:
+The Worker uses the `CelebrationRoom` Durable Object configured in `realtime/wrangler.jsonc`.
 
-```sh
-export ZM_RTMS_CLIENT=...
-export ZM_RTMS_SECRET=...
-export ZM_RTMS_PORT=8080
-export ZM_RTMS_PATH=/webhook
-```
+Supported command triggers currently include:
 
-Optional:
+- `photo.capture`
+- `photo.show`
+- `flowers`
+- `celebrate`
+- `haldi`
+- `kunku`
+- `oti`
 
-```sh
-export BABYSHOWER_TRANSCRIPT_LANGUAGE=ENGLISH
-```
+## Local transcript trigger pipeline
 
-Run the full pipeline:
-
-```sh
-BABYSHOWER_URL=https://your-event.example \
-npm run rtms:transcript \
-  | tee -a transcript.log /dev/stderr \
-  | npm run transcript:map --silent \
-  | xargs -r -n1 node babyshower.js trigger
-```
-
-Configure the Zoom app's RTMS webhook endpoint to the public URL serving `ZM_RTMS_PATH`.
-
-
-### Public RTMS webhook runtime
-
-The RTMS process binds locally and is intended to be exposed only through Cloudflare Tunnel.
-
-Runtime layout:
+The transcript transport is separate from trigger semantics:
 
 ```text
-Zoom RTMS webhook
-       |
-       v
-https://rtms.example.com/webhook
-       |
-Cloudflare Tunnel
-       |
-http://127.0.0.1:8080/webhook
-       |
-babyshower-rtms.service
-       |
-rtms-transcript -> phrase-map -> babyshower trigger
+meeting/system audio
+  -> ffmpeg
+  -> faster-whisper
+  -> tolerant keyword matcher
+  -> babyshower trigger
 ```
 
-Install the local service:
-
-```sh
-sudo ./scripts/install-rtms-service.sh /opt/babyshower/current
-```
-
-Then edit:
-
-```text
-/etc/babyshower/rtms.env
-```
-
-and configure Cloudflare Tunnel from:
-
-```text
-deploy/cloudflared/config.yml.example
-```
-
-The application listens on localhost. No direct inbound RTMS port needs to be exposed.
-
-Secret storage is intentionally abstracted behind `/etc/babyshower/rtms.env` for now. A vault-backed mechanism can replace that later without changing the JS runtime or systemd unit.
-
-
-### Local .env setup
-
-For a single trusted machine, use a local `.env` file:
-
-```sh
-cp .env.example .env
-$EDITOR .env
-npm run rtms:local
-```
-
-`.env` and other `.env.*` files are gitignored; only `.env.example` is tracked.
-
-The local runner exports the values from `.env` for the whole Unix pipeline, so both the RTMS source and downstream `babyshower trigger` commands inherit the same configuration. Logs default to `./logs/transcript.log`.
-
-The systemd deployment path still uses `/etc/babyshower/rtms.env`; both paths expose the same environment-variable contract.
-
-
-For interactive simulator pipelines, prefer calling the simulator with `node scripts/rtms-transcript-sim.mjs` (or `npm run --silent rtms:sim`) so npm's script banner does not enter stdout and get inspected by the phrase mapper.
-
-
-### Local Whisper transcript source
-
-Zoom RTMS is optional. On an Ubuntu/PipeWire machine the event pipeline can transcribe audio locally:
-
-```text
-Pulse/PipeWire -> ffmpeg -> faster-whisper -> phrase-map -> babyshower trigger
-```
-
-Install once:
+Install once on Ubuntu/PipeWire:
 
 ```sh
 sudo apt install ffmpeg python3-venv pulseaudio-utils
@@ -178,12 +73,46 @@ List audio sources:
 npm run transcript:sources
 ```
 
-For Zoom audio, set `BABYSHOWER_AUDIO_SOURCE` in `.env` to the output source ending in `.monitor`. For microphone testing, `default` is usually sufficient.
+Set `BABYSHOWER_AUDIO_SOURCE` in `.env` to the desired PipeWire/Pulse source, typically an output `.monitor` source for meeting audio.
 
-Then run:
+Run directly:
 
 ```sh
 npm run transcript:local
 ```
 
-The default model is multilingual Whisper `small`; set `BABYSHOWER_WHISPER_MODEL` to `tiny`, `base`, `medium`, etc. The first run downloads the selected model. Set `BABYSHOWER_WHISPER_LANGUAGE=` (empty) for language auto-detection.
+Or run it in tmux:
+
+```sh
+npm run transcript:tmux
+npm run transcript:tmux -- status
+npm run transcript:tmux -- attach
+npm run transcript:tmux -- stop
+```
+
+The keyword matcher is intentionally tolerant of noisy ASR output and supports Latin and Devanagari ceremony aliases. Duplicate suppression and per-trigger cooldowns remain in place.
+
+## Photo workflow
+
+The native photobooth captures the visible meeting surface and uploads the image to the event backend.
+
+```sh
+node photobooth.js run
+```
+
+The shared flow is:
+
+```text
+photo.capture
+  -> native photobooth
+  -> upload
+  -> photo.captured(asset)
+  -> photo.show(asset)
+  -> guest/projector display
+```
+
+## Development
+
+Development happens on `devel`.
+
+Do not commit directly to `main`.
