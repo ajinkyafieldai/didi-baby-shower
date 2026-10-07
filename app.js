@@ -521,7 +521,6 @@ function showCapturedPhoto(asset) {
 }
 
 async function pollEvents() {
-  if (document.visibilityState === "hidden") return;
   if (syncBusy) return;
   syncBusy = true;
 
