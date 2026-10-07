@@ -1136,7 +1136,8 @@ hubTabs.forEach((button) => {
   button.addEventListener("click", () => switchHubView(button.dataset.hubTab));
 });
 
-timelineForm.addEventListener("submit", async (event) => {\n  if (!featureEnabled("familyTimeline")) return;
+timelineForm.addEventListener("submit", async (event) => {
+  if (!featureEnabled("familyTimeline")) return;
   event.preventDefault();
   const data = new FormData(event.currentTarget);
   const photoId = await storeOptionalPhoto(event.currentTarget.elements.photo.files[0]);
@@ -1155,7 +1156,8 @@ timelineForm.addEventListener("submit", async (event) => {\n  if (!featureEnable
   renderTimeline();
 });
 
-mapForm.addEventListener("submit", (event) => {\n  if (!featureEnabled("familyMap")) return;
+mapForm.addEventListener("submit", (event) => {
+  if (!featureEnabled("familyMap")) return;
   event.preventDefault();
   const data = new FormData(event.currentTarget);
   const name = String(data.get("name") || "").trim();
@@ -1170,7 +1172,8 @@ mapForm.addEventListener("submit", (event) => {\n  if (!featureEnabled("familyMa
   renderMap();
 });
 
-capsuleForm.addEventListener("submit", (event) => {\n  if (!featureEnabled("timeCapsule")) return;
+capsuleForm.addEventListener("submit", (event) => {
+  if (!featureEnabled("timeCapsule")) return;
   event.preventDefault();
   const data = new FormData(event.currentTarget);
   familyStore.add("capsules", {
@@ -1186,7 +1189,8 @@ capsuleForm.addEventListener("submit", (event) => {\n  if (!featureEnabled("time
   renderCapsules();
 });
 
-recipeForm.addEventListener("submit", async (event) => {\n  if (!featureEnabled("recipeBook")) return;
+recipeForm.addEventListener("submit", async (event) => {
+  if (!featureEnabled("recipeBook")) return;
   event.preventDefault();
   const data = new FormData(event.currentTarget);
   const photoId = await storeOptionalPhoto(event.currentTarget.elements.photo.files[0]);
@@ -1205,7 +1209,8 @@ recipeForm.addEventListener("submit", async (event) => {\n  if (!featureEnabled(
   renderRecipes();
 });
 
-guestForm.addEventListener("submit", (event) => {\n  if (!featureEnabled("guestRibbon")) return;
+guestForm.addEventListener("submit", (event) => {
+  if (!featureEnabled("guestRibbon")) return;
   event.preventDefault();
   const data = new FormData(event.currentTarget);
   recordArrival(String(data.get("name") || "").trim(), String(data.get("city") || "").trim());
