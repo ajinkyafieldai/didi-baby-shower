@@ -25,6 +25,23 @@ const blessingExport = document.getElementById("blessing-export");
 const wallPhotoInput = document.getElementById("wall-photo-input");
 const wallPhotoCaption = document.getElementById("wall-photo-caption");
 const wallPhotoStatus = document.getElementById("wall-photo-status");
+const timelineForm = document.getElementById("timeline-form");
+const timelineList = document.getElementById("timeline-list");
+const mapForm = document.getElementById("map-form");
+const familyMap = document.getElementById("family-map");
+const mapList = document.getElementById("map-list");
+const capsuleForm = document.getElementById("capsule-form");
+const capsuleList = document.getElementById("capsule-list");
+const recipeForm = document.getElementById("recipe-form");
+const recipeList = document.getElementById("recipe-list");
+const photoMosaic = document.getElementById("photo-mosaic");
+const guestForm = document.getElementById("guest-form");
+const arrivalRibbon = document.getElementById("arrival-ribbon");
+const keepsakeSummary = document.getElementById("keepsake-summary");
+const afterpartyPreview = document.getElementById("afterparty-preview");
+const hubTabs = Array.from(document.querySelectorAll("[data-hub-tab]"));
+const hubViews = Array.from(document.querySelectorAll("[data-hub-view]"));
+const afterpartyMode = new URLSearchParams(location.search).get("afterparty") === "1";
 
 let gameState = { names: [], quiz: [] };
 let activeGame = null;
@@ -110,6 +127,65 @@ const wallPhotoStore = (() => {
     }
   };
 })();
+
+const familyStore = (() => {
+  const key = "baby-shower-family-hub-v1";
+
+  function read() {
+    try {
+      const value = JSON.parse(localStorage.getItem(key) || "{}");
+      return {
+        timeline: Array.isArray(value.timeline) ? value.timeline : [],
+        pins: Array.isArray(value.pins) ? value.pins : [],
+        capsules: Array.isArray(value.capsules) ? value.capsules : [],
+        recipes: Array.isArray(value.recipes) ? value.recipes : [],
+        guests: Array.isArray(value.guests) ? value.guests : []
+      };
+    } catch {
+      return { timeline: [], pins: [], capsules: [], recipes: [], guests: [] };
+    }
+  }
+
+  function write(value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function add(type, entry) {
+    const value = read();
+    value[type].push(entry);
+    write(value);
+    return entry;
+  }
+
+  return { read, write, add };
+})();
+
+const cityCoordinates = {
+  "mumbai": [72.8777, 19.0760],
+  "bombay": [72.8777, 19.0760],
+  "pune": [73.8567, 18.5204],
+  "delhi": [77.1025, 28.7041],
+  "new delhi": [77.2090, 28.6139],
+  "bengaluru": [77.5946, 12.9716],
+  "bangalore": [77.5946, 12.9716],
+  "hyderabad": [78.4867, 17.3850],
+  "chennai": [80.2707, 13.0827],
+  "kolkata": [88.3639, 22.5726],
+  "ahmedabad": [72.5714, 23.0225],
+  "vadodara": [73.1812, 22.3072],
+  "london": [-0.1276, 51.5072],
+  "new york": [-74.0060, 40.7128],
+  "san francisco": [-122.4194, 37.7749],
+  "los angeles": [-118.2437, 34.0522],
+  "toronto": [-79.3832, 43.6532],
+  "vancouver": [-123.1207, 49.2827],
+  "singapore": [103.8198, 1.3521],
+  "dubai": [55.2708, 25.2048],
+  "sydney": [151.2093, -33.8688],
+  "melbourne": [144.9631, -37.8136],
+  "paris": [2.3522, 48.8566],
+  "berlin": [13.4050, 52.5200]
+};
 
 let guestName = "";
 let effectTimer = null;
@@ -367,6 +443,7 @@ joinForm.addEventListener("submit", async (event) => {
 
   frame.src = `/zoom.html?name=${encodeURIComponent(guestName)}`;
   stage.classList.add("in-call");
+  recordArrival(guestName, "");
 });
 
 window.addEventListener("message", (event) => {
@@ -727,6 +804,380 @@ function renderGame(game) {
 
 
 
+let activeHubView = "wall";
+let timelineObjectUrls = [];
+let recipeObjectUrls = [];
+let mosaicObjectUrls = [];
+
+function safeGuestName() {
+  return guestName || guestNameInput.value.trim() || "Someone";
+}
+
+function switchHubView(view) {
+  activeHubView = view;
+  hubTabs.forEach((button) => button.classList.toggle("active", button.dataset.hubTab === view));
+  hubViews.forEach((section) => {
+    const active = section.dataset.hubView === view;
+    section.classList.toggle("active", active);
+    section.hidden = !active;
+  });
+  renderHubView(view);
+}
+
+function worldPoint(lon, lat) {
+  const x = ((Number(lon) + 180) / 360) * 100;
+  const y = ((90 - Number(lat)) / 180) * 100;
+  return [x, y];
+}
+
+function lookupCity(city) {
+  return cityCoordinates[String(city || "").trim().toLowerCase()] || null;
+}
+
+function recordArrival(name, city) {
+  const cleanName = String(name || "").trim();
+  if (!cleanName) return;
+
+  const data = familyStore.read();
+  const recent = data.guests.find((guest) =>
+    guest.name.toLowerCase() === cleanName.toLowerCase() &&
+    Date.now() - Number(guest.at || 0) < 12 * 60 * 60 * 1000
+  );
+
+  if (recent) {
+    if (city && !recent.city) {
+      recent.city = String(city).trim().slice(0, 60);
+      const coords = lookupCity(recent.city);
+      if (coords) recent.coords = coords;
+      familyStore.write(data);
+    }
+    return;
+  }
+
+  const entry = {
+    id: crypto.randomUUID(),
+    name: cleanName.slice(0, 60),
+    city: String(city || "").trim().slice(0, 60),
+    at: Date.now()
+  };
+  const coords = lookupCity(entry.city);
+  if (coords) entry.coords = coords;
+  familyStore.add("guests", entry);
+}
+
+async function storeOptionalPhoto(file) {
+  if (!file || !file.size) return null;
+  const blob = await compressWallPhoto(file);
+  const photoId = crypto.randomUUID();
+  await wallPhotoStore.put(photoId, blob);
+  return photoId;
+}
+
+async function renderTimeline() {
+  timelineObjectUrls.forEach(URL.revokeObjectURL);
+  timelineObjectUrls = [];
+  const items = familyStore.read().timeline.slice().reverse();
+
+  if (!items.length) {
+    timelineList.innerHTML = '<p class="hub-empty">No timeline memories yet. Start with a childhood one ✨</p>';
+    return;
+  }
+
+  const rows = [];
+  for (const item of items) {
+    let photo = "";
+    if (item.photoId) {
+      try {
+        const blob = await wallPhotoStore.get(item.photoId);
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          timelineObjectUrls.push(url);
+          photo = `<img src="${url}" alt="">`;
+        }
+      } catch {}
+    }
+    rows.push(`
+      <article class="timeline-item">
+        <div class="timeline-when">${escapeHtml(item.when)}</div>
+        <div class="timeline-card">
+          ${photo}
+          <h4>${escapeHtml(item.title)}</h4>
+          <p>${escapeHtml(item.story)}</p>
+          <small>— ${escapeHtml(item.sender)}</small>
+        </div>
+      </article>
+    `);
+  }
+  timelineList.innerHTML = rows.join("");
+}
+
+function renderMap() {
+  const data = familyStore.read();
+  const combined = [...data.pins];
+  data.guests.forEach((guest) => {
+    if (guest.city && !combined.some((pin) => pin.name === guest.name && pin.city === guest.city)) {
+      combined.push(guest);
+    }
+  });
+
+  familyMap.innerHTML = `
+    <div class="map-land map-land-a"></div>
+    <div class="map-land map-land-b"></div>
+    <div class="map-land map-land-c"></div>
+    <div class="map-land map-land-d"></div>
+  `;
+
+  const mapped = [];
+  const unmapped = [];
+  combined.forEach((pin) => {
+    const coords = pin.coords || lookupCity(pin.city);
+    if (!coords) {
+      unmapped.push(pin);
+      return;
+    }
+    const [x, y] = worldPoint(coords[0], coords[1]);
+    const dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "family-map-pin";
+    dot.style.left = `${x}%`;
+    dot.style.top = `${y}%`;
+    dot.title = `${pin.name} — ${pin.city}`;
+    dot.innerHTML = "<span>♥</span>";
+    familyMap.appendChild(dot);
+    mapped.push(pin);
+  });
+
+  mapList.innerHTML = combined.length
+    ? combined.map((pin) => `<span>📍 <strong>${escapeHtml(pin.name)}</strong>${pin.city ? " · " + escapeHtml(pin.city) : ""}</span>`).join("")
+    : '<p class="hub-empty">No family pins yet.</p>';
+
+  if (unmapped.length) {
+    const note = document.createElement("p");
+    note.className = "map-hint";
+    note.textContent = "Some cities are listed below but are not in the tiny offline map dictionary yet.";
+    mapList.appendChild(note);
+  }
+}
+
+function renderCapsules() {
+  const items = familyStore.read().capsules.slice().reverse();
+  capsuleList.innerHTML = items.length
+    ? items.map((item) => `
+      <article class="capsule-card">
+        <div class="capsule-seal">🔒</div>
+        <div>
+          <small>Open at age ${escapeHtml(item.openAt)}</small>
+          <strong>${escapeHtml(item.title || "A message from the family")}</strong>
+          <span>Sealed by ${escapeHtml(item.sender)}</span>
+        </div>
+      </article>
+    `).join("")
+    : '<p class="hub-empty">No sealed messages yet.</p>';
+}
+
+async function renderRecipes() {
+  recipeObjectUrls.forEach(URL.revokeObjectURL);
+  recipeObjectUrls = [];
+  const items = familyStore.read().recipes.slice().reverse();
+  if (!items.length) {
+    recipeList.innerHTML = '<p class="hub-empty">No recipes yet. Someone has to preserve the family food lore 🍲</p>';
+    return;
+  }
+
+  const rows = [];
+  for (const item of items) {
+    let photo = "";
+    if (item.photoId) {
+      try {
+        const blob = await wallPhotoStore.get(item.photoId);
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          recipeObjectUrls.push(url);
+          photo = `<img src="${url}" alt="">`;
+        }
+      } catch {}
+    }
+
+    rows.push(`
+      <article class="recipe-card">
+        ${photo}
+        <div>
+          <h4>${escapeHtml(item.name)}</h4>
+          ${item.why ? `<p class="recipe-why">${escapeHtml(item.why)}</p>` : ""}
+          <details>
+            <summary>Recipe</summary>
+            <pre>${escapeHtml(item.recipe)}</pre>
+          </details>
+          <small>— ${escapeHtml(item.sender)}</small>
+        </div>
+      </article>
+    `);
+  }
+  recipeList.innerHTML = rows.join("");
+}
+
+async function renderMosaic() {
+  mosaicObjectUrls.forEach(URL.revokeObjectURL);
+  mosaicObjectUrls = [];
+  const photos = blessingStore.list().filter((item) => item.kind === "photo" && item.photoId);
+
+  if (!photos.length) {
+    photoMosaic.innerHTML = '<p class="hub-empty">Share photos on the Family Wall and they will build the mosaic here.</p>';
+    return;
+  }
+
+  const tiles = [];
+  for (const item of photos.slice(0, 40)) {
+    try {
+      const blob = await wallPhotoStore.get(item.photoId);
+      if (!blob) continue;
+      const url = URL.createObjectURL(blob);
+      mosaicObjectUrls.push(url);
+      tiles.push(`<figure><img src="${url}" alt="${escapeHtml(item.caption || "Family photo")}"><figcaption>${escapeHtml(item.caption || item.sender || "")}</figcaption></figure>`);
+    } catch {}
+  }
+  photoMosaic.innerHTML = tiles.join("") || '<p class="hub-empty">No photos available on this device.</p>';
+}
+
+function renderGuests() {
+  const items = familyStore.read().guests.slice().reverse();
+  arrivalRibbon.innerHTML = items.length
+    ? items.map((item, index) => `
+      <article class="arrival-card">
+        <span class="arrival-number">${items.length - index}</span>
+        <div>
+          <strong>👋 ${escapeHtml(item.name)}</strong>
+          <small>${item.city ? "joined from " + escapeHtml(item.city) : "was here"} · ${new Date(item.at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}</small>
+        </div>
+      </article>
+    `).join("")
+    : '<p class="hub-empty">No arrivals recorded yet.</p>';
+}
+
+function renderKeepsakeSummary() {
+  const hub = familyStore.read();
+  const wall = blessingStore.list();
+  const photoCount = wall.filter((item) => item.kind === "photo").length;
+  const noteCount = wall.filter((item) => item.kind !== "photo").length;
+
+  keepsakeSummary.innerHTML = `
+    <div class="keepsake-hero">
+      <span>✨</span>
+      <div><h3>Didi's Baby Shower</h3><p>The day, collected by everyone who was there.</p></div>
+    </div>
+    <div class="keepsake-stats">
+      <div><strong>${noteCount}</strong><span>notes</span></div>
+      <div><strong>${photoCount}</strong><span>photos</span></div>
+      <div><strong>${hub.timeline.length}</strong><span>memories</span></div>
+      <div><strong>${hub.capsules.length}</strong><span>time capsules</span></div>
+      <div><strong>${hub.recipes.length}</strong><span>recipes</span></div>
+      <div><strong>${hub.guests.length}</strong><span>people here</span></div>
+    </div>
+    <div class="keepsake-callout">
+      <strong>After the party</strong>
+      <p>Use the afterparty link to turn this site into a quiet keepsake instead of a live call.</p>
+      <code>${escapeHtml(location.origin + location.pathname + "?afterparty=1")}</code>
+    </div>
+  `;
+}
+
+function renderHubView(view) {
+  if (view === "wall") renderBlessings();
+  if (view === "timeline") renderTimeline();
+  if (view === "map") renderMap();
+  if (view === "capsule") renderCapsules();
+  if (view === "recipes") renderRecipes();
+  if (view === "mosaic") renderMosaic();
+  if (view === "guests") renderGuests();
+  if (view === "keepsake") renderKeepsakeSummary();
+}
+
+hubTabs.forEach((button) => {
+  button.addEventListener("click", () => switchHubView(button.dataset.hubTab));
+});
+
+timelineForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  const photoId = await storeOptionalPhoto(event.currentTarget.elements.photo.files[0]);
+  familyStore.add("timeline", {
+    id: crypto.randomUUID(),
+    when: String(data.get("when") || "").trim().slice(0, 20),
+    title: String(data.get("title") || "").trim().slice(0, 70),
+    story: String(data.get("story") || "").trim().slice(0, 280),
+    photoId,
+    sender: safeGuestName(),
+    at: Date.now()
+  });
+  event.currentTarget.reset();
+  playChime("photo");
+  renderTimeline();
+});
+
+mapForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  const name = String(data.get("name") || "").trim();
+  const city = String(data.get("city") || "").trim();
+  const entry = { id: crypto.randomUUID(), name, city, at: Date.now() };
+  const coords = lookupCity(city);
+  if (coords) entry.coords = coords;
+  familyStore.add("pins", entry);
+  recordArrival(name, city);
+  event.currentTarget.reset();
+  playChime();
+  renderMap();
+});
+
+capsuleForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  familyStore.add("capsules", {
+    id: crypto.randomUUID(),
+    openAt: String(data.get("openAt") || "18"),
+    title: String(data.get("title") || "").trim().slice(0, 60),
+    message: String(data.get("message") || "").trim().slice(0, 500),
+    sender: safeGuestName(),
+    at: Date.now()
+  });
+  event.currentTarget.reset();
+  playChime("photo");
+  renderCapsules();
+});
+
+recipeForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  const photoId = await storeOptionalPhoto(event.currentTarget.elements.photo.files[0]);
+  familyStore.add("recipes", {
+    id: crypto.randomUUID(),
+    name: String(data.get("name") || "").trim().slice(0, 80),
+    why: String(data.get("why") || "").trim().slice(0, 180),
+    recipe: String(data.get("recipe") || "").trim().slice(0, 900),
+    photoId,
+    sender: safeGuestName(),
+    at: Date.now()
+  });
+  event.currentTarget.reset();
+  playChime("photo");
+  renderRecipes();
+});
+
+guestForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  recordArrival(String(data.get("name") || "").trim(), String(data.get("city") || "").trim());
+  event.currentTarget.reset();
+  playChime();
+  renderGuests();
+});
+
+afterpartyPreview.addEventListener("click", () => {
+  const url = new URL(location.href);
+  url.searchParams.set("afterparty", "1");
+  location.href = url.toString();
+});
+
 let wallObjectUrls = [];
 
 function clearWallObjectUrls() {
@@ -952,8 +1403,8 @@ ${rows.join("") || "<p>The wall is empty.</p>"}
 blessingLaunch.addEventListener("click", () => {
   ensureAudioContext();
   blessingPanel.hidden = false;
-  renderBlessings();
-  blessingMessage.focus();
+  switchHubView(activeHubView);
+  if (activeHubView === "wall") blessingMessage.focus();
 });
 
 blessingClose.addEventListener("click", () => {
@@ -1053,6 +1504,13 @@ gamePanel.addEventListener("click", (event) => {
     gamePanel.hidden = true;
   }
 });
+
+if (afterpartyMode) {
+  document.body.classList.add("afterparty-mode");
+  blessingPanel.hidden = false;
+  activeHubView = "keepsake";
+  switchHubView("keepsake");
+}
 
 pollEvents();
 syncTimer = window.setInterval(pollEvents, 750);
