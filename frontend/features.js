@@ -35,12 +35,21 @@ export function applyFeatureVisibility(root = document) {
       .split(/\s+/)
       .filter(Boolean);
 
-    const enabled = names.every(featureEnabled);
-    element.hidden = !enabled;
-    element.setAttribute("aria-hidden", enabled ? "false" : "true");
+    if (!element.dataset.featureInitialHidden) {
+      element.dataset.featureInitialHidden = element.hidden ? "true" : "false";
+    }
 
-    if ("disabled" in element && !enabled) {
-      element.disabled = true;
+    const enabled = names.every(featureEnabled);
+    const initiallyHidden = element.dataset.featureInitialHidden === "true";
+
+    // Preserve UI state such as closed dialogs/tabs when a feature is enabled.
+    // A feature flag may hide something; it should never force-open it.
+    element.hidden = !enabled || initiallyHidden;
+    element.toggleAttribute("data-feature-disabled", !enabled);
+
+    if (!enabled) {
+      element.setAttribute("aria-hidden", "true");
+      if ("disabled" in element) element.disabled = true;
     }
   });
 }
