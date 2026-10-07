@@ -43,9 +43,9 @@ function currentRoom(snapshot) {
 }
 
 export async function onRequestPost(context) {
-  const apiKey = String(context.env.WHEREBY_API_KEY || "").trim();
+  const apiKey = String(context.env.DAILY_API_KEY || "").trim();
   if (!apiKey) {
-    return json({ error: "WHEREBY_API_KEY is not configured." }, 503);
+    return json({ error: "DAILY_API_KEY is not configured." }, 503);
   }
 
   let existing;
@@ -63,9 +63,9 @@ export async function onRequestPost(context) {
     return json({
       ok: true,
       reused: true,
-      provider: "whereby",
+      provider: "daily",
       roomUrl: existing.roomUrl,
-      meetingId: existing.meetingId || null,
+      roomId: existing.roomId || existing.meetingId || null,
       endDate: existing.endDate || null
     });
   }
@@ -96,7 +96,7 @@ export async function onRequestPost(context) {
   const meeting = await whereby.json().catch(() => ({}));
   if (!whereby.ok) {
     return json(
-      { error: meeting.error || meeting.message || `Whereby HTTP ${whereby.status}` },
+      { error: meeting.error || meeting.message || `Daily HTTP ${whereby.status}` },
       whereby.status
     );
   }
@@ -104,8 +104,8 @@ export async function onRequestPost(context) {
   try {
     const { response, data } = await realtime(context.env, "POST", {
       type: "video_room_set",
-      roomUrl: meeting.roomUrl,
-      meetingId: meeting.meetingId || null,
+      roomUrl: room.url,
+      roomId: room.id || null,
       endDate
     });
 
@@ -119,9 +119,9 @@ export async function onRequestPost(context) {
   return json({
     ok: true,
     reused: false,
-    provider: "whereby",
-    roomUrl: meeting.roomUrl,
-    meetingId: meeting.meetingId || null,
+    provider: "daily",
+    roomUrl: room.url,
+    roomId: room.id || null,
     endDate
   });
 }
