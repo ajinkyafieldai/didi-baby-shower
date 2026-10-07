@@ -21,15 +21,19 @@ Video transport is intentionally separate from Apsila interaction logic.
 Room creation is deliberate and does not require a Pages redeploy.
 
 ```sh
+node babyshower.js room status
 node babyshower.js room create --hours 8 --dry-run
 node babyshower.js room create --hours 8
+node babyshower.js room create --hours 8 --force
 ```
 
-The CLI calls `/api/video-provision`. The Pages Function uses the server-side `WHEREBY_API_KEY`, creates or reuses a Whereby meeting, and stores the current room in the existing realtime Durable Object.
+The CLI calls `/api/video-provision`. The Pages Function uses the server-side `WHEREBY_API_KEY` and claims room provisioning atomically through the realtime Durable Object before calling Whereby.
 
-Guests call `/api/video-config`, which reads that stored room from realtime state and returns only the guest room URL and metadata needed by the browser. The Whereby API key is never exposed to the client.
+By default, provisioning reuses a live room. `--force` deliberately rotates to a new room. A short-lived provisioning claim prevents concurrent operators from creating competing rooms.
 
-A new room therefore changes runtime event state rather than deployment configuration.
+Whereby's host URL is returned only in the successful operator provisioning response. It is never stored in guest-visible Durable Object state. Guests call `/api/video-config`, which validates the stored guest room URL and expiry before returning it to the browser.
+
+Expired rooms return HTTP 410 from `/api/video-config`; malformed stored room state fails closed. Creating a new room changes runtime state rather than deployment configuration.
 
 ## Realtime event layer
 

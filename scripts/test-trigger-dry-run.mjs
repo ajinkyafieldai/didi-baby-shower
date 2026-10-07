@@ -53,3 +53,16 @@ assert.equal(roomPayload.dryRun, true);
 assert.equal(roomPayload.provider, "whereby");
 assert.equal(roomPayload.hours, 8);
 assert.equal(roomPayload.endpoint, "/api/video-provision");
+
+
+const forcedRoom = spawnSync(process.execPath, [cli, "room", "create", "--hours", "4", "--force", "--dry-run"], {
+  env: { ...process.env },
+  encoding: "utf8"
+});
+
+assert.equal(forcedRoom.status, 0, forcedRoom.stderr);
+const forcedRoomPayload = JSON.parse(forcedRoom.stdout);
+assert.equal(forcedRoomPayload.ok, true);
+assert.equal(forcedRoomPayload.force, true);
+assert.equal(forcedRoomPayload.hours, 4);
+assert.equal(forcedRoomPayload.endpoint, "/api/video-provision");

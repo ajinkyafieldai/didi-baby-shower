@@ -32,6 +32,7 @@ jobs:
           node --check babyshower.js
           node --check photobooth.js
           node --check scripts/phrase-map.mjs
+          node --check scripts/test-video-room-contract.mjs
           node --check whereby-client.js
           node --check functions/api/events.js
           node --check functions/api/photos.js
@@ -52,6 +53,9 @@ jobs:
 
       - name: Trigger dry-run test
         run: node scripts/test-trigger-dry-run.mjs
+
+      - name: Video room contract test
+        run: node scripts/test-video-room-contract.mjs
 
       - name: Build and verify
         run: npm run build

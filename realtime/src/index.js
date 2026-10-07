@@ -53,6 +53,14 @@ function json(data, status = 200) {
   });
 }
 
+function roomIsLive(room, now = Date.now()) {
+  if (!room?.roomUrl || !room?.endDate) return false;
+  const end = Date.parse(room.endDate);
+  return Number.isFinite(end) && end > now;
+}
+
+const VIDEO_PROVISION_LOCK_MS = 60_000;
+
 async function gameSnapshot(ctx) {
   const nameSuggestions = await ctx.storage.get("nameSuggestions");
   const quizAnswers = await ctx.storage.get("quizAnswers");
@@ -100,7 +108,53 @@ export class CelebrationRoom {
         return json({ error: "Invalid JSON" }, 400);
       }
 
+      if (body && body.type === "video_room_claim") {
+        const force = body.force === true;
+        const now = Date.now();
+        const current = await this.ctx.storage.get("videoRoom");
+
+        if (!force && roomIsLive(current, now)) {
+          return json({ ok: true, action: "reuse", videoRoom: current });
+        }
+
+        const existingClaim = await this.ctx.storage.get("videoProvisionClaim");
+        if (
+          existingClaim &&
+          Number(existingClaim.createdAt || 0) > now - VIDEO_PROVISION_LOCK_MS
+        ) {
+          return json({ error: "Video room provisioning is already in progress." }, 409);
+        }
+
+        const claim = {
+          token: crypto.randomUUID(),
+          createdAt: now
+        };
+        await this.ctx.storage.put("videoProvisionClaim", claim);
+
+        return json({
+          ok: true,
+          action: "create",
+          claimToken: claim.token,
+          previousRoomLive: roomIsLive(current, now)
+        });
+      }
+
+      if (body && body.type === "video_room_release") {
+        const token = String(body.claimToken || "");
+        const claim = await this.ctx.storage.get("videoProvisionClaim");
+        if (claim?.token && claim.token === token) {
+          await this.ctx.storage.delete("videoProvisionClaim");
+        }
+        return json({ ok: true });
+      }
+
       if (body && body.type === "video_room_set") {
+        const claimToken = String(body.claimToken || "");
+        const claim = await this.ctx.storage.get("videoProvisionClaim");
+        if (!claim?.token || claim.token !== claimToken) {
+          return json({ error: "Invalid or expired video provisioning claim." }, 409);
+        }
+
         const roomUrl = String(body.roomUrl || "").trim().slice(0, 500);
         const meetingId = String(body.meetingId || "").trim().slice(0, 200);
         const endDate = String(body.endDate || "").trim().slice(0, 100);
@@ -119,15 +173,22 @@ export class CelebrationRoom {
           return json({ error: "Invalid Whereby room URL" }, 400);
         }
 
+        const end = Date.parse(endDate);
+        if (!Number.isFinite(end) || end <= Date.now()) {
+          return json({ error: "Video room expiry must be in the future." }, 400);
+        }
+
         const videoRoom = {
           provider: "whereby",
           roomUrl: parsed.toString(),
           meetingId: meetingId || null,
-          endDate: endDate || null,
+          endDate,
+          createdAt: Date.now(),
           updatedAt: Date.now()
         };
 
         await this.ctx.storage.put("videoRoom", videoRoom);
+        await this.ctx.storage.delete("videoProvisionClaim");
         return json({ ok: true, videoRoom });
       }
 
