@@ -20,7 +20,6 @@ export const FEATURES = Object.freeze({
   timeCapsule: true,
   recipeBook: true,
   photoMosaic: true,
-  guestRibbon: true,
   keepsake: true,
   afterparty: true
 });
