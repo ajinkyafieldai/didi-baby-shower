@@ -1,3 +1,8 @@
+import { FEATURES, featureEnabled, applyFeatureVisibility } from "./frontend/features.js";
+
+applyFeatureVisibility();
+window.__DIDI_FEATURES__ = FEATURES;
+
 const stage = document.querySelector(".video-stage");
 const frame = document.getElementById("zoom-frame");
 const joinForm = document.getElementById("join-form");
@@ -195,7 +200,7 @@ let photoCaptureStream = null;
 const zoomCaptureRequests = new Map();
 
 function showPhotoButton() {
-  if (!photoButton) return;
+  if (!featureEnabled("familyPhoto") || !photoButton) return;
   photoButton.classList.add("is-peeking");
   photoButton.setAttribute("aria-hidden", "false");
   photoButton.style.left = "auto";
@@ -443,7 +448,7 @@ joinForm.addEventListener("submit", async (event) => {
 
   frame.src = `/zoom.html?name=${encodeURIComponent(guestName)}`;
   stage.classList.add("in-call");
-  recordArrival(guestName, "");
+  if (featureEnabled("guestRibbon")) recordArrival(guestName, "");
 });
 
 window.addEventListener("message", (event) => {
@@ -703,6 +708,8 @@ function escapeHtml(value) {
 }
 
 function renderGame(game) {
+  if (game === "names" && !featureEnabled("babyNames")) return;
+  if (game === "didi" && !featureEnabled("didiQuiz")) return;
   activeGame = game;
   gamePanel.hidden = false;
 
@@ -814,6 +821,33 @@ function safeGuestName() {
 }
 
 function switchHubView(view) {
+  const featureForView = {
+    wall: "familyWall",
+    timeline: "familyTimeline",
+    map: "familyMap",
+    capsule: "timeCapsule",
+    recipes: "recipeBook",
+    mosaic: "photoMosaic",
+    guests: "guestRibbon",
+    keepsake: "keepsake"
+  }[view];
+
+  if (featureForView && !featureEnabled(featureForView)) {
+    const fallback = [
+      ["wall", "familyWall"],
+      ["timeline", "familyTimeline"],
+      ["map", "familyMap"],
+      ["capsule", "timeCapsule"],
+      ["recipes", "recipeBook"],
+      ["mosaic", "photoMosaic"],
+      ["guests", "guestRibbon"],
+      ["keepsake", "keepsake"]
+    ].find(([, feature]) => featureEnabled(feature));
+
+    if (!fallback) return;
+    view = fallback[0];
+  }
+
   activeHubView = view;
   hubTabs.forEach((button) => button.classList.toggle("active", button.dataset.hubTab === view));
   hubViews.forEach((section) => {
@@ -1082,21 +1116,22 @@ function renderKeepsakeSummary() {
 }
 
 function renderHubView(view) {
-  if (view === "wall") renderBlessings();
-  if (view === "timeline") renderTimeline();
-  if (view === "map") renderMap();
-  if (view === "capsule") renderCapsules();
-  if (view === "recipes") renderRecipes();
-  if (view === "mosaic") renderMosaic();
-  if (view === "guests") renderGuests();
-  if (view === "keepsake") renderKeepsakeSummary();
+  if (!featureEnabled("familyHub")) return;
+  if (view === "wall" && featureEnabled("familyWall")) renderBlessings();
+  if (view === "timeline" && featureEnabled("familyTimeline")) renderTimeline();
+  if (view === "map" && featureEnabled("familyMap")) renderMap();
+  if (view === "capsule" && featureEnabled("timeCapsule")) renderCapsules();
+  if (view === "recipes" && featureEnabled("recipeBook")) renderRecipes();
+  if (view === "mosaic" && featureEnabled("photoMosaic")) renderMosaic();
+  if (view === "guests" && featureEnabled("guestRibbon")) renderGuests();
+  if (view === "keepsake" && featureEnabled("keepsake")) renderKeepsakeSummary();
 }
 
 hubTabs.forEach((button) => {
   button.addEventListener("click", () => switchHubView(button.dataset.hubTab));
 });
 
-timelineForm.addEventListener("submit", async (event) => {
+timelineForm.addEventListener("submit", async (event) => {\n  if (!featureEnabled("familyTimeline")) return;
   event.preventDefault();
   const data = new FormData(event.currentTarget);
   const photoId = await storeOptionalPhoto(event.currentTarget.elements.photo.files[0]);
@@ -1114,7 +1149,7 @@ timelineForm.addEventListener("submit", async (event) => {
   renderTimeline();
 });
 
-mapForm.addEventListener("submit", (event) => {
+mapForm.addEventListener("submit", (event) => {\n  if (!featureEnabled("familyMap")) return;
   event.preventDefault();
   const data = new FormData(event.currentTarget);
   const name = String(data.get("name") || "").trim();
@@ -1129,7 +1164,7 @@ mapForm.addEventListener("submit", (event) => {
   renderMap();
 });
 
-capsuleForm.addEventListener("submit", (event) => {
+capsuleForm.addEventListener("submit", (event) => {\n  if (!featureEnabled("timeCapsule")) return;
   event.preventDefault();
   const data = new FormData(event.currentTarget);
   familyStore.add("capsules", {
@@ -1145,7 +1180,7 @@ capsuleForm.addEventListener("submit", (event) => {
   renderCapsules();
 });
 
-recipeForm.addEventListener("submit", async (event) => {
+recipeForm.addEventListener("submit", async (event) => {\n  if (!featureEnabled("recipeBook")) return;
   event.preventDefault();
   const data = new FormData(event.currentTarget);
   const photoId = await storeOptionalPhoto(event.currentTarget.elements.photo.files[0]);
@@ -1163,7 +1198,7 @@ recipeForm.addEventListener("submit", async (event) => {
   renderRecipes();
 });
 
-guestForm.addEventListener("submit", (event) => {
+guestForm.addEventListener("submit", (event) => {\n  if (!featureEnabled("guestRibbon")) return;
   event.preventDefault();
   const data = new FormData(event.currentTarget);
   recordArrival(String(data.get("name") || "").trim(), String(data.get("city") || "").trim());
@@ -1401,6 +1436,7 @@ ${rows.join("") || "<p>The wall is empty.</p>"}
 }
 
 blessingLaunch.addEventListener("click", () => {
+  if (!featureEnabled("familyHub")) return;
   ensureAudioContext();
   blessingPanel.hidden = false;
   switchHubView(activeHubView);
@@ -1421,6 +1457,7 @@ blessingMessage.addEventListener("input", () => {
 
 blessingForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  if (!featureEnabled("familyWall")) return;
   const data = new FormData(blessingForm);
   const message = String(data.get("message") || "").trim();
   if (!message) return;
@@ -1445,6 +1482,7 @@ blessingForm.addEventListener("submit", (event) => {
 });
 
 wallPhotoInput.addEventListener("change", async () => {
+  if (!featureEnabled("familyWall")) return;
   const [file] = wallPhotoInput.files || [];
   if (!file) return;
 
@@ -1505,7 +1543,7 @@ gamePanel.addEventListener("click", (event) => {
   }
 });
 
-if (afterpartyMode) {
+if (afterpartyMode && featureEnabled("afterparty") && featureEnabled("familyHub") && featureEnabled("keepsake")) {
   document.body.classList.add("afterparty-mode");
   blessingPanel.hidden = false;
   activeHubView = "keepsake";
