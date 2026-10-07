@@ -457,6 +457,7 @@ joinForm.addEventListener("submit", async (event) => {
   frame.src = `/daily.html?name=${encodeURIComponent(guestName)}`;
   stage.classList.add("in-call");
   if (featureEnabled("guestRibbon")) recordArrival(guestName, "");
+  if (featureEnabled("familyMap")) hydrateMapForm();
 });
 
 window.addEventListener("message", (event) => {
@@ -813,6 +814,48 @@ function renderGame(game) {
 
 
 
+
+let coarseLocationPromise = null;
+
+async function getCoarseLocation() {
+  if (!coarseLocationPromise) {
+    coarseLocationPromise = fetch("/api/location", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Coarse location unavailable.");
+        return response.json();
+      })
+      .catch((error) => {
+        console.debug("Coarse location lookup failed", error);
+        return null;
+      });
+  }
+  return coarseLocationPromise;
+}
+
+async function hydrateMapForm() {
+  if (!featureEnabled("familyMap") || !mapForm) return;
+
+  const nameInput = mapForm.elements.name;
+  const cityInput = mapForm.elements.city;
+
+  if (nameInput && !nameInput.value.trim()) {
+    const name = safeGuestName();
+    if (name && name !== "Someone") nameInput.value = name;
+  }
+
+  if (!cityInput || cityInput.value.trim()) return;
+
+  cityInput.placeholder = "Finding your city…";
+  const location = await getCoarseLocation();
+
+  if (location?.city && !cityInput.value.trim()) {
+    cityInput.value = location.city;
+    cityInput.dataset.autoLocation = "true";
+  }
+
+  cityInput.placeholder = "City, e.g. Mumbai";
+}
+
 let activeHubView = "wall";
 let timelineObjectUrls = [];
 let recipeObjectUrls = [];
@@ -859,7 +902,10 @@ function switchHubView(view) {
   });
 
   // Let the selected tab paint first; load images/content right after.
-  requestAnimationFrame(() => renderHubView(view));
+  requestAnimationFrame(() => {
+    renderHubView(view);
+    if (view === "map") hydrateMapForm();
+  });
 }
 
 function worldPoint(lon, lat) {
@@ -1155,14 +1201,22 @@ timelineForm.addEventListener("submit", async (event) => {
   renderTimeline();
 });
 
-mapForm.addEventListener("submit", (event) => {
+mapForm.addEventListener("submit", async (event) => {
   if (!featureEnabled("familyMap")) return;
   event.preventDefault();
   const data = new FormData(event.currentTarget);
   const name = String(data.get("name") || "").trim();
   const city = String(data.get("city") || "").trim();
   const entry = { id: crypto.randomUUID(), name, city, at: Date.now() };
-  const coords = lookupCity(city);
+  let coords = lookupCity(city);
+
+  if (!coords && event.currentTarget.elements.city.dataset.autoLocation === "true") {
+    const location = await getCoarseLocation();
+    if (Array.isArray(location?.coords) && location.coords.length === 2) {
+      coords = location.coords;
+    }
+  }
+
   if (coords) entry.coords = coords;
   familyStore.add("pins", entry);
   recordArrival(name, city);
