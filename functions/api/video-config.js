@@ -40,9 +40,9 @@ export async function onRequestGet(context) {
   }
 
   return json({
-    provider: "whereby",
+    provider: "daily",
     roomUrl: room.roomUrl,
-    meetingId: room.meetingId || null,
+    roomId: room.roomId || null,
     endDate: room.endDate || null
   });
 }
