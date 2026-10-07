@@ -11,13 +11,14 @@
   <main class="app-shell">
     <section class="video-stage" aria-label="Baby shower video call">
       <iframe
+        data-feature="videoCall"
         id="zoom-frame"
         title="Zoom baby shower call"
         allow="camera; microphone; autoplay; fullscreen"
         referrerpolicy="same-origin"
       ></iframe>
 
-      <div id="video-placeholder" class="video-placeholder">
+      <div id="video-placeholder" class="video-placeholder" data-feature="videoCall">
         <div class="flower-mark" aria-hidden="true">✿</div>
         <h1>Didi's Baby Shower</h1>
         <p>Join the family video call, then use the celebration buttons together.</p>
@@ -40,18 +41,18 @@
       </div>
 
       <div class="game-actions" aria-label="Baby shower activities">
-        <button class="game-launch" data-game="names" type="button">
+        <button class="game-launch" data-feature="babyNames" data-game="names" type="button">
           <span aria-hidden="true">👶</span><span>Baby Names</span>
         </button>
-        <button class="game-launch" data-game="didi" type="button">
+        <button class="game-launch" data-feature="didiQuiz" data-game="didi" type="button">
           <span aria-hidden="true">🏆</span><span>Didi Quiz</span>
         </button>
-        <button class="game-launch blessing-launch" id="blessing-launch" type="button">
+        <button class="game-launch blessing-launch" data-feature="familyHub" id="blessing-launch" type="button">
           <span aria-hidden="true">🖼️</span><span>Family Wall</span>
         </button>
       </div>
 
-      <button class="photo-button" data-effect="photo" type="button" aria-label="Family photo moment">
+      <button class="photo-button" data-feature="familyPhoto" data-effect="photo" type="button" aria-label="Family photo moment">
         <span aria-hidden="true">📸</span>
         <span>Photo</span>
       </button>
@@ -63,7 +64,7 @@
         </div>
       </div>
 
-      <div id="blessing-panel" class="blessing-panel" hidden>
+      <div id="blessing-panel" class="blessing-panel" data-feature="familyHub" hidden>
         <div class="blessing-card family-hub-card" role="dialog" aria-modal="true" aria-labelledby="blessing-title">
           <button id="blessing-close" class="game-close" type="button" aria-label="Close family hub">×</button>
           <div class="blessing-head">
@@ -75,17 +76,17 @@
           </div>
 
           <nav class="family-hub-tabs" aria-label="Family keepsake sections">
-            <button type="button" data-hub-tab="wall" class="active">🖼️ Wall</button>
-            <button type="button" data-hub-tab="timeline">🕰️ Timeline</button>
-            <button type="button" data-hub-tab="map">🌍 Map</button>
-            <button type="button" data-hub-tab="capsule">💌 Capsule</button>
-            <button type="button" data-hub-tab="recipes">🍲 Recipes</button>
-            <button type="button" data-hub-tab="mosaic">🧩 Mosaic</button>
-            <button type="button" data-hub-tab="guests">👋 Who was here</button>
-            <button type="button" data-hub-tab="keepsake">✨ Keepsake</button>
+            <button type="button" data-feature="familyWall" data-hub-tab="wall" class="active">🖼️ Wall</button>
+            <button type="button" data-feature="familyTimeline" data-hub-tab="timeline">🕰️ Timeline</button>
+            <button type="button" data-feature="familyMap" data-hub-tab="map">🌍 Map</button>
+            <button type="button" data-feature="timeCapsule" data-hub-tab="capsule">💌 Capsule</button>
+            <button type="button" data-feature="recipeBook" data-hub-tab="recipes">🍲 Recipes</button>
+            <button type="button" data-feature="photoMosaic" data-hub-tab="mosaic">🧩 Mosaic</button>
+            <button type="button" data-feature="guestRibbon" data-hub-tab="guests">👋 Who was here</button>
+            <button type="button" data-feature="keepsake" data-hub-tab="keepsake">✨ Keepsake</button>
           </nav>
 
-          <section class="hub-view active" data-hub-view="wall">
+          <section class="hub-view active" data-feature="familyWall" data-hub-view="wall">
             <form id="blessing-form" class="blessing-form">
               <div class="blessing-audience" role="group" aria-label="Message recipient">
                 <label><input type="radio" name="audience" value="baby" checked> <span>For the baby</span></label>
@@ -110,7 +111,7 @@
             <div id="blessing-wall" class="blessing-wall" aria-live="polite"></div>
           </section>
 
-          <section class="hub-view" data-hub-view="timeline" hidden>
+          <section class="hub-view" data-feature="familyTimeline" data-hub-view="timeline" hidden>
             <form id="timeline-form" class="hub-form">
               <h3>Add a Didi memory</h3>
               <div class="hub-form-row">
@@ -124,7 +125,7 @@
             <div id="timeline-list" class="timeline-list"></div>
           </section>
 
-          <section class="hub-view" data-hub-view="map" hidden>
+          <section class="hub-view" data-feature="familyMap" data-hub-view="map" hidden>
             <form id="map-form" class="hub-form compact">
               <h3>Where is everyone joining from?</h3>
               <div class="hub-form-row">
@@ -137,7 +138,7 @@
             <div id="map-list" class="map-list"></div>
           </section>
 
-          <section class="hub-view" data-hub-view="capsule" hidden>
+          <section class="hub-view" data-feature="timeCapsule" data-hub-view="capsule" hidden>
             <form id="capsule-form" class="hub-form">
               <h3>Baby Time Capsule</h3>
               <div class="hub-form-row">
@@ -156,7 +157,7 @@
             <div id="capsule-list" class="capsule-list"></div>
           </section>
 
-          <section class="hub-view" data-hub-view="recipes" hidden>
+          <section class="hub-view" data-feature="recipeBook" data-hub-view="recipes" hidden>
             <form id="recipe-form" class="hub-form">
               <h3>Family Recipe Book</h3>
               <input name="name" maxlength="80" placeholder="Dish name" required>
@@ -168,14 +169,14 @@
             <div id="recipe-list" class="recipe-list"></div>
           </section>
 
-          <section class="hub-view" data-hub-view="mosaic" hidden>
+          <section class="hub-view" data-feature="photoMosaic" data-hub-view="mosaic" hidden>
             <div class="hub-section-head">
               <div><h3>Family Photo Mosaic</h3><p>Every shared photo becomes one tile of the day.</p></div>
             </div>
             <div id="photo-mosaic" class="photo-mosaic"></div>
           </section>
 
-          <section class="hub-view" data-hub-view="guests" hidden>
+          <section class="hub-view" data-feature="guestRibbon" data-hub-view="guests" hidden>
             <form id="guest-form" class="hub-form compact">
               <h3>Who was here</h3>
               <div class="hub-form-row">
@@ -187,7 +188,7 @@
             <div id="arrival-ribbon" class="arrival-ribbon"></div>
           </section>
 
-          <section class="hub-view" data-hub-view="keepsake" hidden>
+          <section class="hub-view" data-feature="keepsake" data-hub-view="keepsake" hidden>
             <div id="keepsake-summary" class="keepsake-summary"></div>
             <button id="afterparty-preview" class="afterparty-preview" type="button">Preview afterparty page ✨</button>
           </section>
@@ -195,7 +196,7 @@
       </div>
     </section>
 
-    <nav class="ritual-dock" aria-label="Baby shower celebrations">
+    <nav class="ritual-dock" data-feature="rituals" aria-label="Baby shower celebrations">
       <button class="ritual-button" data-effect="ovalni" type="button">
         <span class="ritual-icon" aria-hidden="true">🪔</span>
         <span>Ovalni</span>
