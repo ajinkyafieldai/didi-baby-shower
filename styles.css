@@ -2043,3 +2043,238 @@ button.is-busy {
     transition: none;
   }
 }
+
+
+/* Festive family-call theme -------------------------------------------------
+   The video provider stays provider-neutral. We frame it with our own visual
+   language instead of trying to reach into the cross-origin meeting UI. */
+:root {
+  --sage: #78866b;
+  --sage-deep: #5f6f57;
+  --gold: #d9a441;
+  --gold-soft: #efd7a5;
+  --blush-wash: #fff1ee;
+  --ivory: #fffaf2;
+}
+
+html,
+body {
+  background: var(--ivory);
+}
+
+.app-shell {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 8% 6%, rgba(244,199,207,.56) 0 0, transparent 20rem),
+    radial-gradient(circle at 92% 8%, rgba(248,219,197,.62) 0 0, transparent 22rem),
+    radial-gradient(circle at 12% 92%, rgba(224,236,214,.7) 0 0, transparent 24rem),
+    radial-gradient(circle at 88% 88%, rgba(255,224,214,.58) 0 0, transparent 24rem),
+    linear-gradient(145deg, #fffaf2 0%, #fff4ef 52%, #fff9ef 100%);
+}
+
+.app-shell::before,
+.app-shell::after {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  width: min(36vw, 430px);
+  aspect-ratio: 1;
+  pointer-events: none;
+  opacity: .62;
+  filter: saturate(.9);
+}
+
+.app-shell::before {
+  left: -7vw;
+  top: -8vw;
+  background:
+    radial-gradient(circle at 35% 34%, rgba(244,199,207,.85) 0 6%, transparent 7%),
+    radial-gradient(circle at 53% 22%, rgba(248,219,197,.9) 0 5%, transparent 6%),
+    radial-gradient(circle at 61% 43%, rgba(255,229,214,.95) 0 7%, transparent 8%),
+    radial-gradient(ellipse at 51% 54%, rgba(120,134,107,.5) 0 10%, transparent 11%),
+    radial-gradient(ellipse at 36% 62%, rgba(120,134,107,.42) 0 9%, transparent 10%);
+  transform: rotate(-18deg);
+}
+
+.app-shell::after {
+  right: -8vw;
+  bottom: -10vw;
+  background:
+    radial-gradient(circle at 40% 38%, rgba(244,199,207,.86) 0 6%, transparent 7%),
+    radial-gradient(circle at 58% 48%, rgba(248,219,197,.86) 0 5%, transparent 6%),
+    radial-gradient(circle at 65% 28%, rgba(255,232,218,.92) 0 7%, transparent 8%),
+    radial-gradient(ellipse at 48% 62%, rgba(120,134,107,.5) 0 10%, transparent 11%),
+    radial-gradient(ellipse at 67% 58%, rgba(120,134,107,.4) 0 9%, transparent 10%);
+  transform: rotate(15deg);
+}
+
+.video-stage,
+.ritual-dock {
+  position: relative;
+  z-index: 1;
+}
+
+.video-stage {
+  margin: clamp(10px, 1.4vw, 20px);
+  border: 1px solid rgba(217,164,65,.42);
+  border-radius: clamp(18px, 2vw, 26px);
+  background:
+    linear-gradient(rgba(255,250,242,.93), rgba(255,248,241,.93)),
+    radial-gradient(circle at 50% 0%, rgba(244,199,207,.34), transparent 45%);
+  box-shadow:
+    0 24px 70px rgba(83,58,55,.14),
+    inset 0 0 0 1px rgba(255,255,255,.7);
+}
+
+.video-stage.in-call {
+  padding: clamp(8px, 1vw, 14px);
+}
+
+#video-frame {
+  border-radius: clamp(14px, 1.5vw, 20px);
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(217,164,65,.52),
+    0 12px 34px rgba(65,44,40,.16);
+}
+
+.call-status,
+.game-launch,
+.photo-button {
+  border: 1px solid rgba(255,255,255,.52);
+  background: rgba(70,55,49,.72);
+  box-shadow: 0 8px 24px rgba(65,44,40,.16);
+  backdrop-filter: blur(18px) saturate(1.1);
+}
+
+.game-launch {
+  color: #fffdf8;
+}
+
+.game-launch[data-game="names"] {
+  background: rgba(179,111,115,.82);
+}
+
+.game-launch[data-game="didi"] {
+  background: rgba(95,111,87,.88);
+}
+
+.blessing-launch {
+  background: rgba(166,124,64,.88);
+}
+
+.photo-button {
+  background: linear-gradient(145deg, rgba(190,90,103,.95), rgba(169,71,98,.95));
+}
+
+.ritual-dock {
+  margin: 0 clamp(10px, 1.4vw, 20px) clamp(10px, 1.4vw, 20px);
+  border: 1px solid rgba(217,164,65,.25);
+  border-radius: 20px;
+  background: rgba(255,250,242,.88);
+  box-shadow: 0 16px 42px rgba(83,58,55,.10);
+  backdrop-filter: blur(18px) saturate(1.06);
+}
+
+.ritual-button {
+  border-color: rgba(217,164,65,.22);
+  background:
+    linear-gradient(160deg, rgba(255,255,255,.97), rgba(255,248,238,.92));
+  box-shadow:
+    0 6px 18px rgba(83,58,55,.08),
+    inset 0 0 0 1px rgba(255,255,255,.72);
+}
+
+.ritual-button:hover {
+  border-color: rgba(217,164,65,.48);
+  background: linear-gradient(160deg, #fff, #fff2e4);
+}
+
+.ritual-icon {
+  filter: drop-shadow(0 2px 3px rgba(83,58,55,.12));
+}
+
+.video-placeholder {
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(244,199,207,.38), transparent 20rem),
+    radial-gradient(circle at 84% 18%, rgba(248,219,197,.5), transparent 22rem),
+    radial-gradient(circle at 20% 84%, rgba(223,235,212,.54), transparent 20rem),
+    linear-gradient(145deg, rgba(255,250,242,.98), rgba(255,241,235,.98));
+}
+
+.flower-mark {
+  background: linear-gradient(145deg, #ffe4e7, #f4c7cf);
+  color: #9d445d;
+  box-shadow:
+    0 14px 34px rgba(169,71,98,.16),
+    0 0 0 1px rgba(217,164,65,.24);
+}
+
+.primary-button,
+.blessing-form-foot button,
+.wall-photo-pick,
+.hub-form > button,
+.afterparty-preview {
+  background: linear-gradient(145deg, #b95670, #984059);
+  box-shadow: 0 8px 18px rgba(169,71,98,.18);
+}
+
+.blessing-card,
+.game-card {
+  border: 1px solid rgba(217,164,65,.24);
+  background:
+    radial-gradient(circle at 8% 3%, rgba(244,199,207,.26), transparent 16rem),
+    linear-gradient(160deg, #fffdf9, #fff7ef);
+}
+
+.family-hub-tabs button.active {
+  border-color: rgba(217,164,65,.48);
+  background: linear-gradient(145deg, rgba(244,199,207,.38), rgba(255,242,217,.7));
+  color: #8f4058;
+}
+
+@media (min-width: 980px) {
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr) 112px;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .video-stage {
+    grid-column: 1;
+    grid-row: 1;
+    margin-right: 8px;
+  }
+
+  .ritual-dock {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 10px 10px 10px 0;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: 1fr;
+    align-content: stretch;
+    gap: 7px;
+    border-radius: 22px;
+  }
+
+  .ritual-button {
+    min-height: 0;
+    border-radius: 16px;
+  }
+}
+
+@media (max-width: 979px) {
+  .video-stage {
+    margin-bottom: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell::before,
+  .app-shell::after {
+    display: none;
+  }
+}
