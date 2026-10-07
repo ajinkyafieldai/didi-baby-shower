@@ -2,6 +2,43 @@ const root = document.getElementById("video-root");
 const bootMessage = document.getElementById("boot-message");
 const name = new URLSearchParams(location.search).get("name") || "Guest";
 
+const APSILA_DAILY_THEME = {
+  colors: {
+    accent: "#A94762",
+    accentText: "#FFFFFF",
+    background: "#FFFAF2",
+    backgroundAccent: "#FFF2E8",
+    baseText: "#422F35",
+    border: "#E8D8C7",
+    mainAreaBg: "#FFF7EF",
+    mainAreaBgAccent: "#F6E9DF",
+    mainAreaText: "#422F35",
+    supportiveText: "#7A6970"
+  }
+};
+
+async function blendDaily(callFrame) {
+  // Daily Prebuilt supports native theming; use it instead of brittle iframe CSS.
+  try {
+    await callFrame.setTheme(APSILA_DAILY_THEME);
+  } catch (error) {
+    console.warn("Daily theme could not be applied", error);
+  }
+
+  // Equal-size tiles are a better fit for a family gathering and avoid the
+  // large empty active-speaker canvas visible with only a few participants.
+  try {
+    await callFrame.setActiveSpeakerMode(false);
+  } catch (error) {
+    console.warn("Daily grid mode could not be enabled", error);
+  }
+
+  try {
+    await callFrame.setShowParticipantsBar(false);
+  } catch {}
+}
+
+
 function report(type, text) {
   parent.postMessage({ type, text }, location.origin);
 }
@@ -40,11 +77,15 @@ async function startVideo() {
     stage("Loading Daily…");
 
     const callFrame = window.Daily.createFrame(root, {
-      showLeaveButton: true,
+      showLeaveButton: false,
+      activeSpeakerMode: false,
+      theme: APSILA_DAILY_THEME,
       iframeStyle: {
         width: "100%",
         height: "100%",
-        border: "0"
+        border: "0",
+        borderRadius: "14px",
+        background: "#FFF7EF"
       }
     });
 
@@ -55,9 +96,10 @@ async function startVideo() {
       if (!loaded) fail("Daily room load timed out.");
     }, 15000);
 
-    callFrame.on("loaded", () => {
+    callFrame.on("loaded", async () => {
       loaded = true;
       window.clearTimeout(loadTimeout);
+      await blendDaily(callFrame);
       if (bootMessage && bootMessage.isConnected) bootMessage.remove();
       report("video-status", "Ready to join");
     });
@@ -67,6 +109,7 @@ async function startVideo() {
       try {
         await callFrame.setUserName(name);
       } catch {}
+      await blendDaily(callFrame);
       if (bootMessage) bootMessage.remove();
       report("video-status", "Live");
     });
