@@ -52,4 +52,4 @@ assert.equal(roomPayload.ok, true);
 assert.equal(roomPayload.dryRun, true);
 assert.equal(roomPayload.provider, "whereby");
 assert.equal(roomPayload.hours, 8);
-assert.equal(roomPayload.endpoint, "/api/video-config");
+assert.equal(roomPayload.endpoint, "/api/video-provision");
