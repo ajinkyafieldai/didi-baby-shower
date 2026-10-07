@@ -1,3 +1,38 @@
+import { FEATURES, featureEnabled, applyFeatureVisibility } from "./frontend/features.js";
+
+applyFeatureVisibility();
+window.__DIDI_FEATURES__ = FEATURES;
+
+const uiTask = window.scheduler?.postTask
+  ? (callback, priority = "user-visible") => window.scheduler.postTask(callback, { priority })
+  : (callback) => Promise.resolve().then(callback);
+
+function nextFrame() {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+function setBusy(button, busy, label = "") {
+  if (!button) return;
+  if (!button.dataset.originalLabel) button.dataset.originalLabel = button.textContent;
+  button.disabled = busy;
+  button.classList.toggle("is-busy", busy);
+  button.setAttribute("aria-busy", busy ? "true" : "false");
+  if (busy && label) button.textContent = label;
+  if (!busy) button.textContent = button.dataset.originalLabel || button.textContent;
+}
+
+function warmLocalUi() {
+  // Touch frequently used local stores after first paint so opening panels feels instant.
+  uiTask(() => {
+    try {
+      localStorage.getItem("baby-shower-blessings-v1");
+      localStorage.getItem("baby-shower-family-hub-v1");
+    } catch {}
+  }, "background");
+}
+
+requestAnimationFrame(() => warmLocalUi());
+
 const stage = document.querySelector(".video-stage");
 const frame = document.getElementById("video-frame");
 const joinForm = document.getElementById("join-form");
@@ -14,9 +49,178 @@ const photoHost = new URLSearchParams(location.search).get("photoHost") === "1";
 const gamePanel = document.getElementById("game-panel");
 const gameContent = document.getElementById("game-content");
 const gameClose = document.getElementById("game-close");
+const blessingLaunch = document.getElementById("blessing-launch");
+const blessingPanel = document.getElementById("blessing-panel");
+const blessingClose = document.getElementById("blessing-close");
+const blessingForm = document.getElementById("blessing-form");
+const blessingMessage = document.getElementById("blessing-message");
+const blessingCount = document.getElementById("blessing-count");
+const blessingWall = document.getElementById("blessing-wall");
+const blessingExport = document.getElementById("blessing-export");
+const wallPhotoInput = document.getElementById("wall-photo-input");
+const wallPhotoCaption = document.getElementById("wall-photo-caption");
+const wallPhotoStatus = document.getElementById("wall-photo-status");
+const timelineForm = document.getElementById("timeline-form");
+const timelineList = document.getElementById("timeline-list");
+const mapForm = document.getElementById("map-form");
+const familyMap = document.getElementById("family-map");
+const mapList = document.getElementById("map-list");
+const capsuleForm = document.getElementById("capsule-form");
+const capsuleList = document.getElementById("capsule-list");
+const recipeForm = document.getElementById("recipe-form");
+const recipeList = document.getElementById("recipe-list");
+const photoMosaic = document.getElementById("photo-mosaic");
+const guestForm = document.getElementById("guest-form");
+const arrivalRibbon = document.getElementById("arrival-ribbon");
+const keepsakeSummary = document.getElementById("keepsake-summary");
+const afterpartyPreview = document.getElementById("afterparty-preview");
+const hubTabs = Array.from(document.querySelectorAll("[data-hub-tab]"));
+const hubViews = Array.from(document.querySelectorAll("[data-hub-view]"));
+const afterpartyMode = new URLSearchParams(location.search).get("afterparty") === "1";
 
 let gameState = { names: [], quiz: [] };
 let activeGame = null;
+
+const blessingStore = (() => {
+  const key = "baby-shower-blessings-v1";
+
+  function read() {
+    try {
+      const value = JSON.parse(localStorage.getItem(key) || "[]");
+      return Array.isArray(value) ? value : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function write(items) {
+    localStorage.setItem(key, JSON.stringify(items.slice(-200)));
+  }
+
+  return {
+    list() {
+      return read().sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+    },
+    add(entry) {
+      const items = read();
+      items.push(entry);
+      write(items);
+      return entry;
+    },
+    react(id, emoji) {
+      const items = read();
+      const entry = items.find((item) => item.id === id);
+      if (!entry) return;
+
+      entry.reactions = entry.reactions || {};
+      entry.reactions[emoji] = Number(entry.reactions[emoji] || 0) + 1;
+      write(items);
+    }
+  };
+})();
+
+const wallPhotoStore = (() => {
+  const dbName = "didi-baby-shower-family-wall";
+  const storeName = "photos";
+
+  function open() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(dbName, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(storeName)) {
+          db.createObjectStore(storeName);
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error("Could not open photo storage."));
+    });
+  }
+
+  async function transact(mode, callback) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, mode);
+      const store = tx.objectStore(storeName);
+      const request = callback(store);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error("Photo storage failed."));
+      tx.oncomplete = () => db.close();
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error || new Error("Photo storage failed."));
+      };
+    });
+  }
+
+  return {
+    put(id, blob) {
+      return transact("readwrite", (store) => store.put(blob, id));
+    },
+    get(id) {
+      return transact("readonly", (store) => store.get(id));
+    }
+  };
+})();
+
+const familyStore = (() => {
+  const key = "baby-shower-family-hub-v1";
+
+  function read() {
+    try {
+      const value = JSON.parse(localStorage.getItem(key) || "{}");
+      return {
+        timeline: Array.isArray(value.timeline) ? value.timeline : [],
+        pins: Array.isArray(value.pins) ? value.pins : [],
+        capsules: Array.isArray(value.capsules) ? value.capsules : [],
+        recipes: Array.isArray(value.recipes) ? value.recipes : [],
+        guests: Array.isArray(value.guests) ? value.guests : []
+      };
+    } catch {
+      return { timeline: [], pins: [], capsules: [], recipes: [], guests: [] };
+    }
+  }
+
+  function write(value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function add(type, entry) {
+    const value = read();
+    value[type].push(entry);
+    write(value);
+    return entry;
+  }
+
+  return { read, write, add };
+})();
+
+const cityCoordinates = {
+  "mumbai": [72.8777, 19.0760],
+  "bombay": [72.8777, 19.0760],
+  "pune": [73.8567, 18.5204],
+  "delhi": [77.1025, 28.7041],
+  "new delhi": [77.2090, 28.6139],
+  "bengaluru": [77.5946, 12.9716],
+  "bangalore": [77.5946, 12.9716],
+  "hyderabad": [78.4867, 17.3850],
+  "chennai": [80.2707, 13.0827],
+  "kolkata": [88.3639, 22.5726],
+  "ahmedabad": [72.5714, 23.0225],
+  "vadodara": [73.1812, 22.3072],
+  "london": [-0.1276, 51.5072],
+  "new york": [-74.0060, 40.7128],
+  "san francisco": [-122.4194, 37.7749],
+  "los angeles": [-118.2437, 34.0522],
+  "toronto": [-79.3832, 43.6532],
+  "vancouver": [-123.1207, 49.2827],
+  "singapore": [103.8198, 1.3521],
+  "dubai": [55.2708, 25.2048],
+  "sydney": [151.2093, -33.8688],
+  "melbourne": [144.9631, -37.8136],
+  "paris": [2.3522, 48.8566],
+  "berlin": [13.4050, 52.5200]
+};
 
 let guestName = "";
 let effectTimer = null;
@@ -25,7 +229,7 @@ let audioContext = null;
 let photoCaptureStream = null;
 
 function showPhotoButton() {
-  if (!photoButton) return;
+  if (!featureEnabled("familyPhoto") || !photoButton) return;
   photoButton.classList.add("is-peeking");
   photoButton.setAttribute("aria-hidden", "false");
   photoButton.style.left = "auto";
@@ -252,6 +456,7 @@ joinForm.addEventListener("submit", async (event) => {
 
   frame.src = `/whereby.html?name=${encodeURIComponent(guestName)}`;
   stage.classList.add("in-call");
+  if (featureEnabled("guestRibbon")) recordArrival(guestName, "");
 });
 
 window.addEventListener("message", (event) => {
@@ -316,6 +521,7 @@ function showCapturedPhoto(asset) {
 }
 
 async function pollEvents() {
+  if (document.visibilityState === "hidden") return;
   if (syncBusy) return;
   syncBusy = true;
 
@@ -336,8 +542,9 @@ async function pollEvents() {
     const shouldResync = resyncOnNextPoll || resumedAfterGap;
 
     if (data.games) {
+      const previous = JSON.stringify(gameState);
       gameState = data.games;
-      if (activeGame) renderGame(activeGame);
+      if (activeGame && JSON.stringify(gameState) !== previous) renderGame(activeGame);
     }
 
     if (!eventsInitialized || shouldResync) {
@@ -499,6 +706,8 @@ function escapeHtml(value) {
 }
 
 function renderGame(game) {
+  if (game === "names" && !featureEnabled("babyNames")) return;
+  if (game === "didi" && !featureEnabled("didiQuiz")) return;
   activeGame = game;
   gamePanel.hidden = false;
 
@@ -529,10 +738,14 @@ function renderGame(game) {
       const input = event.currentTarget.elements.babyName;
       const name = input.value.trim();
       if (!name) return;
+      const submit = event.currentTarget.querySelector("button");
       input.disabled = true;
+      setBusy(submit, true, "Adding…");
       try {
         await sendGame({ type: "name_suggestion", name });
       } catch (error) {
+        input.disabled = false;
+        setBusy(submit, false);
         eventLabel.textContent = error.message;
         eventLabel.classList.add("visible");
       }
@@ -586,17 +799,742 @@ function renderGame(game) {
     event.preventDefault();
     const answers = didiQuestions.map((_, index) => event.currentTarget.elements[`q${index}`].value.trim());
     if (answers.some((value) => !value)) return;
-    event.currentTarget.querySelector("button").disabled = true;
+    const submit = event.currentTarget.querySelector("button");
+    setBusy(submit, true, "Locking…");
     try {
       await sendGame({ type: "quiz_submit", answers });
       playChime("photo");
     } catch (error) {
-      event.currentTarget.querySelector("button").disabled = false;
+      setBusy(submit, false);
       eventLabel.textContent = error.message;
       eventLabel.classList.add("visible");
     }
   });
 }
+
+
+
+let activeHubView = "wall";
+let timelineObjectUrls = [];
+let recipeObjectUrls = [];
+let mosaicObjectUrls = [];
+
+function safeGuestName() {
+  return guestName || guestNameInput.value.trim() || "Someone";
+}
+
+function switchHubView(view) {
+  const featureForView = {
+    wall: "familyWall",
+    timeline: "familyTimeline",
+    map: "familyMap",
+    capsule: "timeCapsule",
+    recipes: "recipeBook",
+    mosaic: "photoMosaic",
+    guests: "guestRibbon",
+    keepsake: "keepsake"
+  }[view];
+
+  if (featureForView && !featureEnabled(featureForView)) {
+    const fallback = [
+      ["wall", "familyWall"],
+      ["timeline", "familyTimeline"],
+      ["map", "familyMap"],
+      ["capsule", "timeCapsule"],
+      ["recipes", "recipeBook"],
+      ["mosaic", "photoMosaic"],
+      ["guests", "guestRibbon"],
+      ["keepsake", "keepsake"]
+    ].find(([, feature]) => featureEnabled(feature));
+
+    if (!fallback) return;
+    view = fallback[0];
+  }
+
+  activeHubView = view;
+  hubTabs.forEach((button) => button.classList.toggle("active", button.dataset.hubTab === view));
+  hubViews.forEach((section) => {
+    const active = section.dataset.hubView === view;
+    section.classList.toggle("active", active);
+    section.hidden = !active;
+  });
+
+  // Let the selected tab paint first; load images/content right after.
+  requestAnimationFrame(() => renderHubView(view));
+}
+
+function worldPoint(lon, lat) {
+  const x = ((Number(lon) + 180) / 360) * 100;
+  const y = ((90 - Number(lat)) / 180) * 100;
+  return [x, y];
+}
+
+function lookupCity(city) {
+  return cityCoordinates[String(city || "").trim().toLowerCase()] || null;
+}
+
+function recordArrival(name, city) {
+  const cleanName = String(name || "").trim();
+  if (!cleanName) return;
+
+  const data = familyStore.read();
+  const recent = data.guests.find((guest) =>
+    guest.name.toLowerCase() === cleanName.toLowerCase() &&
+    Date.now() - Number(guest.at || 0) < 12 * 60 * 60 * 1000
+  );
+
+  if (recent) {
+    if (city && !recent.city) {
+      recent.city = String(city).trim().slice(0, 60);
+      const coords = lookupCity(recent.city);
+      if (coords) recent.coords = coords;
+      familyStore.write(data);
+    }
+    return;
+  }
+
+  const entry = {
+    id: crypto.randomUUID(),
+    name: cleanName.slice(0, 60),
+    city: String(city || "").trim().slice(0, 60),
+    at: Date.now()
+  };
+  const coords = lookupCity(entry.city);
+  if (coords) entry.coords = coords;
+  familyStore.add("guests", entry);
+}
+
+async function storeOptionalPhoto(file) {
+  if (!file || !file.size) return null;
+  const blob = await compressWallPhoto(file);
+  const photoId = crypto.randomUUID();
+  await wallPhotoStore.put(photoId, blob);
+  return photoId;
+}
+
+async function renderTimeline() {
+  timelineObjectUrls.forEach(URL.revokeObjectURL);
+  timelineObjectUrls = [];
+  const items = familyStore.read().timeline.slice().reverse();
+
+  if (!items.length) {
+    timelineList.innerHTML = '<p class="hub-empty">No timeline memories yet. Start with a childhood one ✨</p>';
+    return;
+  }
+
+  const rows = [];
+  for (const item of items) {
+    let photo = "";
+    if (item.photoId) {
+      try {
+        const blob = await wallPhotoStore.get(item.photoId);
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          timelineObjectUrls.push(url);
+          photo = `<img src="${url}" alt="">`;
+        }
+      } catch {}
+    }
+    rows.push(`
+      <article class="timeline-item">
+        <div class="timeline-when">${escapeHtml(item.when)}</div>
+        <div class="timeline-card">
+          ${photo}
+          <h4>${escapeHtml(item.title)}</h4>
+          <p>${escapeHtml(item.story)}</p>
+          <small>— ${escapeHtml(item.sender)}</small>
+        </div>
+      </article>
+    `);
+  }
+  timelineList.innerHTML = rows.join("");
+}
+
+function renderMap() {
+  const data = familyStore.read();
+  const combined = [...data.pins];
+  data.guests.forEach((guest) => {
+    if (guest.city && !combined.some((pin) => pin.name === guest.name && pin.city === guest.city)) {
+      combined.push(guest);
+    }
+  });
+
+  familyMap.innerHTML = `
+    <div class="map-land map-land-a"></div>
+    <div class="map-land map-land-b"></div>
+    <div class="map-land map-land-c"></div>
+    <div class="map-land map-land-d"></div>
+  `;
+
+  const mapped = [];
+  const unmapped = [];
+  combined.forEach((pin) => {
+    const coords = pin.coords || lookupCity(pin.city);
+    if (!coords) {
+      unmapped.push(pin);
+      return;
+    }
+    const [x, y] = worldPoint(coords[0], coords[1]);
+    const dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "family-map-pin";
+    dot.style.left = `${x}%`;
+    dot.style.top = `${y}%`;
+    dot.title = `${pin.name} — ${pin.city}`;
+    dot.innerHTML = "<span>♥</span>";
+    familyMap.appendChild(dot);
+    mapped.push(pin);
+  });
+
+  mapList.innerHTML = combined.length
+    ? combined.map((pin) => `<span>📍 <strong>${escapeHtml(pin.name)}</strong>${pin.city ? " · " + escapeHtml(pin.city) : ""}</span>`).join("")
+    : '<p class="hub-empty">No family pins yet.</p>';
+
+  if (unmapped.length) {
+    const note = document.createElement("p");
+    note.className = "map-hint";
+    note.textContent = "Some cities are listed below but are not in the tiny offline map dictionary yet.";
+    mapList.appendChild(note);
+  }
+}
+
+function renderCapsules() {
+  const items = familyStore.read().capsules.slice().reverse();
+  capsuleList.innerHTML = items.length
+    ? items.map((item) => `
+      <article class="capsule-card">
+        <div class="capsule-seal">🔒</div>
+        <div>
+          <small>Open at age ${escapeHtml(item.openAt)}</small>
+          <strong>${escapeHtml(item.title || "A message from the family")}</strong>
+          <span>Sealed by ${escapeHtml(item.sender)}</span>
+        </div>
+      </article>
+    `).join("")
+    : '<p class="hub-empty">No sealed messages yet.</p>';
+}
+
+async function renderRecipes() {
+  recipeObjectUrls.forEach(URL.revokeObjectURL);
+  recipeObjectUrls = [];
+  const items = familyStore.read().recipes.slice().reverse();
+  if (!items.length) {
+    recipeList.innerHTML = '<p class="hub-empty">No recipes yet. Someone has to preserve the family food lore 🍲</p>';
+    return;
+  }
+
+  const rows = [];
+  for (const item of items) {
+    let photo = "";
+    if (item.photoId) {
+      try {
+        const blob = await wallPhotoStore.get(item.photoId);
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          recipeObjectUrls.push(url);
+          photo = `<img src="${url}" alt="">`;
+        }
+      } catch {}
+    }
+
+    rows.push(`
+      <article class="recipe-card">
+        ${photo}
+        <div>
+          <h4>${escapeHtml(item.name)}</h4>
+          ${item.why ? `<p class="recipe-why">${escapeHtml(item.why)}</p>` : ""}
+          <details>
+            <summary>Recipe</summary>
+            <pre>${escapeHtml(item.recipe)}</pre>
+          </details>
+          <small>— ${escapeHtml(item.sender)}</small>
+        </div>
+      </article>
+    `);
+  }
+  recipeList.innerHTML = rows.join("");
+}
+
+async function renderMosaic() {
+  mosaicObjectUrls.forEach(URL.revokeObjectURL);
+  mosaicObjectUrls = [];
+  const photos = blessingStore.list().filter((item) => item.kind === "photo" && item.photoId);
+
+  if (!photos.length) {
+    photoMosaic.innerHTML = '<p class="hub-empty">Share photos on the Family Wall and they will build the mosaic here.</p>';
+    return;
+  }
+
+  const tiles = [];
+  for (const item of photos.slice(0, 40)) {
+    try {
+      const blob = await wallPhotoStore.get(item.photoId);
+      if (!blob) continue;
+      const url = URL.createObjectURL(blob);
+      mosaicObjectUrls.push(url);
+      tiles.push(`<figure><img src="${url}" alt="${escapeHtml(item.caption || "Family photo")}"><figcaption>${escapeHtml(item.caption || item.sender || "")}</figcaption></figure>`);
+    } catch {}
+  }
+  photoMosaic.innerHTML = tiles.join("") || '<p class="hub-empty">No photos available on this device.</p>';
+}
+
+function renderGuests() {
+  const items = familyStore.read().guests.slice().reverse();
+  arrivalRibbon.innerHTML = items.length
+    ? items.map((item, index) => `
+      <article class="arrival-card">
+        <span class="arrival-number">${items.length - index}</span>
+        <div>
+          <strong>👋 ${escapeHtml(item.name)}</strong>
+          <small>${item.city ? "joined from " + escapeHtml(item.city) : "was here"} · ${new Date(item.at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}</small>
+        </div>
+      </article>
+    `).join("")
+    : '<p class="hub-empty">No arrivals recorded yet.</p>';
+}
+
+function renderKeepsakeSummary() {
+  const hub = familyStore.read();
+  const wall = blessingStore.list();
+  const photoCount = wall.filter((item) => item.kind === "photo").length;
+  const noteCount = wall.filter((item) => item.kind !== "photo").length;
+
+  keepsakeSummary.innerHTML = `
+    <div class="keepsake-hero">
+      <span>✨</span>
+      <div><h3>Didi's Baby Shower</h3><p>The day, collected by everyone who was there.</p></div>
+    </div>
+    <div class="keepsake-stats">
+      <div><strong>${noteCount}</strong><span>notes</span></div>
+      <div><strong>${photoCount}</strong><span>photos</span></div>
+      <div><strong>${hub.timeline.length}</strong><span>memories</span></div>
+      <div><strong>${hub.capsules.length}</strong><span>time capsules</span></div>
+      <div><strong>${hub.recipes.length}</strong><span>recipes</span></div>
+      <div><strong>${hub.guests.length}</strong><span>people here</span></div>
+    </div>
+    <div class="keepsake-callout">
+      <strong>After the party</strong>
+      <p>Use the afterparty link to turn this site into a quiet keepsake instead of a live call.</p>
+      <code>${escapeHtml(location.origin + location.pathname + "?afterparty=1")}</code>
+    </div>
+  `;
+}
+
+function renderHubView(view) {
+  if (!featureEnabled("familyHub")) return;
+  if (view === "wall" && featureEnabled("familyWall")) renderBlessings();
+  if (view === "timeline" && featureEnabled("familyTimeline")) renderTimeline();
+  if (view === "map" && featureEnabled("familyMap")) renderMap();
+  if (view === "capsule" && featureEnabled("timeCapsule")) renderCapsules();
+  if (view === "recipes" && featureEnabled("recipeBook")) renderRecipes();
+  if (view === "mosaic" && featureEnabled("photoMosaic")) renderMosaic();
+  if (view === "guests" && featureEnabled("guestRibbon")) renderGuests();
+  if (view === "keepsake" && featureEnabled("keepsake")) renderKeepsakeSummary();
+}
+
+hubTabs.forEach((button) => {
+  button.addEventListener("click", () => switchHubView(button.dataset.hubTab));
+});
+
+timelineForm.addEventListener("submit", async (event) => {\n  if (!featureEnabled("familyTimeline")) return;
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  const photoId = await storeOptionalPhoto(event.currentTarget.elements.photo.files[0]);
+  familyStore.add("timeline", {
+    id: crypto.randomUUID(),
+    when: String(data.get("when") || "").trim().slice(0, 20),
+    title: String(data.get("title") || "").trim().slice(0, 70),
+    story: String(data.get("story") || "").trim().slice(0, 280),
+    photoId,
+    sender: safeGuestName(),
+    at: Date.now()
+  });
+  event.currentTarget.reset();
+  setBusy(submit, false);
+  playChime("photo");
+  renderTimeline();
+});
+
+mapForm.addEventListener("submit", (event) => {\n  if (!featureEnabled("familyMap")) return;
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  const name = String(data.get("name") || "").trim();
+  const city = String(data.get("city") || "").trim();
+  const entry = { id: crypto.randomUUID(), name, city, at: Date.now() };
+  const coords = lookupCity(city);
+  if (coords) entry.coords = coords;
+  familyStore.add("pins", entry);
+  recordArrival(name, city);
+  event.currentTarget.reset();
+  playChime();
+  renderMap();
+});
+
+capsuleForm.addEventListener("submit", (event) => {\n  if (!featureEnabled("timeCapsule")) return;
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  familyStore.add("capsules", {
+    id: crypto.randomUUID(),
+    openAt: String(data.get("openAt") || "18"),
+    title: String(data.get("title") || "").trim().slice(0, 60),
+    message: String(data.get("message") || "").trim().slice(0, 500),
+    sender: safeGuestName(),
+    at: Date.now()
+  });
+  event.currentTarget.reset();
+  playChime("photo");
+  renderCapsules();
+});
+
+recipeForm.addEventListener("submit", async (event) => {\n  if (!featureEnabled("recipeBook")) return;
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  const photoId = await storeOptionalPhoto(event.currentTarget.elements.photo.files[0]);
+  familyStore.add("recipes", {
+    id: crypto.randomUUID(),
+    name: String(data.get("name") || "").trim().slice(0, 80),
+    why: String(data.get("why") || "").trim().slice(0, 180),
+    recipe: String(data.get("recipe") || "").trim().slice(0, 900),
+    photoId,
+    sender: safeGuestName(),
+    at: Date.now()
+  });
+  event.currentTarget.reset();
+  setBusy(submit, false);
+  playChime("photo");
+  renderRecipes();
+});
+
+guestForm.addEventListener("submit", (event) => {\n  if (!featureEnabled("guestRibbon")) return;
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  recordArrival(String(data.get("name") || "").trim(), String(data.get("city") || "").trim());
+  event.currentTarget.reset();
+  playChime();
+  renderGuests();
+});
+
+afterpartyPreview.addEventListener("click", () => {
+  const url = new URL(location.href);
+  url.searchParams.set("afterparty", "1");
+  location.href = url.toString();
+});
+
+let wallObjectUrls = [];
+
+function clearWallObjectUrls() {
+  wallObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+  wallObjectUrls = [];
+}
+
+async function renderBlessings() {
+  const items = blessingStore.list();
+  clearWallObjectUrls();
+
+  if (!items.length) {
+    blessingWall.innerHTML = '<p class="blessing-empty">The family wall is waiting for its first note or photo ✨</p>';
+    return;
+  }
+
+  const rows = await Promise.all(items.map(async (item) => {
+    const reactions = item.reactions || {};
+
+    if (item.kind === "photo" && item.photoId) {
+      let imageHtml = '<div class="wall-photo-missing">Photo unavailable on this device</div>';
+      try {
+        const blob = await wallPhotoStore.get(item.photoId);
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          wallObjectUrls.push(url);
+          imageHtml = `<img class="wall-photo" src="${url}" alt="${escapeHtml(item.caption || "Shared family photo")}">`;
+        }
+      } catch (error) {
+        console.warn("Could not load wall photo", error);
+      }
+
+      return `
+        <article class="blessing-note wall-photo-note" data-blessing-id="${escapeHtml(item.id)}">
+          ${imageHtml}
+          ${item.caption ? `<p class="wall-photo-caption">${escapeHtml(item.caption)}</p>` : ""}
+          <footer>
+            <strong>📷 ${escapeHtml(item.sender || "Someone")}</strong>
+            <div class="blessing-reactions">
+              ${["❤️","🥹","😂"].map((emoji) => `
+                <button type="button" data-blessing-react="${emoji}">
+                  <span>${emoji}</span>
+                  <small>${Number(reactions[emoji] || 0) || ""}</small>
+                </button>
+              `).join("")}
+            </div>
+          </footer>
+        </article>
+      `;
+    }
+
+    const forWhom = item.audience === "didi" ? "For Didi" : "For the baby";
+    return `
+      <article class="blessing-note" data-blessing-id="${escapeHtml(item.id)}">
+        <div class="blessing-note-top">
+          <span>${item.audience === "didi" ? "🌸" : "👶"} ${forWhom}</span>
+          <time>${new Date(item.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+        </div>
+        <p>${escapeHtml(item.message || "")}</p>
+        <footer>
+          <strong>— ${escapeHtml(item.sender || "Someone")}</strong>
+          <div class="blessing-reactions">
+            ${["❤️","🥹","😂"].map((emoji) => `
+              <button type="button" data-blessing-react="${emoji}">
+                <span>${emoji}</span>
+                <small>${Number(reactions[emoji] || 0) || ""}</small>
+              </button>
+            `).join("")}
+          </div>
+        </footer>
+      </article>
+    `;
+  }));
+
+  blessingWall.innerHTML = rows.join("");
+
+  blessingWall.querySelectorAll("[data-blessing-react]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const note = button.closest("[data-blessing-id]");
+      if (!note) return;
+      blessingStore.react(note.dataset.blessingId, button.dataset.blessingReact);
+      renderBlessings();
+      playChime();
+    });
+  });
+}
+
+function showBlessingFloat(entry) {
+  const note = document.createElement("div");
+  note.className = "blessing-float";
+  note.innerHTML = `
+    <span>${entry.kind === "photo" ? "📷" : (entry.audience === "didi" ? "🌸" : "👶")}</span>
+    <div>
+      <strong>${escapeHtml(entry.sender || "Someone")}</strong>
+      <p>${escapeHtml(entry.kind === "photo" ? (entry.caption || "shared a photo") : entry.message)}</p>
+    </div>
+  `;
+  effectLayer.appendChild(note);
+  window.setTimeout(() => note.remove(), 5200);
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error("Could not read photo."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function compressWallPhoto(file) {
+  if (!file || !file.type.startsWith("image/")) {
+    throw new Error("Choose an image.");
+  }
+
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.decoding = "async";
+    image.src = sourceUrl;
+    await image.decode();
+
+    const maxEdge = 1280;
+    const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(image, 0, 0, width, height);
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.8));
+    if (!blob) throw new Error("Could not prepare photo.");
+    return blob;
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+
+async function exportBlessingsKeepsake() {
+  blessingExport.disabled = true;
+  blessingExport.textContent = "Preparing…";
+
+  try {
+    const items = blessingStore.list().slice().reverse();
+    const rows = [];
+
+    for (const item of items) {
+      if (item.kind === "photo" && item.photoId) {
+        let photoHtml = "";
+        try {
+          const blob = await wallPhotoStore.get(item.photoId);
+          if (blob) {
+            const dataUrl = await blobToDataUrl(blob);
+            photoHtml = `<img src="${dataUrl}" alt="${escapeHtml(item.caption || "Family photo")}">`;
+          }
+        } catch (error) {
+          console.warn("Could not export wall photo", error);
+        }
+
+        rows.push(`
+          <article>
+            <div class="meta">Family photo · ${new Date(item.at).toLocaleString()}</div>
+            ${photoHtml}
+            ${item.caption ? `<blockquote>${escapeHtml(item.caption)}</blockquote>` : ""}
+            <div class="from">— ${escapeHtml(item.sender || "Someone")}</div>
+          </article>
+        `);
+        continue;
+      }
+
+      const title = item.audience === "didi" ? "For Didi" : "For the baby";
+      rows.push(`
+        <article>
+          <div class="meta">${title} · ${new Date(item.at).toLocaleString()}</div>
+          <blockquote>${escapeHtml(item.message || "")}</blockquote>
+          <div class="from">— ${escapeHtml(item.sender || "Someone")}</div>
+        </article>
+      `);
+    }
+
+    const html = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Didi's Baby Shower — Family Wall</title>
+<style>
+  body{font-family:Georgia,serif;margin:0;padding:48px;background:#fffaf7;color:#422f35}
+  main{max-width:820px;margin:auto}
+  h1{font-size:42px;margin:0 0 8px}
+  .sub{color:#7a6970;margin-bottom:36px}
+  article{break-inside:avoid;margin:0 0 18px;padding:22px;border:1px solid #eadfdc;border-radius:18px;background:white}
+  article img{display:block;width:100%;max-height:620px;object-fit:contain;border-radius:14px;margin:10px 0}
+  .meta{font:700 12px system-ui;color:#a94762;text-transform:uppercase;letter-spacing:.06em}
+  blockquote{margin:12px 0;font-size:22px;line-height:1.45}
+  .from{text-align:right;font-weight:700}
+  @media print{body{padding:0}article{box-shadow:none}}
+</style>
+</head>
+<body><main>
+<h1>Didi's Baby Shower</h1>
+<p class="sub">Family Wall — notes, memories and photos 💛</p>
+${rows.join("") || "<p>The wall is empty.</p>"}
+</main></body></html>`;
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "didi-baby-shower-family-wall.html";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } finally {
+    blessingExport.disabled = false;
+    blessingExport.textContent = "Export keepsake";
+  }
+}
+
+blessingLaunch.addEventListener("click", () => {
+  if (!featureEnabled("familyHub")) return;
+  ensureAudioContext();
+  blessingPanel.hidden = false;
+  blessingPanel.classList.add("opening");
+  requestAnimationFrame(() => {
+    blessingPanel.classList.remove("opening");
+    switchHubView(activeHubView);
+    if (activeHubView === "wall") blessingMessage.focus({ preventScroll: true });
+  });
+});
+
+blessingClose.addEventListener("click", () => {
+  blessingPanel.hidden = true;
+});
+
+blessingPanel.addEventListener("click", (event) => {
+  if (event.target === blessingPanel) blessingPanel.hidden = true;
+});
+
+blessingMessage.addEventListener("input", () => {
+  blessingCount.textContent = `${blessingMessage.value.length}/180`;
+});
+
+blessingForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!featureEnabled("familyWall")) return;
+  const data = new FormData(blessingForm);
+  const message = String(data.get("message") || "").trim();
+  if (!message) return;
+
+  const entry = {
+    id: crypto.randomUUID(),
+    kind: "note",
+    sender: guestName || guestNameInput.value.trim() || "Someone",
+    audience: data.get("audience") === "didi" ? "didi" : "baby",
+    message,
+    at: Date.now(),
+    reactions: {}
+  };
+
+  blessingStore.add(entry);
+  blessingForm.reset();
+  blessingMessage.value = "";
+  blessingCount.textContent = "0/180";
+  showBlessingFloat(entry);
+  playChime("photo");
+  requestAnimationFrame(() => renderBlessings());
+});
+
+wallPhotoInput.addEventListener("change", async () => {
+  if (!featureEnabled("familyWall")) return;
+  const [file] = wallPhotoInput.files || [];
+  if (!file) return;
+
+  wallPhotoInput.disabled = true;
+  wallPhotoStatus.textContent = "Preparing photo…";
+  await nextFrame();
+
+  try {
+    const blob = await compressWallPhoto(file);
+    const photoId = crypto.randomUUID();
+    await wallPhotoStore.put(photoId, blob);
+
+    const entry = {
+      id: crypto.randomUUID(),
+      kind: "photo",
+      photoId,
+      sender: guestName || guestNameInput.value.trim() || "Someone",
+      caption: wallPhotoCaption.value.trim().slice(0, 80),
+      at: Date.now(),
+      reactions: {}
+    };
+
+    blessingStore.add(entry);
+    wallPhotoInput.value = "";
+    wallPhotoCaption.value = "";
+    wallPhotoStatus.textContent = "Added ✓";
+    await renderBlessings();
+    showBlessingFloat(entry);
+    playChime("photo");
+    window.setTimeout(() => {
+      wallPhotoStatus.textContent = "";
+    }, 2200);
+  } catch (error) {
+    console.error("Family wall photo failed", error);
+    wallPhotoStatus.textContent = error.message || "Could not add photo.";
+  } finally {
+    wallPhotoInput.disabled = false;
+  }
+});
+
+blessingExport.addEventListener("click", exportBlessingsKeepsake);
 
 document.querySelectorAll("[data-game]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -616,6 +1554,13 @@ gamePanel.addEventListener("click", (event) => {
     gamePanel.hidden = true;
   }
 });
+
+if (afterpartyMode && featureEnabled("afterparty") && featureEnabled("familyHub") && featureEnabled("keepsake")) {
+  document.body.classList.add("afterparty-mode");
+  blessingPanel.hidden = false;
+  activeHubView = "keepsake";
+  switchHubView("keepsake");
+}
 
 pollEvents();
 syncTimer = window.setInterval(pollEvents, 750);
