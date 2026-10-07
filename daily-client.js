@@ -48,7 +48,14 @@ async function startVideo() {
       }
     });
 
+    let joined = false;
+    const joinTimeout = window.setTimeout(() => {
+      if (!joined) fail("Daily join timed out.");
+    }, 15000);
+
     callFrame.on("joined-meeting", async () => {
+      joined = true;
+      window.clearTimeout(joinTimeout);
       try {
         await callFrame.setUserName(name);
       } catch {}
@@ -57,7 +64,14 @@ async function startVideo() {
     });
 
     callFrame.on("error", (event) => {
+      window.clearTimeout(joinTimeout);
       const message = event?.errorMsg || event?.error?.msg || "Daily call failed.";
+      fail(message);
+    });
+
+    callFrame.on("load-attempt-failed", (event) => {
+      window.clearTimeout(joinTimeout);
+      const message = event?.errorMsg || event?.error?.msg || "Daily room failed to load.";
       fail(message);
     });
 
