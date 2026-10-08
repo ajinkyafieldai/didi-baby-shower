@@ -33,6 +33,9 @@ jobs:
           node --check photobooth.js
           node --check scripts/phrase-map.mjs
           node --check daily-client.js
+          node --check frontend/event-config.js
+          node --check frontend/features.js
+          node --check scripts/test-event-package-runtime.mjs
           node --check functions/api/events.js
           node --check functions/api/photos.js
           node --check functions/api/video-config.js
@@ -52,6 +55,9 @@ jobs:
 
       - name: Trigger dry-run test
         run: node scripts/test-trigger-dry-run.mjs
+
+      - name: Event package runtime proof
+        run: node scripts/test-event-package-runtime.mjs
 
       - name: Build and verify
         run: npm run build
