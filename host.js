@@ -1,3 +1,15 @@
+import { loadEventPackage, applyEventTheme } from "./frontend/event-config.js";
+
+const EVENT_PACKAGE = await loadEventPackage();
+applyEventTheme(EVENT_PACKAGE);
+document.title = EVENT_PACKAGE.manifest.title + " Host";
+const hostEyebrow = document.querySelector(".host-header .eyebrow");
+if (hostEyebrow) hostEyebrow.textContent = EVENT_PACKAGE.manifest.title;
+const projectorLink = document.querySelector('a[href="/projector.html"]');
+if (projectorLink) {
+  projectorLink.href = "/projector.html?event=" + encodeURIComponent(EVENT_PACKAGE.id);
+}
+
 const els={
   health:document.getElementById("overall-health"),
   clients:document.getElementById("metric-clients"),

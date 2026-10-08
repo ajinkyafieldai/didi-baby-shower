@@ -5,7 +5,7 @@
 //
 // Keep this file front-end only. Backend capability negotiation can be layered
 // on later without changing the UI modules.
-export const FEATURES = Object.freeze({
+export const FEATURES = {
   videoCall: true,
   rituals: true,
   familyPhoto: true,
@@ -23,7 +23,21 @@ export const FEATURES = Object.freeze({
   guestRibbon: true,
   keepsake: true,
   afterparty: true
-});
+};
+
+export function configureFeatures(eventPackage) {
+  const overrides = eventPackage?.content?.module_overrides || {};
+
+  if (typeof overrides.time_capsule === "boolean") {
+    FEATURES.timeCapsule = overrides.time_capsule;
+  }
+  if (typeof overrides.recipe_book === "boolean") {
+    FEATURES.recipeBook = overrides.recipe_book;
+  }
+  if (typeof overrides.afterparty === "boolean") {
+    FEATURES.afterparty = overrides.afterparty;
+  }
+}
 
 export function featureEnabled(name) {
   return FEATURES[name] !== false;

@@ -116,3 +116,27 @@ photo.capture
 Development happens on `devel`.
 
 Do not commit directly to `main`.
+
+
+## Event package runtime proof
+
+The web runtime can load an event package by event ID without changing application code.
+
+The default event remains:
+
+```text
+didi-baby-shower
+```
+
+For the current static proof, event packages live under `public/events/<event-id>/` and may be selected with the `event` query parameter:
+
+```text
+/?event=didi-baby-shower
+/?event=maya-baby-shower
+/host.html?event=maya-baby-shower
+/projector.html?event=maya-baby-shower
+```
+
+Participant, host, and projector surfaces all load the same package. Event identity, copy, accent, and supported module overrides come from that package. Browser-local event data is namespaced by event ID so one event cannot reuse another event's local family-wall state.
+
+The static directory is deliberately a proof adapter, not the final event registry. A future database/API resolver can replace the package source while preserving the runtime contract.

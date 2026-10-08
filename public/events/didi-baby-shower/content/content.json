@@ -1,0 +1,12 @@
+{
+  "honoree_name": "Didi",
+  "event_date": "2026-10-08",
+  "venue": "Mumbai",
+  "welcome_text": "Join the family video call, then use the celebration buttons together.",
+  "family_hub_title": "With the family",
+  "module_overrides": {
+    "time_capsule": true,
+    "recipe_book": true,
+    "afterparty": true
+  }
+}

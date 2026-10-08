@@ -1,0 +1,12 @@
+{
+  "honoree_name": "Maya",
+  "event_date": "2026-11-21",
+  "venue": "Pune",
+  "welcome_text": "Join us for Maya\u0027s baby shower.",
+  "family_hub_title": "Family corner",
+  "module_overrides": {
+    "time_capsule": false,
+    "recipe_book": false,
+    "afterparty": true
+  }
+}
