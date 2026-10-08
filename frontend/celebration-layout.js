@@ -2,6 +2,14 @@
 export function setupCelebrationLayout({ stage, panel, enabled, showView, close }) {
   const shell = document.querySelector('.app-shell');
   const fullscreen = document.getElementById('video-fullscreen');
+  const activities = document.createElement('div');
+  activities.className = 'activity-bar';
+  activities.setAttribute('aria-label', 'Celebration activities');
+  const games = stage.querySelector('.game-actions');
+  const photo = stage.querySelector('.photo-button');
+  if (games) activities.append(games);
+  if (photo) activities.append(photo);
+  shell.append(activities);
   if (enabled) {
     shell.append(panel);
     panel.hidden = false;

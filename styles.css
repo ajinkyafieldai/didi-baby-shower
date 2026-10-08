@@ -2420,3 +2420,32 @@ body:not(.afterparty-mode) .call-status { background: #422f35c9; }
 .location-help { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
 .family-map .leaflet-popup-content p { margin: 6px 0; }
 .family-map .leaflet-control-attribution { font-size: 10px; }
+
+/* Keep celebration actions clear of the embedded call's controls. */
+body:not(.afterparty-mode) .activity-bar {
+  grid-column: 1; grid-row: 2; display: flex; gap: 8px;
+  align-items: center; justify-content: space-between; flex-wrap: wrap;
+  padding: 8px; border: 1px solid var(--line); border-radius: 16px; background: #fffaf6;
+}
+body:not(.afterparty-mode) .activity-bar .game-actions {
+  position: static; transform: none; max-width: 100%;
+  display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px;
+}
+body:not(.afterparty-mode) .activity-bar .game-launch {
+  width: auto; height: auto; min-height: 44px; border-radius: 12px; padding: 8px 12px;
+}
+body:not(.afterparty-mode) .activity-bar .game-launch span:last-child { display: inline; }
+body:not(.afterparty-mode) .activity-bar .photo-button {
+  position: static; transform: none; min-height: 44px; width: auto; height: auto;
+  border-radius: 12px; padding: 8px 12px; margin-left: auto;
+}
+body:not(.afterparty-mode) .activity-bar .photo-button span:last-child { display: inline; }
+body:not(.afterparty-mode) .ritual-dock { grid-row: 3; }
+body:not(.afterparty-mode) .blessing-panel { grid-row: 1 / 4; }
+@media (max-width: 979px) {
+  body:not(.afterparty-mode) .activity-bar { order: 1; }
+  body:not(.afterparty-mode) .ritual-dock { order: 2; }
+  body:not(.afterparty-mode) .blessing-panel { order: 3; }
+}
+body:not(.afterparty-mode) .video-stage.in-call .call-status { display: none; }
+body:not(.afterparty-mode) .video-stage.in-call .video-fullscreen { top: 48px; }
