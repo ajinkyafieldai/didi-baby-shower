@@ -58,6 +58,25 @@ export async function onRequestPost(context) {
   }
 
   if (existing) {
+    try {
+      const chatStore = await realtime(context.env, "POST", {
+        type: "chat_room_set",
+        provider: "daily",
+        roomUrl: existing.roomUrl,
+        roomId: existing.roomId || null,
+        endDate: existing.endDate
+      });
+
+      if (!chatStore.response.ok) {
+        return json(
+          { error: chatStore.data.error || "Unable to store chat room." },
+          chatStore.response.status
+        );
+      }
+    } catch (error) {
+      return json({ error: error.message || "Unable to store chat room." }, 503);
+    }
+
     return json({
       ok: true,
       reused: true,
@@ -95,7 +114,7 @@ export async function onRequestPost(context) {
         exp,
         eject_at_room_exp: true,
         enable_prejoin_ui: true,
-        enable_chat: false,
+        enable_chat: true,
         enable_screenshare: false
       }
     })
@@ -114,7 +133,7 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const { response, data } = await realtime(context.env, "POST", {
+    const videoStore = await realtime(context.env, "POST", {
       type: "video_room_set",
       provider: "daily",
       roomUrl: room.url,
@@ -122,11 +141,29 @@ export async function onRequestPost(context) {
       endDate
     });
 
-    if (!response.ok) {
-      return json({ error: data.error || "Unable to store video room." }, response.status);
+    if (!videoStore.response.ok) {
+      return json(
+        { error: videoStore.data.error || "Unable to store video room." },
+        videoStore.response.status
+      );
+    }
+
+    const chatStore = await realtime(context.env, "POST", {
+      type: "chat_room_set",
+      provider: "daily",
+      roomUrl: room.url,
+      roomId: room.id || null,
+      endDate
+    });
+
+    if (!chatStore.response.ok) {
+      return json(
+        { error: chatStore.data.error || "Unable to store chat room." },
+        chatStore.response.status
+      );
     }
   } catch (error) {
-    return json({ error: error.message || "Unable to store video room." }, 503);
+    return json({ error: error.message || "Unable to store room capabilities." }, 503);
   }
 
   return json({

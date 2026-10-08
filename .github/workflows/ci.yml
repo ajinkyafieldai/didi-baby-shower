@@ -32,10 +32,12 @@ jobs:
           node --check babyshower.js
           node --check photobooth.js
           node --check scripts/phrase-map.mjs
+          node --check scripts/test-media-capability-contract.mjs
           node --check daily-client.js
           node --check functions/api/events.js
           node --check functions/api/photos.js
           node --check functions/api/video-config.js
+          node --check functions/api/chat-config.js
           node --check functions/api/video-provision.js
           node --check realtime/src/index.js
 
@@ -52,6 +54,9 @@ jobs:
 
       - name: Trigger dry-run test
         run: node scripts/test-trigger-dry-run.mjs
+
+      - name: Media capability contract test
+        run: node scripts/test-media-capability-contract.mjs
 
       - name: Build and verify
         run: npm run build

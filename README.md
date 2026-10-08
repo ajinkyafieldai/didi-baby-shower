@@ -116,3 +116,17 @@ photo.capture
 Development happens on `devel`.
 
 Do not commit directly to `main`.
+
+
+## Video and chat transport boundaries
+
+Video and chat are separate Apsila capabilities even when the current provider supplies both.
+
+```text
+/api/video-config -> video transport
+/api/chat-config  -> chat transport
+```
+
+Today both capabilities use the same Daily room, but they are stored independently in realtime state as `videoRoom` and `chatRoom`. Daily chat is enabled when the room is provisioned.
+
+Frontend code should consume the capability-specific endpoint rather than assuming that chat and video always share a provider or room. This keeps a future chat-provider change independent from video transport.

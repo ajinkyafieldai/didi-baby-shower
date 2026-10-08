@@ -87,7 +87,8 @@ export class CelebrationRoom {
         games: await gameSnapshot(this.ctx),
         telemetry: await telemetrySnapshot(this.ctx),
         latestPhoto: await this.ctx.storage.get("latestPhoto") || null,
-        videoRoom: await this.ctx.storage.get("videoRoom") || null
+        videoRoom: await this.ctx.storage.get("videoRoom") || null,
+        chatRoom: await this.ctx.storage.get("chatRoom") || null
       });
     }
 
@@ -129,6 +130,45 @@ export class CelebrationRoom {
 
         await this.ctx.storage.put("videoRoom", videoRoom);
         return json({ ok: true, videoRoom });
+      }
+
+      if (body && body.type === "chat_room_set") {
+        const roomUrl = String(body.roomUrl || "").trim().slice(0, 500);
+        const roomId = String(body.roomId || "").trim().slice(0, 200);
+        const endDate = String(body.endDate || "").trim().slice(0, 100);
+        const provider = String(body.provider || "").trim().slice(0, 40);
+
+        let parsed;
+        try {
+          parsed = new URL(roomUrl);
+        } catch {
+          return json({ error: "Invalid chat room URL" }, 400);
+        }
+
+        if (
+          provider === "daily" &&
+          (
+            parsed.protocol !== "https:" ||
+            !(parsed.hostname === "daily.co" || parsed.hostname.endsWith(".daily.co"))
+          )
+        ) {
+          return json({ error: "Invalid Daily chat room URL" }, 400);
+        }
+
+        if (!provider) {
+          return json({ error: "Missing chat provider" }, 400);
+        }
+
+        const chatRoom = {
+          provider,
+          roomUrl: parsed.toString(),
+          roomId: roomId || null,
+          endDate: endDate || null,
+          updatedAt: Date.now()
+        };
+
+        await this.ctx.storage.put("chatRoom", chatRoom);
+        return json({ ok: true, chatRoom });
       }
 
       if (body && body.type === "telemetry") {
