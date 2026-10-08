@@ -2461,3 +2461,23 @@ body:not(.afterparty-mode) .video-stage.in-call .video-fullscreen { top: 48px; }
 body:not(.afterparty-mode) .app-shell { padding-top: 8px; }
 .video-stage:not(.in-call) .video-event-title { display: none; }
 .afterparty-mode .video-event-title { display: none; }
+
+@media (max-width: 979px) {
+  body:not(.afterparty-mode) .activity-bar { flex-wrap: nowrap; gap: 6px; padding: 6px; }
+  body:not(.afterparty-mode) .activity-bar .game-actions {
+    flex: 1; min-width: 0; flex-wrap: nowrap; gap: 4px;
+  }
+  body:not(.afterparty-mode) .activity-bar .game-launch {
+    flex: 1; min-width: 0; justify-content: center; padding: 6px 4px;
+    gap: 4px; font-size: 13px; white-space: nowrap;
+  }
+  body:not(.afterparty-mode) .activity-bar .game-launch span:first-child { font-size: 18px; }
+  body:not(.afterparty-mode) .activity-bar .photo-button {
+    flex: 0 0 44px; min-width: 44px; padding: 6px; margin: 0;
+  }
+  body:not(.afterparty-mode) .activity-bar .photo-button span:last-child { display: none; }
+  body:not(.afterparty-mode) .ritual-dock {
+    position: sticky; bottom: max(6px, env(safe-area-inset-bottom)); z-index: 22;
+    background: #fffaf6; box-shadow: 0 4px 20px rgba(66,47,53,.12);
+  }
+}
