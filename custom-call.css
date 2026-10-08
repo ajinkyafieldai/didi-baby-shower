@@ -80,3 +80,9 @@
 .call-thumbnails, .call-picture { overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#b594a0 transparent; }
 .call-notice button { min-height:44px; margin-left:6px; padding:6px 12px; border:1px solid #e8d8c7; border-radius:9px; background:#fffaf2; color:#422f35; }
 @media(prefers-reduced-motion:reduce) { .call-footer [data-action] { transition:none; } }
+
+/* Keep the complete second row visible, with less space between cameras. */
+.custom-call[data-mode=speaker] .call-thumbnails { gap:4px; padding:4px; }
+.custom-call[data-mode=speaker][data-rail=bottom] .call-thumbnails:not(:empty) { height:var(--rail-height); box-sizing:border-box; }
+.camera-tile { border-radius:6px; }
+.call-footer { padding:4px; }

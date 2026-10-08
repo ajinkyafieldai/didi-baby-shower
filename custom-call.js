@@ -13,11 +13,13 @@ export function participantInitials(name) {
 }
 export function chooseCallLayout(width, height, aspect, count) {
   aspect = Number.isFinite(aspect) && aspect > 0 ? aspect : 16 / 9;
-  const tileWidth = Math.min(164, Math.max(112, (width - 24) / Math.min(Math.max(count, 1), 3)));
+  const columns = Math.min(Math.max(count, 1), Math.max(1, Math.floor((width - 8) / 112)), 4);
+  const tileWidth = Math.min(164, (width - 8 - (columns - 1) * 4) / columns);
   const tileHeight = Math.round(tileWidth * .7);
-  const across = Math.max(1, Math.floor((width - 12) / (tileWidth + 6)));
-  const rows = count > across && height >= 500 ? 2 : 1;
-  const rowSpace = Math.min(height * .3, rows * (tileHeight + 6) + 12);
+  const across = columns;
+  const twoRows = 2 * tileHeight + 4 + 8;
+  const rows = count > across && height - twoRows >= Math.min(220, width / aspect) ? 2 : 1;
+  const rowSpace = rows * tileHeight + (rows - 1) * 4 + 8;
   const railWidth = Math.min(164, Math.max(112, width * .25));
   const fittedArea = (w, h) => { const fittedWidth = Math.min(w, h * aspect); return fittedWidth * fittedWidth / aspect; };
   const rowScore = fittedArea(width, Math.max(1, height - rowSpace)) + Math.min(count, across * rows) * 6000;
