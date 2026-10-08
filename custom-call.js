@@ -15,6 +15,14 @@ export function mobileAudioRoutes(devices, canSwitch) {
   const speaker = outputs.find(d => /speaker|built.?in/i.test(d.label) && d !== bluetooth);
   return [{ kind: 'mute', label: 'Sound off' }, ...(bluetooth ? [{ kind: 'bluetooth', label: 'Bluetooth', id: bluetooth.deviceId }] : []), { kind: 'speaker', label: speaker ? 'Speaker' : 'Device audio', id: speaker?.deviceId || '' }];
 }
+export function resolvePinnedParticipant(people, target) {
+  if (!target) return null;
+  const session = people.find(p => p.session_id === target.sessionId);
+  if (session) return session;
+  if (target.local) return people.find(p => p.local) || null;
+  const matches = people.filter(p => !p.local && (target.userId ? p.user_id === target.userId : target.name && p.user_name === target.name));
+  return matches.length === 1 ? matches[0] : null;
+}
 export function scrollCue(scrollHeight, clientHeight, scrollTop, mode) {
   if (mode === 'focus' || scrollHeight <= clientHeight + 8) return null;
   return scrollHeight - clientHeight - scrollTop >= 8 ? 'down' : 'up';
@@ -56,9 +64,16 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   let mobileRoutes = mobileAudioRoutes([], false);
   let mobileRoute = soundOff ? 'mute' : 'speaker';
   let restoringDevices = false;
-  let savedPin;
-  try { savedPin = sessionStorage.getItem(`${preferenceKey}:pin`); } catch {}
-  function savePreferences() { try { localStorage.setItem(preferenceKey, JSON.stringify({ ...preferences, mode })); sessionStorage.setItem(`${preferenceKey}:pin`, pinned || ''); } catch {} }
+  let pinTarget = preferences.pin || null;
+  let reconnecting = false;
+  function savePreferences() { try { localStorage.setItem(preferenceKey, JSON.stringify({ ...preferences, mode, pin: pinTarget })); } catch {} }
+  function selectPin(id) {
+    const person = Object.values(call.participants()).find(p => p.session_id === id);
+    pinned = person?.session_id;
+    pinTarget = person ? { sessionId: person.session_id, userId: person.user_id || null, name: person.user_name || null, local: !!person.local } : null;
+    if (pinned && mode === 'grid') mode = 'speaker';
+    savePreferences(); render();
+  }
   let joinTimer;
   const tiles = new Map();
   const audios = new Map();
@@ -137,7 +152,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   buttons.view.setAttribute('aria-expanded', 'false');
   viewPanel.querySelector('button').onclick = () => { viewPanel.hidden = true; buttons.view.setAttribute('aria-expanded', 'false'); buttons.view.focus(); };
   viewPanel.querySelector('.view-mode').onchange = e => { mode = e.target.value; savePreferences(); render(); };
-  viewPanel.querySelector('.pin-person').onchange = e => { pinned = e.target.value || null; if (pinned && mode === 'grid') mode = 'speaker'; savedPin = null; savePreferences(); render(); };
+  viewPanel.querySelector('.pin-person').onchange = e => { selectPin(e.target.value); };
   buttons.view.onclick = () => { devicePanel.hidden = true; buttons.audio.setAttribute('aria-expanded', 'false'); viewPanel.hidden = !viewPanel.hidden; buttons.view.setAttribute('aria-expanded', String(!viewPanel.hidden)); if (!viewPanel.hidden) viewPanel.querySelector('button').focus(); };
   const fullDocument = window.parent === window ? document : parent.document;
   const fullStage = fullDocument.querySelector('.video-stage') || root;
@@ -184,7 +199,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
       }
       soundOff = next.kind === 'mute'; preferences.soundOff = soundOff;
       for (const audio of audios.values()) { audio.muted = soundOff; if (!soundOff) audio.play().catch(() => {}); }
-      mobileRoute = next.kind; savePreferences(); updateAudioButton(); showFeedback(next.label);
+      mobileRoute = next.kind; savePreferences(); updateAudioButton();
     } catch { showFeedback('Audio output unavailable'); }
     finally { buttons.audio.disabled = call.meetingState() !== 'joined-meeting'; }
   }
@@ -239,9 +254,9 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     if (track) element.play().catch(() => { if (element.tagName === 'AUDIO') notice.textContent = 'Tap Audio to hear the call.'; });
   }
   function render() {
+    if (reconnecting) return;
     const people = Object.values(call.participants());
-    if (savedPin && people.some(p => p.session_id === savedPin)) { pinned = savedPin; savedPin = null; }
-    if (!people.some(p => p.session_id === pinned)) pinned = null;
+    pinned = resolvePinnedParticipant(people, pinTarget)?.session_id;
     shell.dataset.mode = mode;
     viewPanel.querySelector('.view-mode').value = mode;
     const pinSelect = viewPanel.querySelector('.pin-person');
@@ -262,7 +277,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
         tile.querySelector('video').onloadedmetadata = arrangeVideos;
         let nameTimer;
         tile.addEventListener('click', () => { tile.classList.add('show-name'); clearTimeout(nameTimer); nameTimer = setTimeout(() => tile.classList.remove('show-name'), 2500); });
-        tile.querySelector('.video-pin').onclick = () => { pinned = pinned === p.session_id ? null : p.session_id; if (pinned && mode === 'grid') mode = 'speaker'; savedPin = null; savePreferences(); render(); };
+        tile.querySelector('.video-pin').onclick = () => { selectPin(pinned === p.session_id ? null : p.session_id); };
         tiles.set(p.session_id, tile);
       }
       const isMain = p === main;
@@ -320,12 +335,18 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     for (const event of ['participant-joined', 'participant-updated', 'participant-left', 'track-started', 'track-stopped']) call.on(event, render);
     call.on('active-speaker-change', e => { speaker = e.activeSpeaker?.peerId; render(); });
     const interrupted = new Set();
-    function updateConnection() { connection.textContent = !navigator.onLine ? 'Offline · reconnecting…' : interrupted.size ? 'Connection interrupted · reconnecting…' : ''; }
+    function updateConnection() {
+      const wasReconnecting = reconnecting;
+      reconnecting = !navigator.onLine || interrupted.size > 0 || call.meetingState() !== 'joined-meeting';
+      connection.textContent = reconnecting ? 'Reconnecting…' : '';
+      shell.classList.toggle('reconnecting', reconnecting);
+      if (wasReconnecting && !reconnecting) render();
+    }
     const offline = () => updateConnection();
     const online = () => updateConnection();
     window.addEventListener('offline', offline); window.addEventListener('online', online);
     call.on('network-connection', e => { const key = `${e.type}:${e.session_id || e.sfu_id || ''}`; if (e.event === 'interrupted') interrupted.add(key); if (e.event === 'connected') interrupted.delete(key); updateConnection(); });
-    call.on('network-quality-change', e => { if (!interrupted.size && navigator.onLine) connection.textContent = ['warning', 'bad'].includes(e.networkState) ? 'Weak connection' : ''; });
+    call.on('network-quality-change', e => { if (!reconnecting && !interrupted.size && navigator.onLine) connection.textContent = ['warning', 'bad'].includes(e.networkState) ? 'Weak connection' : ''; });
     async function restoreDevices() {
       restoringDevices = true; buttons.audio.disabled = true;
       try {
@@ -338,10 +359,10 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
       } catch { /* Unavailable saved devices keep the working defaults. */ }
       finally { restoringDevices = false; buttons.audio.disabled = call.meetingState() !== 'joined-meeting'; }
     }
-    call.on('joined-meeting', () => { restoreDevices(); interrupted.clear(); updateConnection(); showControls(); window.clearTimeout(joinTimer); bootMessage?.remove(); Object.values(buttons).forEach(b => b.disabled = false); buttons.audio.disabled = restoringDevices; render(); report('video-status', 'Live'); });
+    call.on('joined-meeting', () => { interrupted.clear(); reconnecting = false; notice.textContent = ''; updateConnection(); restoreDevices(); showControls(); window.clearTimeout(joinTimer); bootMessage?.remove(); Object.values(buttons).forEach(b => b.disabled = false); buttons.audio.disabled = restoringDevices; render(); report('video-status', 'Live'); });
     call.on('error', e => { notice.textContent = e.errorMsg || 'Call connection failed.'; report('video-status', notice.textContent); });
     call.on('camera-error', () => { notice.textContent = 'Check camera and microphone permissions.'; });
-    call.on('left-meeting', () => { for (const audio of audios.values()) { audio.srcObject = null; audio.remove(); } Object.values(buttons).forEach(b => b.disabled = true); picture.replaceChildren(); thumbnails.replaceChildren(); tiles.clear(); audios.clear(); connection.textContent = 'Disconnected'; notice.replaceChildren(document.createTextNode('Connection ended. ')); const retry = document.createElement('button'); retry.textContent = 'Rejoin'; retry.onclick = async () => { retry.disabled = true; connection.textContent = 'Reconnecting…'; try { await call.join({ url: config.roomUrl, userName: name }); notice.textContent = ''; } catch { connection.textContent = 'Could not reconnect'; retry.disabled = false; } }; notice.append(retry); showControls(); report('video-status', 'Disconnected'); });
+    call.on('left-meeting', () => { reconnecting = true; shell.classList.add('reconnecting'); for (const audio of audios.values()) audio.srcObject = null; Object.values(buttons).forEach(b => b.disabled = true); connection.textContent = 'Disconnected'; notice.replaceChildren(document.createTextNode('Connection ended. ')); const retry = document.createElement('button'); retry.textContent = 'Rejoin'; retry.onclick = async () => { retry.disabled = true; connection.textContent = 'Reconnecting…'; try { await call.join({ url: config.roomUrl, userName: name }); notice.textContent = ''; } catch { connection.textContent = 'Could not reconnect'; retry.disabled = false; } }; notice.append(retry); showControls(); report('video-status', 'Disconnected'); });
     buttons.mic.onclick = () => act(buttons.mic, async () => { await call.setLocalAudio(!call.localAudio()); showFeedback(call.localAudio() ? 'Mic on' : 'Mic off'); });
     buttons.camera.onclick = () => act(buttons.camera, () => call.setLocalVideo(!call.localVideo()));
     buttons.flip.onclick = () => act(buttons.flip, () => call.cycleCamera());
