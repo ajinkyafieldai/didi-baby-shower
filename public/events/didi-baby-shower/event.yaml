@@ -1,0 +1,89 @@
+{
+  "id": "didi-baby-shower",
+  "title": "Didi's Baby Shower",
+  "template_id": "baby-shower-classic",
+  "template_version": 1,
+  "brand": "apsila",
+  "event_type": "baby-shower",
+  "theme": {
+    "preset": "baby-shower-classic"
+  },
+  "surfaces": {
+    "participant": true,
+    "projector": true,
+    "host": true,
+    "conference": true
+  },
+  "capabilities": {
+    "video": true,
+    "chat": true,
+    "reactions": true,
+    "family_photo": true
+  },
+  "rituals": [
+    {
+      "id": "ovalni",
+      "label": "Ovalni",
+      "icon": "🪔"
+    },
+    {
+      "id": "flowers",
+      "label": "Flowers",
+      "icon": "🌸"
+    },
+    {
+      "id": "ashirwad",
+      "label": "Ashirwad",
+      "icon": "🙌"
+    },
+    {
+      "id": "supari",
+      "label": "Supari",
+      "icon": "🌰"
+    },
+    {
+      "id": "haldi",
+      "label": "Haldi",
+      "icon": "🟡"
+    },
+    {
+      "id": "kunku",
+      "label": "Kunku",
+      "icon": "🔴"
+    },
+    {
+      "id": "oti",
+      "label": "Oti",
+      "icon": "🥥"
+    },
+    {
+      "id": "celebrate",
+      "label": "Celebrate",
+      "icon": "🎉"
+    }
+  ],
+  "modules": [
+    "baby-names",
+    "honoree-quiz",
+    "family-wall",
+    "family-timeline",
+    "family-map",
+    "time-capsule",
+    "recipe-book",
+    "photo-mosaic",
+    "guest-ribbon",
+    "keepsake",
+    "afterparty"
+  ],
+  "data": {
+    "honoree_name": "Didi",
+    "event_date": "2026-10-08",
+    "venue": "Mumbai",
+    "welcome_text": "Join the family video call, then use the celebration buttons together.",
+    "family_hub_title": "With the family",
+    "accent": "rose",
+    "enable_time_capsule": true,
+    "enable_recipe_book": true,
+    "enable_afterparty": true
+  }
+}
