@@ -142,3 +142,37 @@ Legacy event IDs such as `?event=didi-baby-shower` remain accepted as compatibil
 Participant, host, and projector surfaces all load the same package. Event identity, copy, accent, and supported module overrides come from that package. Browser-local event data is namespaced by event ID so one event cannot reuse another event's local family-wall state.
 
 The JSON registry is deliberately the first registry adapter. A future database/API-backed registry can replace it while preserving the same slug -> record -> package contract.
+
+
+## Event registration
+
+The live registry is exposed at:
+
+```text
+GET /api/event-registry
+POST /api/event-registry
+```
+
+GET merges the static bootstrap registry with durable registrations stored in the dedicated `event-registry` Durable Object instance.
+
+POST requires the `EVENT_REGISTRY_ADMIN_SECRET` Pages environment variable and the matching `x-event-registry-secret` request header. A registration is accepted only when the referenced deployed package:
+
+- has a matching event ID,
+- has the requested template ID/version,
+- contains matching Dugong provenance, and
+- matches the provenance hashes for `event.yaml`, `content/content.json`, and `theme/theme.json`.
+
+Example payload:
+
+```json
+{
+  "slug": "maya",
+  "event_id": "maya-baby-shower",
+  "package_base": "/events/maya-baby-shower",
+  "template_id": "baby-shower-classic",
+  "template_version": 1,
+  "status": "preview"
+}
+```
+
+Once accepted, the runtime can resolve `?event=maya` immediately without editing `registry.json` or redeploying the frontend.
