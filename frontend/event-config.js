@@ -53,12 +53,18 @@ async function fetchJson(url) {
   if (!response.ok) {
     throw new Error(`Event package request failed (${response.status}): ${url}`);
   }
-  return response.json();
+  const text = await response.text();
+  try { return JSON.parse(text); }
+  catch { throw new Error(`Event package response is not JSON: ${url}`); }
 }
 
 export async function loadEventPackage() {
   const params = new URLSearchParams(location.search);
-  const registry = await fetchJson(REGISTRY_URL);
+  // Vite publishes public/ at the root; raw-file hosting keeps that directory.
+  let registry;
+  let assetPrefix = "";
+  try { registry = await fetchJson(REGISTRY_URL); }
+  catch { assetPrefix = "/public"; registry = await fetchJson(`${assetPrefix}${REGISTRY_URL}`); }
   const { slug, record } = findRegistryRecord(
     registry,
     params.get("event")
@@ -76,9 +82,9 @@ export async function loadEventPackage() {
   }
 
   const [manifest, content, theme] = await Promise.all([
-    fetchJson(`${base}/event.yaml`),
-    fetchJson(`${base}/content/content.json`),
-    fetchJson(`${base}/theme/theme.json`)
+    fetchJson(`${assetPrefix}${base}/event.yaml`),
+    fetchJson(`${assetPrefix}${base}/content/content.json`),
+    fetchJson(`${assetPrefix}${base}/theme/theme.json`)
   ]);
 
   if (manifest.id !== eventId) {
