@@ -37,6 +37,7 @@ jobs:
           node --check frontend/features.js
           node --check scripts/test-event-package-runtime.mjs
           node --check scripts/verify-dugong-packages.mjs
+          node --check scripts/test-event-registry.mjs
           node --check functions/api/events.js
           node --check functions/api/photos.js
           node --check functions/api/video-config.js
@@ -59,6 +60,9 @@ jobs:
 
       - name: Verify Dugong package provenance
         run: node scripts/verify-dugong-packages.mjs
+
+      - name: Event registry contract
+        run: node scripts/test-event-registry.mjs
 
       - name: Event package runtime proof
         run: node scripts/test-event-package-runtime.mjs

@@ -1,4 +1,4 @@
-const DEFAULT_EVENT_ID = "didi-baby-shower";
+const REGISTRY_URL = "/events/registry.json";
 
 const ACCENTS = Object.freeze({
   rose: {
@@ -15,12 +15,37 @@ const ACCENTS = Object.freeze({
   }
 });
 
-function safeEventId(value) {
-  const id = String(value || DEFAULT_EVENT_ID).trim();
-  if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(id)) {
-    throw new Error("Invalid event id.");
+function safeSlug(value) {
+  const slug = String(value || "").trim();
+  if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(slug)) {
+    throw new Error("Invalid event slug.");
   }
-  return id;
+  return slug;
+}
+
+function findRegistryRecord(registry, requested) {
+  const events = registry?.events;
+  if (!events || typeof events !== "object") {
+    throw new Error("Event registry is invalid.");
+  }
+
+  const candidate = safeSlug(
+    requested || registry.default_event || ""
+  );
+
+  if (events[candidate]) {
+    return { slug: candidate, record: events[candidate] };
+  }
+
+  const alias = Object.entries(events).find(
+    ([, record]) => record?.event_id === candidate
+  );
+
+  if (alias) {
+    return { slug: alias[0], record: alias[1] };
+  }
+
+  throw new Error(`Unknown event: ${candidate}`);
 }
 
 async function fetchJson(url) {
@@ -33,8 +58,22 @@ async function fetchJson(url) {
 
 export async function loadEventPackage() {
   const params = new URLSearchParams(location.search);
-  const eventId = safeEventId(params.get("event") || DEFAULT_EVENT_ID);
-  const base = `/events/${eventId}`;
+  const registry = await fetchJson(REGISTRY_URL);
+  const { slug, record } = findRegistryRecord(
+    registry,
+    params.get("event")
+  );
+
+  if (record.status === "disabled") {
+    throw new Error(`Event is disabled: ${slug}`);
+  }
+
+  const eventId = safeSlug(record.event_id);
+  const base = String(record.package_base || "").trim();
+
+  if (!base.startsWith("/events/")) {
+    throw new Error("Event registry package location is invalid.");
+  }
 
   const [manifest, content, theme] = await Promise.all([
     fetchJson(`${base}/event.yaml`),
@@ -43,11 +82,21 @@ export async function loadEventPackage() {
   ]);
 
   if (manifest.id !== eventId) {
-    throw new Error("Event package id does not match requested event.");
+    throw new Error("Event package id does not match registry record.");
+  }
+
+  if (
+    manifest.template_id !== record.template_id ||
+    Number(manifest.template_version) !== Number(record.template_version)
+  ) {
+    throw new Error("Event package template does not match registry record.");
   }
 
   return Object.freeze({
     id: eventId,
+    slug,
+    status: record.status || "active",
+    registry: Object.freeze({ ...record }),
     manifest,
     content,
     theme

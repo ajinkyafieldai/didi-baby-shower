@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "default_event": "didi",
+  "events": {
+    "didi": {
+      "event_id": "didi-baby-shower",
+      "package_base": "/events/didi-baby-shower",
+      "template_id": "baby-shower-classic",
+      "template_version": 1,
+      "status": "active"
+    },
+    "maya": {
+      "event_id": "maya-baby-shower",
+      "package_base": "/events/maya-baby-shower",
+      "template_id": "baby-shower-classic",
+      "template_version": 1,
+      "status": "preview"
+    }
+  }
+}
