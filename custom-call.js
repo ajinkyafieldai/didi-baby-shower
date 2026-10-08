@@ -1,4 +1,15 @@
 
+const iconPaths = {
+  mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/>',
+  camera: '<rect x="2" y="5" width="14" height="14" rx="2"/><path d="m16 10 6-4v12l-6-4"/>',
+  flip: '<path d="M20 7h-5l2-3M4 17h5l-2 3M20 7a9 9 0 0 0-15-3M4 17a9 9 0 0 0 15 3"/>',
+  audio: '<path d="M3 14v-3a9 9 0 0 1 18 0v3"/><rect x="2" y="12" width="4" height="8" rx="2"/><rect x="18" y="12" width="4" height="8" rx="2"/>',
+  leave: '<path d="M5 15c4-4 10-4 14 0l2-3c-5-6-13-6-18 0z"/>'
+};
+function controlIcon(kind, off = false) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[kind]}${off ? '<path d="m3 3 18 18"/>' : ''}</svg>`;
+}
+
 export async function startCustomCall({ root, bootMessage, name, report, fail }) {
   let call;
   let speaker;
@@ -15,10 +26,62 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     <button data-action="flip" aria-label="Flip camera">Flip</button><button data-action="audio" aria-label="Choose audio output">Audio</button>
     <button data-action="leave">Leave</button></footer><p class="call-notice" role="status"></p>`;
   root.append(shell);
+  const devicePanel = document.createElement('section');
+  devicePanel.className = 'call-devices'; devicePanel.hidden = true;
+  devicePanel.setAttribute('aria-label', 'Call devices');
+  devicePanel.innerHTML = '<header><strong>Call devices</strong><button type="button" aria-label="Close device picker">×</button></header><label>Microphone<select data-device="audioinput"></select></label><label>Camera<select data-device="videoinput"></select></label><label>Speaker / headphones<select data-device="audiooutput"></select></label><p class="device-help" role="status"></p>';
+  shell.append(devicePanel);
   const picture = shell.querySelector('.call-picture');
   const thumbnails = shell.querySelector('.call-thumbnails');
   const notice = shell.querySelector('.call-notice');
   const buttons = Object.fromEntries([...shell.querySelectorAll('[data-action]')].map(b => [b.dataset.action, b]));
+  for (const [kind, button] of Object.entries(buttons)) { button.innerHTML = controlIcon(kind); button.title = button.getAttribute('aria-label') || 'Leave call'; }
+  buttons.leave.setAttribute('aria-label', 'Leave call');
+  buttons.audio.setAttribute('aria-label', 'Choose microphone, camera and speaker');
+  buttons.audio.setAttribute('aria-expanded', 'false');
+  const selects = [...devicePanel.querySelectorAll('select')];
+  let deviceRefresh = 0;
+  async function refreshDevices() {
+    const version = ++deviceRefresh;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      if (version !== deviceRefresh) return;
+      const local = call.participants().local;
+      for (const select of selects) {
+        const kind = select.dataset.device;
+        const current = kind === 'audiooutput' ? outputId || '' : local?.tracks?.[kind === 'audioinput' ? 'audio' : 'video']?.persistentTrack?.getSettings().deviceId;
+        const choices = devices.filter(d => d.kind === kind && d.deviceId);
+        select.replaceChildren();
+        if (kind === 'audiooutput') select.add(new Option('Default output', ''));
+        choices.forEach((d, i) => select.add(new Option(d.label || `${kind === 'videoinput' ? 'Camera' : kind === 'audioinput' ? 'Microphone' : 'Speaker'} ${i + 1}`, d.deviceId)));
+        select.disabled = !choices.length || (kind === 'audiooutput' && !HTMLMediaElement.prototype.setSinkId);
+        if (!select.options.length) select.add(new Option('No device available', ''));
+        if ([...select.options].some(o => o.value === current)) select.value = current;
+        select.dataset.applied = select.value;
+      }
+      const output = selects.find(s => s.dataset.device === 'audiooutput');
+      devicePanel.querySelector('.device-help').textContent = output.disabled ? 'This browser does not expose speaker switching. Audio uses the connected default output.' : 'Select a connected device. Bluetooth appears here when the browser makes it available.';
+    } catch (error) { devicePanel.querySelector('.device-help').textContent = error.message || 'Could not list devices.'; }
+  }
+  function closeDevices() { devicePanel.hidden = true; buttons.audio.setAttribute('aria-expanded', 'false'); buttons.audio.focus(); }
+  devicePanel.querySelector('button').onclick = closeDevices;
+  shell.addEventListener('keydown', e => { if (e.key === 'Escape' && !devicePanel.hidden) closeDevices(); });
+  for (const select of selects) select.onchange = async () => {
+    const previous = select.dataset.applied || '';
+    select.disabled = true;
+    try {
+      if (select.dataset.device === 'audiooutput') {
+        const id = select.value;
+        // Validate even when nobody else is in the call yet.
+        const probe = document.createElement('audio'); await probe.setSinkId(id);
+        await Promise.all([...audios.values()].map(audio => audio.setSinkId(id)));
+        outputId = id;
+      } else await call.setInputDevicesAsync({ [select.dataset.device === 'audioinput' ? 'audioDeviceId' : 'videoDeviceId']: select.value });
+      select.dataset.applied = select.value;
+      notice.textContent = ''; render();
+    } catch (error) { select.value = previous; notice.textContent = error.message || 'Could not switch device.'; }
+    finally { await refreshDevices(); }
+  };
   Object.values(buttons).forEach(b => b.disabled = true);
   function attach(element, track) {
     if (element.srcObject?.getTracks()[0] === track) return;
@@ -61,10 +124,13 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
       }
     }
     shell.querySelector('.call-count').textContent = `${people.length} in call`;
-    buttons.mic.textContent = call.localAudio() ? 'Mute' : 'Unmute';
+    buttons.mic.innerHTML = controlIcon('mic', !call.localAudio());
     buttons.mic.setAttribute('aria-label', `${call.localAudio() ? 'Mute' : 'Unmute'} microphone`);
     buttons.mic.setAttribute('aria-pressed', String(!call.localAudio()));
-    buttons.camera.textContent = call.localVideo() ? 'Camera off' : 'Camera on';
+    buttons.camera.innerHTML = controlIcon('camera', !call.localVideo());
+    buttons.camera.setAttribute('aria-label', `Turn camera ${call.localVideo() ? 'off' : 'on'}`);
+    buttons.mic.title = buttons.mic.getAttribute('aria-label');
+    buttons.camera.title = buttons.camera.getAttribute('aria-label');
     buttons.camera.setAttribute('aria-pressed', String(!call.localVideo()));
   }
   async function act(button, task) {
@@ -92,14 +158,15 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     buttons.camera.onclick = () => act(buttons.camera, () => call.setLocalVideo(!call.localVideo()));
     buttons.flip.onclick = () => act(buttons.flip, () => call.cycleCamera());
     buttons.leave.onclick = () => act(buttons.leave, () => call.leave());
-    buttons.audio.onclick = () => act(buttons.audio, async () => {
-      for (const audio of audios.values()) await audio.play().catch(() => {});
-      if (navigator.mediaDevices.selectAudioOutput && HTMLMediaElement.prototype.setSinkId) {
-        const device = await navigator.mediaDevices.selectAudioOutput(); outputId = device.deviceId;
-        await Promise.all([...audios.values()].map(audio => audio.setSinkId(outputId)));
-      } else notice.textContent = 'Choose Bluetooth or speaker in your phone’s audio output settings.';
-    });
-    window.addEventListener('pagehide', () => { call.destroy(); }, { once: true });
+    buttons.audio.onclick = async () => {
+      for (const audio of audios.values()) audio.play().catch(() => {});
+      devicePanel.hidden = !devicePanel.hidden;
+      buttons.audio.setAttribute('aria-expanded', String(!devicePanel.hidden));
+      if (!devicePanel.hidden) { await refreshDevices(); devicePanel.querySelector('button').focus(); }
+    };
+    const devicesChanged = () => { if (!devicePanel.hidden) refreshDevices(); };
+    navigator.mediaDevices.addEventListener('devicechange', devicesChanged);
+    window.addEventListener('pagehide', () => { navigator.mediaDevices.removeEventListener('devicechange', devicesChanged); call.destroy(); }, { once: true });
     await call.join({ url: config.roomUrl, userName: name });
   } catch (error) { window.clearTimeout(joinTimer); fail(error.message || 'Could not join the call.'); await call?.destroy(); }
 }
