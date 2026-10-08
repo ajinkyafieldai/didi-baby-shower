@@ -1,5 +1,4 @@
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import * as L from './vendor/leaflet.js';
 
 const maps = new WeakMap();
 
