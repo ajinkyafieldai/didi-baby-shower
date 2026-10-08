@@ -19,6 +19,10 @@ applyFeatureVisibility();
 window.__DIDI_FEATURES__ = FEATURES;
 window.__APSILA_EVENT__ = EVENT_PACKAGE;
 
+const EVENT_ID = EVENT_PACKAGE.id;
+const EVENT_TITLE = String(EVENT_PACKAGE.manifest.title || "Apsila Event");
+const HONOREE_NAME = String(EVENT_PACKAGE.content.honoree_name || "Honoree").trim() || "Honoree";
+
 const uiTask = window.scheduler?.postTask
   ? (callback, priority = "user-visible") => window.scheduler.postTask(callback, { priority })
   : (callback) => Promise.resolve().then(callback);
@@ -41,8 +45,8 @@ function warmLocalUi() {
   // Touch frequently used local stores after first paint so opening panels feels instant.
   uiTask(() => {
     try {
-      localStorage.getItem("baby-shower-blessings-v1");
-      localStorage.getItem("baby-shower-family-hub-v1");
+      localStorage.getItem(`${EVENT_ID}:baby-shower-blessings-v1`);
+      localStorage.getItem(`${EVENT_ID}:baby-shower-family-hub-v1`);
     } catch {}
   }, "background");
 }
@@ -98,7 +102,7 @@ let gameState = { names: [], quiz: [] };
 let activeGame = null;
 
 const blessingStore = (() => {
-  const key = "baby-shower-blessings-v1";
+  const key = `${EVENT_ID}:baby-shower-blessings-v1`;
 
   function read() {
     try {
@@ -136,7 +140,7 @@ const blessingStore = (() => {
 })();
 
 const wallPhotoStore = (() => {
-  const dbName = "didi-baby-shower-family-wall";
+  const dbName = `${EVENT_ID}:family-wall`;
   const storeName = "photos";
 
   function open() {
@@ -180,7 +184,7 @@ const wallPhotoStore = (() => {
 })();
 
 const familyStore = (() => {
-  const key = "baby-shower-family-hub-v1";
+  const key = `${EVENT_ID}:baby-shower-family-hub-v1`;
 
   function read() {
     try {
@@ -724,10 +728,10 @@ document.querySelectorAll("[data-effect]").forEach((button) => {
 });
 
 const didiQuestions = [
-  "What is Didi's comfort food?",
-  "What phrase does Didi say all the time?",
-  "Where would Didi pick for a surprise holiday?",
-  "What always makes Didi laugh?"
+  `What is ${HONOREE_NAME}'s comfort food?`,
+  `What phrase does ${HONOREE_NAME} say all the time?`,
+  `Where would ${HONOREE_NAME} pick for a surprise holiday?`,
+  `What always makes ${HONOREE_NAME} laugh?`
 ];
 
 async function sendGame(body) {
@@ -821,9 +825,9 @@ function renderGame(game) {
 
   if (existing) {
     gameContent.innerHTML = `
-      <h2 id="game-title">🏆 Who Knows Didi Best?</h2>
+      <h2 id="game-title">🏆 Who Knows ${HONOREE_NAME} Best?</h2>
       <div class="quiz-done">Answers locked 🔒</div>
-      <p class="game-subtitle">Didi gets to judge. ${gameState.quiz.length} people have played.</p>
+      <p class="game-subtitle">${HONOREE_NAME} gets to judge. ${gameState.quiz.length} people have played.</p>
       <div class="quiz-review">
         ${didiQuestions.map((question, index) => `
           <div><small>${escapeHtml(question)}</small><strong>${escapeHtml(existing.answers[index])}</strong></div>
@@ -833,8 +837,8 @@ function renderGame(game) {
   }
 
   gameContent.innerHTML = `
-    <h2 id="game-title">🏆 Who Knows Didi Best?</h2>
-    <p class="game-subtitle">No cheating. Didi judges the answers 😄</p>
+    <h2 id="game-title">🏆 Who Knows ${HONOREE_NAME} Best?</h2>
+    <p class="game-subtitle">No cheating. ${HONOREE_NAME} judges the answers 😄</p>
     <form id="didi-form" class="quiz-form">
       ${didiQuestions.map((question, index) => `
         <label>
@@ -1138,7 +1142,7 @@ function renderKeepsakeSummary() {
   keepsakeSummary.innerHTML = `
     <div class="keepsake-hero">
       <span>✨</span>
-      <div><h3>Didi's Baby Shower</h3><p>The day, collected by everyone who was there.</p></div>
+      <div><h3>${EVENT_TITLE}</h3><p>The day, collected by everyone who was there.</p></div>
     </div>
     <div class="keepsake-stats">
       <div><strong>${noteCount}</strong><span>notes</span></div>
@@ -1319,7 +1323,7 @@ async function renderBlessings() {
       `;
     }
 
-    const forWhom = item.audience === "didi" ? "For Didi" : "For the baby";
+    const forWhom = item.audience === "didi" ? `${HONOREE_NAME ? "For " + HONOREE_NAME : "For the honoree"}` : "For the baby";
     return `
       <article class="blessing-note" data-blessing-id="${escapeHtml(item.id)}">
         <div class="blessing-note-top">
@@ -1441,7 +1445,7 @@ async function exportBlessingsKeepsake() {
         continue;
       }
 
-      const title = item.audience === "didi" ? "For Didi" : "For the baby";
+      const title = item.audience === "didi" ? `${HONOREE_NAME ? "For " + HONOREE_NAME : "For the honoree"}` : "For the baby";
       rows.push(`
         <article>
           <div class="meta">${title} · ${new Date(item.at).toLocaleString()}</div>
@@ -1455,7 +1459,7 @@ async function exportBlessingsKeepsake() {
 <html>
 <head>
 <meta charset="utf-8">
-<title>Didi's Baby Shower — Family Wall</title>
+<title>${EVENT_TITLE} — Family Wall</title>
 <style>
   body{font-family:Georgia,serif;margin:0;padding:48px;background:#fffaf7;color:#422f35}
   main{max-width:820px;margin:auto}
@@ -1470,7 +1474,7 @@ async function exportBlessingsKeepsake() {
 </style>
 </head>
 <body><main>
-<h1>Didi's Baby Shower</h1>
+<h1>${EVENT_TITLE}</h1>
 <p class="sub">Family Wall — notes, memories and photos 💛</p>
 ${rows.join("") || "<p>The wall is empty.</p>"}
 </main></body></html>`;
@@ -1479,7 +1483,7 @@ ${rows.join("") || "<p>The wall is empty.</p>"}
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "didi-baby-shower-family-wall.html";
+    link.download = `${EVENT_ID}-family-wall.html`;
     document.body.appendChild(link);
     link.click();
     link.remove();
