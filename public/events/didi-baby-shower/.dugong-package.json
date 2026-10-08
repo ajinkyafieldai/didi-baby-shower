@@ -1,0 +1,13 @@
+{
+  "event_id": "didi-baby-shower",
+  "files": {
+    "assets/.keep": "5a8886bdc518533aaf60258308078c87921887b76366f89faa97a8f8eeca9f6b",
+    "content/content.json": "49637bdebaf3b795d9e3d2f013e66d1dfcb6ad2058b79d2667857c72aca917b2",
+    "event.yaml": "7c9a3f54dde5f71b928fcdc9f8d09cd5d5ecf888c9348f5c9862026211b2b64f",
+    "theme/theme.json": "ffb24a5bbaf26f066d4cbf352e902c2ba7e81f1eeb854f18a92cb3b6b8268bc2"
+  },
+  "generator": "dugong",
+  "schema": 1,
+  "template_id": "baby-shower-classic",
+  "template_version": 1
+}
