@@ -53,6 +53,10 @@ function fail(message) {
 }
 
 async function startVideo() {
+  if (new URLSearchParams(location.search).get("ui") !== "prebuilt") {
+    const { startCustomCall } = await import("./frontend/custom-call.js");
+    return startCustomCall({ root, bootMessage, name, report, fail });
+  }
   try {
     stage("Getting Daily room…");
 
