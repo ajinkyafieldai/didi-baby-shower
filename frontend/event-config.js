@@ -60,6 +60,8 @@ export function applyEventTheme(eventPackage, root = document.documentElement) {
   root.dataset.eventAccent = accentName;
   root.style.setProperty("--event-accent", palette.accent);
   root.style.setProperty("--event-accent-soft", palette.accentSoft);
+  root.style.setProperty("--rose-deep", palette.accent);
+  root.style.setProperty("--rose", palette.accentSoft);
 }
 
 export function applyParticipantCopy(eventPackage, root = document) {
