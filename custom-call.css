@@ -47,3 +47,5 @@
 .call-thumbnails .video-pin { top:0; right:0; }
 .call-thumbnails .video-pin::before { width:24px; height:24px; border-radius:6px; }
 .call-thumbnails .video-pin svg { width:16px; height:16px; }
+
+.camera-tile .camera-name { display:none; }
