@@ -1,8 +1,23 @@
 import { setupCelebrationLayout } from "./frontend/celebration-layout.js";
-import { FEATURES, featureEnabled, applyFeatureVisibility } from "./frontend/features.js";
+import {
+  FEATURES,
+  featureEnabled,
+  configureFeatures,
+  applyFeatureVisibility
+} from "./frontend/features.js";
+import {
+  loadEventPackage,
+  applyEventTheme,
+  applyParticipantCopy
+} from "./frontend/event-config.js";
 
+const EVENT_PACKAGE = await loadEventPackage();
+configureFeatures(EVENT_PACKAGE);
+applyEventTheme(EVENT_PACKAGE);
+applyParticipantCopy(EVENT_PACKAGE);
 applyFeatureVisibility();
 window.__DIDI_FEATURES__ = FEATURES;
+window.__APSILA_EVENT__ = EVENT_PACKAGE;
 
 const uiTask = window.scheduler?.postTask
   ? (callback, priority = "user-visible") => window.scheduler.postTask(callback, { priority })
