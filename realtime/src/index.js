@@ -53,6 +53,12 @@ function json(data, status = 200) {
   });
 }
 
+
+async function registrySnapshot(ctx) {
+  const stored = await ctx.storage.get("eventRegistry");
+  return stored && typeof stored === "object" ? stored : {};
+}
+
 async function gameSnapshot(ctx) {
   const nameSuggestions = await ctx.storage.get("nameSuggestions");
   const quizAnswers = await ctx.storage.get("quizAnswers");
@@ -74,6 +80,11 @@ export class CelebrationRoom {
   async fetch(request) {
     if (request.method === "GET") {
       const url = new URL(request.url);
+
+      if (url.searchParams.get("registry") === "1") {
+        return json({ events: await registrySnapshot(this.ctx) });
+      }
+
       const since = Math.max(0, Number(url.searchParams.get("since") || 0));
       const latest = await this.ctx.storage.get("latest");
       const storedEvents = await this.ctx.storage.get("events");
@@ -129,6 +140,30 @@ export class CelebrationRoom {
 
         await this.ctx.storage.put("videoRoom", videoRoom);
         return json({ ok: true, videoRoom });
+      }
+
+      if (body && body.type === "event_registry_set") {
+        const slug = String(body.slug || "").trim();
+        const record = body.record;
+
+        if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(slug)) {
+          return json({ error: "Invalid event slug" }, 400);
+        }
+        if (!record || typeof record !== "object") {
+          return json({ error: "Invalid event registry record" }, 400);
+        }
+
+        const registry = await registrySnapshot(this.ctx);
+        registry[slug] = {
+          event_id: String(record.event_id || "").slice(0, 80),
+          package_base: String(record.package_base || "").slice(0, 500),
+          template_id: String(record.template_id || "").slice(0, 100),
+          template_version: Number(record.template_version),
+          status: String(record.status || "preview").slice(0, 20),
+          updated_at: Date.now()
+        };
+        await this.ctx.storage.put("eventRegistry", registry);
+        return json({ ok: true, slug, record: registry[slug] });
       }
 
       if (body && body.type === "telemetry") {
