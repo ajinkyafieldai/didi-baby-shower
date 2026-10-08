@@ -31,3 +31,8 @@
 .call-devices select { display:block; width:100%; margin-top:6px; padding:10px; min-height:44px; border:1px solid #e8d8c7; border-radius:9px; background:white; color:#422f35; font:14px system-ui; }
 .device-help { margin:12px 0 0; color:#7a6970; font-size:12px; }
 @media(max-width:360px) { .call-footer button { width:40px; flex-basis:40px; padding:8px; } }
+.call-home { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.custom-call[data-mode=grid] .call-picture { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); grid-auto-rows:minmax(120px,1fr); gap:6px; padding:6px; overflow:auto; }
+.custom-call[data-mode=grid] .camera-tile { min-height:120px; }
+.custom-call[data-mode=grid] .call-thumbnails, .custom-call[data-mode=focus] .call-thumbnails { display:none; }
+.pinned-camera .camera-name::before { content:'Pinned · '; }

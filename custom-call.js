@@ -4,7 +4,8 @@ const iconPaths = {
   camera: '<rect x="2" y="5" width="14" height="14" rx="2"/><path d="m16 10 6-4v12l-6-4"/>',
   flip: '<path d="M20 7h-5l2-3M4 17h5l-2 3M20 7a9 9 0 0 0-15-3M4 17a9 9 0 0 0 15 3"/>',
   audio: '<path d="M3 14v-3a9 9 0 0 1 18 0v3"/><rect x="2" y="12" width="4" height="8" rx="2"/><rect x="18" y="12" width="4" height="8" rx="2"/>',
-  leave: '<path d="M5 15c4-4 10-4 14 0l2-3c-5-6-13-6-18 0z"/>'
+  fullscreen: '<path d="M8 3H3v5m13-5h5v5M3 16v5h5m8 0h5v-5"/>',
+  view: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'
 };
 function controlIcon(kind, off = false) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[kind]}${off ? '<path d="m3 3 18 18"/>' : ''}</svg>`;
@@ -14,6 +15,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   let call;
   let speaker;
   let pinned;
+  let mode = 'speaker';
   let outputId;
   let joinTimer;
   const tiles = new Map();
@@ -24,6 +26,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     <footer class="call-footer"><span class="call-home">Home page <small class="call-count"></small></span>
     <button data-action="mic" aria-label="Mute microphone">Mic</button><button data-action="camera" aria-label="Turn camera off">Camera</button>
     <button data-action="flip" aria-label="Flip camera">Flip</button><button data-action="audio" aria-label="Choose audio output">Audio</button>
+    <button data-action="view" aria-label="Video modes and pinning">View</button><button data-action="fullscreen" aria-label="Fullscreen video">Fullscreen</button>
     </footer><p class="call-notice" role="status"></p>`;
   root.append(shell);
   const devicePanel = document.createElement('section');
@@ -31,6 +34,11 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   devicePanel.setAttribute('aria-label', 'Call devices');
   devicePanel.innerHTML = '<header><strong>Call devices</strong><button type="button" aria-label="Close device picker">×</button></header><label>Microphone<select data-device="audioinput"></select></label><label>Camera<select data-device="videoinput"></select></label><label>Speaker / headphones<select data-device="audiooutput"></select></label><p class="device-help" role="status"></p>';
   shell.append(devicePanel);
+  const viewPanel = document.createElement('section');
+  viewPanel.className = 'call-devices'; viewPanel.hidden = true;
+  viewPanel.setAttribute('aria-label', 'Video layout');
+  viewPanel.innerHTML = '<header><strong>Video layout</strong><button aria-label="Close video layout">×</button></header><label>View<select class="view-mode"><option value="speaker">Speaker — large video and thumbnails</option><option value="grid">Grid — everyone together</option><option value="focus">Focus — large video only</option></select></label><label>Pin video<select class="pin-person"><option value="">Automatic speaker</option></select></label><p class="device-help">Tap any video to pin it. Tap again to unpin.</p>';
+  shell.append(viewPanel);
   const picture = shell.querySelector('.call-picture');
   const thumbnails = shell.querySelector('.call-thumbnails');
   const notice = shell.querySelector('.call-notice');
@@ -38,6 +46,28 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   for (const [kind, button] of Object.entries(buttons)) { button.innerHTML = controlIcon(kind); button.title = button.getAttribute('aria-label') || 'Leave call'; }
   buttons.audio.setAttribute('aria-label', 'Choose microphone, camera and speaker');
   buttons.audio.setAttribute('aria-expanded', 'false');
+  buttons.view.setAttribute('aria-expanded', 'false');
+  viewPanel.querySelector('button').onclick = () => { viewPanel.hidden = true; buttons.view.setAttribute('aria-expanded', 'false'); buttons.view.focus(); };
+  viewPanel.querySelector('.view-mode').onchange = e => { mode = e.target.value; render(); };
+  viewPanel.querySelector('.pin-person').onchange = e => { pinned = e.target.value || null; if (pinned && mode === 'grid') mode = 'speaker'; render(); };
+  buttons.view.onclick = () => { devicePanel.hidden = true; buttons.audio.setAttribute('aria-expanded', 'false'); viewPanel.hidden = !viewPanel.hidden; buttons.view.setAttribute('aria-expanded', String(!viewPanel.hidden)); if (!viewPanel.hidden) viewPanel.querySelector('button').focus(); };
+  const fullDocument = window.parent === window ? document : parent.document;
+  const fullStage = fullDocument.querySelector('.video-stage') || root;
+  function updateFullscreen() {
+    const expanded = !!fullDocument.fullscreenElement || fullStage.classList.contains('video-expanded');
+    buttons.fullscreen.setAttribute('aria-pressed', String(expanded));
+    buttons.fullscreen.setAttribute('aria-label', expanded ? 'Exit fullscreen video' : 'Fullscreen video');
+    buttons.fullscreen.title = buttons.fullscreen.getAttribute('aria-label');
+  }
+  buttons.fullscreen.onclick = async () => {
+    try {
+      if (fullDocument.fullscreenElement) await fullDocument.exitFullscreen();
+      else if (fullStage.classList.contains('video-expanded')) { fullStage.classList.remove('video-expanded'); fullDocument.body.classList.remove('video-expanded-open'); }
+      else { try { await fullStage.requestFullscreen({ navigationUI: 'hide' }); } catch { fullStage.classList.add('video-expanded'); fullDocument.body.classList.add('video-expanded-open'); } }
+    } catch { notice.textContent = 'Fullscreen could not be changed.'; }
+    updateFullscreen();
+  };
+  fullDocument.addEventListener('fullscreenchange', updateFullscreen);
   const selects = [...devicePanel.querySelectorAll('select')];
   let deviceRefresh = 0;
   async function refreshDevices() {
@@ -64,7 +94,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   }
   function closeDevices() { devicePanel.hidden = true; buttons.audio.setAttribute('aria-expanded', 'false'); buttons.audio.focus(); }
   devicePanel.querySelector('button').onclick = closeDevices;
-  shell.addEventListener('keydown', e => { if (e.key === 'Escape' && !devicePanel.hidden) closeDevices(); });
+  shell.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!devicePanel.hidden) closeDevices(); if (!viewPanel.hidden) viewPanel.querySelector('button').click(); if (fullStage.classList.contains('video-expanded')) { fullStage.classList.remove('video-expanded'); fullDocument.body.classList.remove('video-expanded-open'); updateFullscreen(); } } });
   for (const select of selects) select.onchange = async () => {
     const previous = select.dataset.applied || '';
     select.disabled = true;
@@ -89,6 +119,13 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   }
   function render() {
     const people = Object.values(call.participants());
+    if (!people.some(p => p.session_id === pinned)) pinned = null;
+    shell.dataset.mode = mode;
+    viewPanel.querySelector('.view-mode').value = mode;
+    const pinSelect = viewPanel.querySelector('.pin-person');
+    const signature = JSON.stringify(people.map(p => [p.session_id, p.user_name]));
+    if (pinSelect.dataset.people !== signature) { pinSelect.replaceChildren(new Option('Automatic speaker', '')); for (const p of people) pinSelect.add(new Option(`${p.user_name || 'Guest'}${p.local ? ' (you)' : ''}`, p.session_id)); pinSelect.dataset.people = signature; }
+    pinSelect.value = pinned || '';
     const ids = new Set(people.map(p => p.session_id));
     for (const p of people) if (!p.local) for (const kind of ['audio', 'screenAudio']) ids.add(`${p.session_id}:${kind}`);
     for (const [id, tile] of tiles) if (!ids.has(id)) { tile.remove(); tiles.delete(id); }
@@ -100,7 +137,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
       if (!tile) {
         tile = document.createElement('button'); tile.className = 'camera-tile';
         tile.innerHTML = '<video autoplay playsinline muted></video><span class="camera-name"></span>';
-        tile.onclick = () => { pinned = pinned === p.session_id ? null : p.session_id; render(); };
+        tile.onclick = () => { pinned = pinned === p.session_id ? null : p.session_id; if (pinned && mode === 'grid') mode = 'speaker'; render(); };
         tiles.set(p.session_id, tile);
       }
       const isMain = p === main;
@@ -108,9 +145,10 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
       attach(tile.querySelector('video'), track);
       tile.classList.toggle('no-camera', !track);
       tile.classList.toggle('self-camera', !!p.local && p !== shared);
+      tile.classList.toggle('pinned-camera', pinned === p.session_id);
       tile.querySelector('.camera-name').textContent = `${p.user_name || 'Guest'}${p.local ? ' (you)' : ''}${['playable', 'sendable'].includes(p.tracks?.audio?.state) ? '' : ' · muted'}`;
       tile.setAttribute('aria-label', `${p.user_name || 'Guest'}: ${pinned === p.session_id ? 'unpin' : 'pin'} video`);
-      const container = isMain ? picture : thumbnails;
+      const container = mode === 'grid' || isMain ? picture : thumbnails;
       if (tile.parentElement !== container) container.append(tile);
       if (!p.local) {
         for (const kind of ['audio', 'screenAudio']) {
@@ -157,6 +195,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     buttons.camera.onclick = () => act(buttons.camera, () => call.setLocalVideo(!call.localVideo()));
     buttons.flip.onclick = () => act(buttons.flip, () => call.cycleCamera());
     buttons.audio.onclick = async () => {
+      viewPanel.hidden = true; buttons.view.setAttribute('aria-expanded', 'false');
       for (const audio of audios.values()) audio.play().catch(() => {});
       devicePanel.hidden = !devicePanel.hidden;
       buttons.audio.setAttribute('aria-expanded', String(!devicePanel.hidden));
@@ -164,7 +203,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     };
     const devicesChanged = () => { if (!devicePanel.hidden) refreshDevices(); };
     navigator.mediaDevices.addEventListener('devicechange', devicesChanged);
-    window.addEventListener('pagehide', () => { navigator.mediaDevices.removeEventListener('devicechange', devicesChanged); call.destroy(); }, { once: true });
+    window.addEventListener('pagehide', () => { fullDocument.removeEventListener('fullscreenchange', updateFullscreen); navigator.mediaDevices.removeEventListener('devicechange', devicesChanged); call.destroy(); }, { once: true });
     await call.join({ url: config.roomUrl, userName: name });
   } catch (error) { window.clearTimeout(joinTimer); fail(error.message || 'Could not join the call.'); await call?.destroy(); }
 }
