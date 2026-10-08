@@ -1,3 +1,4 @@
+import { applyUtilityIcons } from './utility-icons.js';
 // The call remains mounted when family panels change or fullscreen closes.
 export function setupCelebrationLayout({ stage, panel, enabled, showView, close }) {
   const shell = document.querySelector('.app-shell');
@@ -17,7 +18,20 @@ export function setupCelebrationLayout({ stage, panel, enabled, showView, close 
     showView('wall');
   }
 
+  const back = document.createElement('button');
+  back.className = 'back-to-call'; back.type = 'button'; back.hidden = true;
+  back.textContent = '↑ Back to call'; document.body.append(back);
+  back.onclick = () => { stage.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }); };
+  function updateReturnButton() { back.hidden = !stage.classList.contains('in-call') || stage.getBoundingClientRect().bottom > 80 || !!document.fullscreenElement || stage.classList.contains('video-expanded'); }
+  const visibilityObserver = new IntersectionObserver(updateReturnButton, { threshold: [0, .1] }); visibilityObserver.observe(stage);
+  const callObserver = new MutationObserver(updateReturnButton); callObserver.observe(stage, { attributes: true, attributeFilter: ['class'] });
+  window.addEventListener('scroll', updateReturnButton, { passive: true });
+  window.addEventListener('pagehide', () => { visibilityObserver.disconnect(); callObserver.disconnect(); window.removeEventListener('scroll', updateReturnButton); }, { once: true });
+
+  applyUtilityIcons();
+
   function updateExpanded() {
+    updateReturnButton();
     const expanded = document.fullscreenElement === stage || stage.classList.contains('video-expanded');
     fullscreen.setAttribute('aria-pressed', String(expanded));
     fullscreen.setAttribute('aria-label', expanded ? 'Exit fullscreen video' : 'Expand video');

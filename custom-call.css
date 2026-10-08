@@ -86,3 +86,14 @@
 .custom-call[data-mode=speaker][data-rail=bottom] .call-thumbnails:not(:empty) { height:var(--rail-height); box-sizing:border-box; }
 .camera-tile { border-radius:6px; }
 .call-footer { padding:4px; }
+
+.call-home { overflow:visible; }
+.call-footer .call-home .more-people { position:static; display:block; width:auto; min-height:28px; padding:2px 4px; border:0; background:transparent; box-shadow:none; font-size:11px; color:#a94762; white-space:nowrap; }
+.call-footer .call-home .more-people[hidden] { display:none; }
+.more-below { mask-image:linear-gradient(to bottom,#000 calc(100% - 14px),#0008); }
+.call-feedback { position:absolute; top:52px; left:50%; transform:translateX(-50%); padding:6px 12px; border-radius:20px; background:#30262ce6; color:white; pointer-events:none; z-index:15; }
+.call-feedback:empty { display:none; }
+.call-footer .call-home .more-people { max-width:100%; white-space:normal; text-align:left; padding-left:0; }
+.controls-hidden .call-footer [data-action] { display:none; }
+.call-footer { min-height:44px; }
+.controls-hidden .call-home { padding-right:48px; }

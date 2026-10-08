@@ -7,6 +7,10 @@ const iconPaths = {
   fullscreen: '<path d="M8 3H3v5m13-5h5v5M3 16v5h5m8 0h5v-5"/>',
   view: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'
 };
+export function scrollCue(scrollHeight, clientHeight, scrollTop, mode) {
+  if (mode === 'focus' || scrollHeight <= clientHeight + 8) return null;
+  return scrollHeight - clientHeight - scrollTop >= 8 ? 'down' : 'up';
+}
 export function participantInitials(name) {
   const words = (name || 'Guest').trim().split(/\s+/).filter(Boolean);
   return [words[0] || 'Guest', ...(words.length > 1 ? [words.at(-1)] : [])].map(word => Array.from(word)[0]).join('').toLocaleUpperCase();
@@ -34,20 +38,29 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   let call;
   let speaker;
   let pinned;
-  let mode = 'speaker';
+  const preferenceKey = `apsila-call-preferences:${new URLSearchParams(location.search).get('event') || 'didi-baby-shower'}`;
+  let preferences = {};
+  try { preferences = JSON.parse(localStorage.getItem(preferenceKey) || '{}') || {}; } catch {}
+  let mode = ['speaker', 'grid', 'focus'].includes(preferences.mode) ? preferences.mode : 'speaker';
   let outputId;
+  let savedPin;
+  try { savedPin = sessionStorage.getItem(`${preferenceKey}:pin`); } catch {}
+  function savePreferences() { try { localStorage.setItem(preferenceKey, JSON.stringify({ ...preferences, mode })); sessionStorage.setItem(`${preferenceKey}:pin`, pinned || ''); } catch {} }
   let joinTimer;
   const tiles = new Map();
   const audios = new Map();
   const shell = document.createElement('section');
   shell.className = 'custom-call';
   shell.innerHTML = `<div class="call-picture"></div><div class="call-thumbnails" aria-label="Family cameras"></div>
-    <footer class="call-footer"><span class="call-home">Home page <small class="call-count"></small><small class="call-connection" role="status"></small></span><button class="show-controls" aria-label="Show video controls" hidden>•••</button><button class="more-people" aria-label="Scroll to more people" hidden>↓</button>
+    <footer class="call-footer"><span class="call-home">Home page <small class="call-count"></small><button class="more-people" aria-label="Scroll to more people" hidden>More people ↓</button><small class="call-connection" role="status"></small></span><button class="show-controls" aria-label="Show video controls" hidden>•••</button>
     <button data-action="mic" aria-label="Mute microphone">Mic</button><button data-action="camera" aria-label="Turn camera off">Camera</button>
     <button data-action="flip" aria-label="Flip camera">Flip</button><button data-action="audio" aria-label="Choose audio output">Audio</button>
     <button data-action="view" aria-label="Video modes and pinning">View</button><button data-action="fullscreen" aria-label="Fullscreen video">Fullscreen</button>
     </footer><p class="call-notice" role="status"></p>`;
   root.append(shell);
+  const feedback = document.createElement('div'); feedback.className = 'call-feedback'; feedback.setAttribute('role', 'status'); shell.append(feedback);
+  let feedbackTimer;
+  function showFeedback(text) { clearTimeout(feedbackTimer); feedback.textContent = text; feedbackTimer = setTimeout(() => { feedback.textContent = ''; }, 1800); }
   const devicePanel = document.createElement('section');
   devicePanel.className = 'call-devices'; devicePanel.hidden = true;
   devicePanel.setAttribute('aria-label', 'Call devices');
@@ -78,9 +91,15 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   for (const event of ['pointerdown', 'pointermove', 'keydown', 'focusin']) shell.addEventListener(event, showControls);
   function updateScrollCue() {
     const target = mode === 'grid' ? picture : thumbnails;
-    more.hidden = mode === 'focus' || target.scrollHeight - target.clientHeight - target.scrollTop < 8;
+    const cue = scrollCue(target.scrollHeight, target.clientHeight, target.scrollTop, mode);
+    const below = cue === 'down';
+    more.hidden = !cue;
+    more.textContent = below ? 'More people ↓' : 'Back to first ↑';
+    more.setAttribute('aria-label', below ? 'Scroll to more people' : 'Scroll to first people');
+    picture.classList.toggle('more-below', mode === 'grid' && below);
+    thumbnails.classList.toggle('more-below', mode === 'speaker' && below);
   }
-  more.onclick = () => { const target = mode === 'grid' ? picture : thumbnails; target.scrollBy({ top: Math.max(80, target.clientHeight * .8), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }); };
+  more.onclick = () => { const target = mode === 'grid' ? picture : thumbnails; target.scrollBy({ top: target.scrollHeight - target.clientHeight - target.scrollTop >= 8 ? Math.max(80, target.clientHeight * .8) : -target.scrollTop, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }); };
   picture.addEventListener('scroll', updateScrollCue);
   thumbnails.addEventListener('scroll', updateScrollCue);
   function arrangeVideos() {
@@ -104,8 +123,8 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   buttons.audio.setAttribute('aria-expanded', 'false');
   buttons.view.setAttribute('aria-expanded', 'false');
   viewPanel.querySelector('button').onclick = () => { viewPanel.hidden = true; buttons.view.setAttribute('aria-expanded', 'false'); buttons.view.focus(); };
-  viewPanel.querySelector('.view-mode').onchange = e => { mode = e.target.value; render(); };
-  viewPanel.querySelector('.pin-person').onchange = e => { pinned = e.target.value || null; if (pinned && mode === 'grid') mode = 'speaker'; render(); };
+  viewPanel.querySelector('.view-mode').onchange = e => { mode = e.target.value; savePreferences(); render(); };
+  viewPanel.querySelector('.pin-person').onchange = e => { pinned = e.target.value || null; if (pinned && mode === 'grid') mode = 'speaker'; savedPin = null; savePreferences(); render(); };
   buttons.view.onclick = () => { devicePanel.hidden = true; buttons.audio.setAttribute('aria-expanded', 'false'); viewPanel.hidden = !viewPanel.hidden; buttons.view.setAttribute('aria-expanded', String(!viewPanel.hidden)); if (!viewPanel.hidden) viewPanel.querySelector('button').focus(); };
   const fullDocument = window.parent === window ? document : parent.document;
   const fullStage = fullDocument.querySelector('.video-stage') || root;
@@ -162,6 +181,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
         await Promise.all([...audios.values()].map(audio => audio.setSinkId(id)));
         outputId = id;
       } else await call.setInputDevicesAsync({ [select.dataset.device === 'audioinput' ? 'audioDeviceId' : 'videoDeviceId']: select.value });
+      preferences[select.dataset.device] = select.value; savePreferences();
       select.dataset.applied = select.value;
       notice.textContent = ''; render();
     } catch (error) { select.value = previous; notice.textContent = error.message || 'Could not switch device.'; }
@@ -175,6 +195,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   }
   function render() {
     const people = Object.values(call.participants());
+    if (savedPin && people.some(p => p.session_id === savedPin)) { pinned = savedPin; savedPin = null; }
     if (!people.some(p => p.session_id === pinned)) pinned = null;
     shell.dataset.mode = mode;
     viewPanel.querySelector('.view-mode').value = mode;
@@ -196,7 +217,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
         tile.querySelector('video').onloadedmetadata = arrangeVideos;
         let nameTimer;
         tile.addEventListener('click', () => { tile.classList.add('show-name'); clearTimeout(nameTimer); nameTimer = setTimeout(() => tile.classList.remove('show-name'), 2500); });
-        tile.querySelector('.video-pin').onclick = () => { pinned = pinned === p.session_id ? null : p.session_id; if (pinned && mode === 'grid') mode = 'speaker'; render(); };
+        tile.querySelector('.video-pin').onclick = () => { pinned = pinned === p.session_id ? null : p.session_id; if (pinned && mode === 'grid') mode = 'speaker'; savedPin = null; savePreferences(); render(); };
         tiles.set(p.session_id, tile);
       }
       const isMain = p === main;
@@ -259,11 +280,21 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     window.addEventListener('offline', offline); window.addEventListener('online', online);
     call.on('network-connection', e => { const key = `${e.type}:${e.session_id || e.sfu_id || ''}`; if (e.event === 'interrupted') interrupted.add(key); if (e.event === 'connected') interrupted.delete(key); updateConnection(); });
     call.on('network-quality-change', e => { if (!interrupted.size && navigator.onLine) connection.textContent = ['warning', 'bad'].includes(e.networkState) ? 'Weak connection' : ''; });
-    call.on('joined-meeting', () => { interrupted.clear(); updateConnection(); showControls(); window.clearTimeout(joinTimer); bootMessage?.remove(); Object.values(buttons).forEach(b => b.disabled = false); render(); report('video-status', 'Live'); });
+    async function restoreDevices() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const inputs = {};
+        for (const [kind, key] of [['audioinput', 'audioDeviceId'], ['videoinput', 'videoDeviceId']]) if (preferences[kind] && devices.some(d => d.kind === kind && d.deviceId === preferences[kind])) inputs[key] = preferences[kind];
+        if (Object.keys(inputs).length) await call.setInputDevicesAsync(inputs);
+        if (preferences.audiooutput && HTMLMediaElement.prototype.setSinkId && devices.some(d => d.kind === 'audiooutput' && d.deviceId === preferences.audiooutput)) { await Promise.all([...audios.values()].map(audio => audio.setSinkId(preferences.audiooutput))); outputId = preferences.audiooutput; }
+        render();
+      } catch { /* Unavailable saved devices keep the working defaults. */ }
+    }
+    call.on('joined-meeting', () => { restoreDevices(); interrupted.clear(); updateConnection(); showControls(); window.clearTimeout(joinTimer); bootMessage?.remove(); Object.values(buttons).forEach(b => b.disabled = false); render(); report('video-status', 'Live'); });
     call.on('error', e => { notice.textContent = e.errorMsg || 'Call connection failed.'; report('video-status', notice.textContent); });
     call.on('camera-error', () => { notice.textContent = 'Check camera and microphone permissions.'; });
     call.on('left-meeting', () => { for (const audio of audios.values()) { audio.srcObject = null; audio.remove(); } Object.values(buttons).forEach(b => b.disabled = true); picture.replaceChildren(); thumbnails.replaceChildren(); tiles.clear(); audios.clear(); connection.textContent = 'Disconnected'; notice.replaceChildren(document.createTextNode('Connection ended. ')); const retry = document.createElement('button'); retry.textContent = 'Rejoin'; retry.onclick = async () => { retry.disabled = true; connection.textContent = 'Reconnecting…'; try { await call.join({ url: config.roomUrl, userName: name }); notice.textContent = ''; } catch { connection.textContent = 'Could not reconnect'; retry.disabled = false; } }; notice.append(retry); showControls(); report('video-status', 'Disconnected'); });
-    buttons.mic.onclick = () => act(buttons.mic, () => call.setLocalAudio(!call.localAudio()));
+    buttons.mic.onclick = () => act(buttons.mic, async () => { await call.setLocalAudio(!call.localAudio()); showFeedback(call.localAudio() ? 'Mic on' : 'Mic off'); });
     buttons.camera.onclick = () => act(buttons.camera, () => call.setLocalVideo(!call.localVideo()));
     buttons.flip.onclick = () => act(buttons.flip, () => call.cycleCamera());
     buttons.audio.onclick = async () => {
@@ -275,7 +306,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     };
     const devicesChanged = () => { if (!devicePanel.hidden) refreshDevices(); };
     navigator.mediaDevices.addEventListener('devicechange', devicesChanged);
-    window.addEventListener('pagehide', () => { clearTimeout(controlsTimer); cancelAnimationFrame(scrollFrame); window.removeEventListener('offline', offline); window.removeEventListener('online', online); layoutObserver.disconnect(); fullDocument.removeEventListener('fullscreenchange', updateFullscreen); navigator.mediaDevices.removeEventListener('devicechange', devicesChanged); call.destroy(); }, { once: true });
+    window.addEventListener('pagehide', () => { clearTimeout(feedbackTimer); clearTimeout(controlsTimer); cancelAnimationFrame(scrollFrame); window.removeEventListener('offline', offline); window.removeEventListener('online', online); layoutObserver.disconnect(); fullDocument.removeEventListener('fullscreenchange', updateFullscreen); navigator.mediaDevices.removeEventListener('devicechange', devicesChanged); call.destroy(); }, { once: true });
     await call.join({ url: config.roomUrl, userName: name });
   } catch (error) { window.clearTimeout(joinTimer); fail(error.message || 'Could not join the call.'); await call?.destroy(); }
 }

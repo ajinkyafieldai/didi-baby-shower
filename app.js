@@ -500,7 +500,7 @@ joinForm.addEventListener("submit", async (event) => {
   joinMessage.textContent = "Your browser may ask for camera and microphone permission.";
   statusText.textContent = "Connecting to video call…";
 
-  frame.src = `/daily.html?name=${encodeURIComponent(guestName)}`;
+  frame.src = `/daily.html?name=${encodeURIComponent(guestName)}&event=${encodeURIComponent(EVENT_ID)}`;
   stage.classList.add("in-call");
   fillLocationForms();
   if (featureEnabled("guestRibbon")) {
@@ -1022,7 +1022,7 @@ async function renderMap() {
   const people = combined.map(person => ({ ...person, coords: person.coords || lookupCity(person.city) }));
   mapList.innerHTML = people.length
     ? people.map(person => `<span>📍 <strong>${escapeHtml(person.name)}</strong> · ${escapeHtml(person.city || "Location unavailable")}</span>`).join("")
-    : '<p class="hub-empty">Family locations appear here when you join.</p>';
+    : '<p class="hub-empty">Join the call to appear here, or add your name and city above.</p>';
   try {
     const { renderFamilyMap } = await import("./frontend/family-map.js");
     if (version !== mapRenderVersion) return;
@@ -1101,7 +1101,7 @@ async function renderMosaic() {
   const photos = blessingStore.list().filter((item) => item.kind === "photo" && item.photoId);
 
   if (!photos.length) {
-    photoMosaic.innerHTML = '<p class="hub-empty">Share photos on the Family Wall and they will build the mosaic here.</p>';
+    photoMosaic.innerHTML = '<p class="hub-empty">Your family photos will appear here. Open Wishes and choose Share a photo to add the first one.</p>';
     return;
   }
 
@@ -1130,7 +1130,7 @@ function renderGuests() {
         </div>
       </article>
     `).join("")
-    : '<p class="hub-empty">No arrivals recorded yet.</p>';
+    : '<p class="hub-empty">Be the first to say hello. Add your name and city above.</p>';
 }
 
 function renderKeepsakeSummary() {
@@ -1284,7 +1284,7 @@ async function renderBlessings() {
   clearWallObjectUrls();
 
   if (!items.length) {
-    blessingWall.innerHTML = '<p class="blessing-empty">The family wall is waiting for its first note or photo ✨</p>';
+    blessingWall.innerHTML = '<p class="blessing-empty">Leave the first wish for the baby, or share a family photo above.</p>';
     return;
   }
 

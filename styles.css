@@ -2483,3 +2483,8 @@ body:not(.afterparty-mode) .app-shell { padding-top: 8px; }
 }
 
 .video-stage.in-call > .video-fullscreen { display:none; }
+
+.back-to-call { position:fixed; bottom:calc(16px + env(safe-area-inset-bottom)); right:16px; z-index:30; min-height:44px; padding:10px 16px; border:1px solid #e8d8c7; border-radius:24px; background:#fffaf2; color:#a94762; box-shadow:0 3px 16px #422f3526; font:600 14px system-ui; }
+.back-to-call[hidden] { display:none; }
+.back-to-call:focus-visible { outline:3px solid #a94762; outline-offset:3px; }
+.utility-icon { width:22px; height:22px; vertical-align:middle; flex-shrink:0; }
