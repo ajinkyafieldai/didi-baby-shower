@@ -7,7 +7,7 @@ const hostEyebrow = document.querySelector(".host-header .eyebrow");
 if (hostEyebrow) hostEyebrow.textContent = EVENT_PACKAGE.manifest.title;
 const projectorLink = document.querySelector('a[href="/projector.html"]');
 if (projectorLink) {
-  projectorLink.href = "/projector.html?event=" + encodeURIComponent(EVENT_PACKAGE.id);
+  projectorLink.href = "/projector.html?event=" + encodeURIComponent(EVENT_PACKAGE.slug);
 }
 
 const els={
