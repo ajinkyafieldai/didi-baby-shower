@@ -2449,3 +2449,15 @@ body:not(.afterparty-mode) .blessing-panel { grid-row: 1 / 4; }
 }
 body:not(.afterparty-mode) .video-stage.in-call .call-status { display: none; }
 body:not(.afterparty-mode) .video-stage.in-call .video-fullscreen { top: 48px; }
+
+.video-event-title {
+  position: absolute; z-index: 8; top: 48px; left: 12px;
+  max-width: calc(100% - 82px); margin: 0;
+  padding: 7px 12px; border-radius: 12px;
+  background: rgba(66,47,53,.78); color: #fffaf6;
+  font-size: clamp(14px, 1.5vw, 19px); font-weight: 600;
+  pointer-events: none;
+}
+body:not(.afterparty-mode) .app-shell { padding-top: 8px; }
+.video-stage:not(.in-call) .video-event-title { display: none; }
+.afterparty-mode .video-event-title { display: none; }
