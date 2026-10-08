@@ -199,6 +199,13 @@ export async function onRequestPost(context) {
     if (registry.events[slug]) {
       return json({ error: "Event slug already exists." }, 409);
     }
+    if (
+      Object.values(registry.events).some(
+        (entry) => entry?.event_id === record.event_id
+      )
+    ) {
+      return json({ error: "Event ID already exists." }, 409);
+    }
 
     await validatePackage(new URL(context.request.url).origin, record);
 
@@ -221,3 +228,6 @@ export async function onRequestPost(context) {
     return json({ error: error.message || "Unable to register event." }, 400);
   }
 }
+
+
+export { validSlug, validRecord, validatePackage };
