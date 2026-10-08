@@ -1,4 +1,4 @@
-const REGISTRY_URL = "/events/registry.json";
+const REGISTRY_URL = "/api/event-registry";
 
 const ACCENTS = Object.freeze({
   rose: {
