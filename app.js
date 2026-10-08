@@ -852,7 +852,11 @@ function switchHubView(view) {
   }
 
   activeHubView = view;
-  hubTabs.forEach((button) => button.classList.toggle("active", button.dataset.hubTab === view));
+  hubTabs.forEach((button) => {
+    const active = button.dataset.hubTab === view;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
   hubViews.forEach((section) => {
     const active = section.dataset.hubView === view;
     section.classList.toggle("active", active);
@@ -1124,7 +1128,10 @@ function renderHubView(view) {
   if (!featureEnabled("familyHub")) return;
   if (view === "wall" && featureEnabled("familyWall")) renderBlessings();
   if (view === "timeline" && featureEnabled("familyTimeline")) renderTimeline();
-  if (view === "map" && featureEnabled("familyMap")) renderMap();
+  if (view === "map" && featureEnabled("familyMap")) {
+    renderMap();
+    if (featureEnabled("guestRibbon")) renderGuests();
+  }
   if (view === "capsule" && featureEnabled("timeCapsule")) renderCapsules();
   if (view === "recipes" && featureEnabled("recipeBook")) renderRecipes();
   if (view === "mosaic" && featureEnabled("photoMosaic")) renderMosaic();
