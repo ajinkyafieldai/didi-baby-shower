@@ -97,3 +97,7 @@
 .controls-hidden .call-footer [data-action] { display:none; }
 .call-footer { min-height:44px; }
 .controls-hidden .call-home { padding-right:48px; }
+
+.call-footer .mobile-audio { padding:3px; gap:1px; }
+.mobile-audio svg { width:19px; height:19px; }
+.mobile-audio small { font-size:8px; line-height:1; text-align:center; }
