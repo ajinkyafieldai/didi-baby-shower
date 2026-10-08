@@ -37,9 +37,13 @@
 .custom-call[data-mode=grid] .call-thumbnails, .custom-call[data-mode=focus] .call-thumbnails { display:none; }
 .pinned-camera .camera-name::before { content:'Pinned · '; }
 
-.video-pin { position:absolute; top:6px; right:6px; width:44px; height:44px; display:grid; place-items:center; padding:10px; border:1px solid #ffffff60; border-radius:50%; background:#30262cb3; color:#fffaf2; cursor:pointer; }
-.video-pin svg { width:22px; height:22px; }
-.video-pin[aria-pressed=true] { background:#a94762; border-color:#fffaf2; }
+.video-pin { position:absolute; top:2px; right:2px; width:44px; height:44px; display:grid; place-items:center; padding:12px; border:0; background:transparent; color:#fff; cursor:pointer; }
+.video-pin::before { content:''; position:absolute; width:28px; height:28px; border-radius:7px; background:#30262c70; }
+.video-pin svg { position:relative; width:18px; height:18px; filter:drop-shadow(0 1px 2px #0006); }
+.video-pin[aria-pressed=true] { color:#ffd7e2; }
+.video-pin[aria-pressed=true]::before { background:#71344d99; }
 .video-pin[aria-pressed=true] svg { fill:currentColor; }
-.video-pin:focus-visible { outline:3px solid #fffaf2; outline-offset:2px; }
-.call-thumbnails .video-pin { top:2px; right:2px; }
+.video-pin:focus-visible { outline:2px solid #fffaf2; outline-offset:-4px; border-radius:8px; }
+.call-thumbnails .video-pin { top:0; right:0; }
+.call-thumbnails .video-pin::before { width:24px; height:24px; border-radius:6px; }
+.call-thumbnails .video-pin svg { width:16px; height:16px; }
