@@ -38,6 +38,8 @@ jobs:
           node --check scripts/test-event-package-runtime.mjs
           node --check scripts/verify-dugong-packages.mjs
           node --check scripts/test-event-registry.mjs
+          node --check scripts/test-event-registration.mjs
+          node --check functions/api/event-registry.js
           node --check functions/api/events.js
           node --check functions/api/photos.js
           node --check functions/api/video-config.js
@@ -63,6 +65,9 @@ jobs:
 
       - name: Event registry contract
         run: node scripts/test-event-registry.mjs
+
+      - name: Event registration validation
+        run: node scripts/test-event-registration.mjs
 
       - name: Event package runtime proof
         run: node scripts/test-event-package-runtime.mjs
