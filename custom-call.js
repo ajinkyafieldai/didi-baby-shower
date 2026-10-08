@@ -7,6 +7,19 @@ const iconPaths = {
   fullscreen: '<path d="M8 3H3v5m13-5h5v5M3 16v5h5m8 0h5v-5"/>',
   view: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'
 };
+export function chooseCallLayout(width, height, aspect, count) {
+  aspect = Number.isFinite(aspect) && aspect > 0 ? aspect : 16 / 9;
+  const tileWidth = Math.min(164, Math.max(112, (width - 24) / Math.min(Math.max(count, 1), 3)));
+  const tileHeight = Math.round(tileWidth * .7);
+  const across = Math.max(1, Math.floor((width - 12) / (tileWidth + 6)));
+  const rows = count > across && height >= 500 ? 2 : 1;
+  const rowSpace = Math.min(height * .3, rows * (tileHeight + 6) + 12);
+  const railWidth = Math.min(164, Math.max(112, width * .25));
+  const fittedArea = (w, h) => { const fittedWidth = Math.min(w, h * aspect); return fittedWidth * fittedWidth / aspect; };
+  const rowScore = fittedArea(width, Math.max(1, height - rowSpace)) + Math.min(count, across * rows) * 6000;
+  const columnScore = fittedArea(width - railWidth - 12, height) + Math.min(count, Math.floor(height / (railWidth * .7 + 6))) * 6000;
+  return { rail: count && width >= 360 && width - railWidth >= 230 && columnScore > rowScore ? 'side' : 'bottom', tileWidth, tileHeight, rowSpace, railWidth };
+}
 function controlIcon(kind, off = false) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[kind]}${off ? '<path d="m3 3 18 18"/>' : ''}</svg>`;
 }
@@ -42,6 +55,20 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   const picture = shell.querySelector('.call-picture');
   const thumbnails = shell.querySelector('.call-thumbnails');
   const notice = shell.querySelector('.call-notice');
+  function arrangeVideos() {
+    const video = picture.querySelector('video');
+    const settings = video?.srcObject?.getVideoTracks()[0]?.getSettings();
+    const aspect = video?.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : settings?.aspectRatio || (settings?.width && settings?.height ? settings.width / settings.height : 16 / 9);
+    const height = Math.max(1, shell.clientHeight - shell.querySelector('.call-footer').offsetHeight - notice.offsetHeight);
+    const layout = chooseCallLayout(shell.clientWidth, height, aspect, thumbnails.children.length);
+    shell.dataset.rail = layout.rail;
+    shell.style.setProperty('--thumb-width', `${layout.tileWidth}px`);
+    shell.style.setProperty('--thumb-height', `${layout.tileHeight}px`);
+    shell.style.setProperty('--rail-height', `${layout.rowSpace}px`);
+    shell.style.setProperty('--rail-width', `${layout.railWidth}px`);
+  }
+  const layoutObserver = new ResizeObserver(arrangeVideos);
+  layoutObserver.observe(shell);
   const buttons = Object.fromEntries([...shell.querySelectorAll('[data-action]')].map(b => [b.dataset.action, b]));
   for (const [kind, button] of Object.entries(buttons)) { button.innerHTML = controlIcon(kind); button.title = button.getAttribute('aria-label') || 'Leave call'; }
   buttons.audio.setAttribute('aria-label', 'Choose microphone, camera and speaker');
@@ -137,6 +164,9 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
       if (!tile) {
         tile = document.createElement('div'); tile.className = 'camera-tile';
         tile.innerHTML = '<video autoplay playsinline muted></video><span class="camera-name"></span><button type="button" class="video-pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6l-1 7 4 4v2H6v-2l4-4zM12 16v6"/></svg></button>';
+        tile.querySelector('video').onloadedmetadata = arrangeVideos;
+        let nameTimer;
+        tile.addEventListener('click', () => { tile.classList.add('show-name'); clearTimeout(nameTimer); nameTimer = setTimeout(() => tile.classList.remove('show-name'), 2500); });
         tile.querySelector('.video-pin').onclick = () => { pinned = pinned === p.session_id ? null : p.session_id; if (pinned && mode === 'grid') mode = 'speaker'; render(); };
         tiles.set(p.session_id, tile);
       }
@@ -172,6 +202,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     buttons.mic.title = buttons.mic.getAttribute('aria-label');
     buttons.camera.title = buttons.camera.getAttribute('aria-label');
     buttons.camera.setAttribute('aria-pressed', String(!call.localVideo()));
+    arrangeVideos();
   }
   async function act(button, task) {
     button.disabled = true; notice.textContent = '';
@@ -206,7 +237,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     };
     const devicesChanged = () => { if (!devicePanel.hidden) refreshDevices(); };
     navigator.mediaDevices.addEventListener('devicechange', devicesChanged);
-    window.addEventListener('pagehide', () => { fullDocument.removeEventListener('fullscreenchange', updateFullscreen); navigator.mediaDevices.removeEventListener('devicechange', devicesChanged); call.destroy(); }, { once: true });
+    window.addEventListener('pagehide', () => { layoutObserver.disconnect(); fullDocument.removeEventListener('fullscreenchange', updateFullscreen); navigator.mediaDevices.removeEventListener('devicechange', devicesChanged); call.destroy(); }, { once: true });
     await call.join({ url: config.roomUrl, userName: name });
   } catch (error) { window.clearTimeout(joinTimer); fail(error.message || 'Could not join the call.'); await call?.destroy(); }
 }
