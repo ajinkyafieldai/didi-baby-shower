@@ -128,15 +128,17 @@ The default event remains:
 didi-baby-shower
 ```
 
-For the current static proof, event packages live under `public/events/<event-id>/` and may be selected with the `event` query parameter:
+Event selection now resolves through `public/events/registry.json`. The browser selects an event slug; the registry maps that slug to an event package and pins its expected template ID/version.
 
 ```text
-/?event=didi-baby-shower
-/?event=maya-baby-shower
-/host.html?event=maya-baby-shower
-/projector.html?event=maya-baby-shower
+/?event=didi
+/?event=maya
+/host.html?event=maya
+/projector.html?event=maya
 ```
+
+Legacy event IDs such as `?event=didi-baby-shower` remain accepted as compatibility aliases.
 
 Participant, host, and projector surfaces all load the same package. Event identity, copy, accent, and supported module overrides come from that package. Browser-local event data is namespaced by event ID so one event cannot reuse another event's local family-wall state.
 
-The static directory is deliberately a proof adapter, not the final event registry. A future database/API resolver can replace the package source while preserving the runtime contract.
+The JSON registry is deliberately the first registry adapter. A future database/API-backed registry can replace it while preserving the same slug -> record -> package contract.
