@@ -19,5 +19,8 @@
   },
   "bin": {
     "babyshower": "./babyshower.js"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4"
   }
 }

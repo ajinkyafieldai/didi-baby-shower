@@ -137,20 +137,21 @@
           <section class="hub-view" data-feature="familyMap" data-hub-view="map" hidden>
             <form id="map-form" class="hub-form compact">
               <h3>Where is everyone joining from?</h3>
+              <p class="location-help">City is estimated from your connection. You can correct it.</p>
               <div class="hub-form-row">
-                <input name="name" maxlength="60" placeholder="Name" required>
-                <input name="city" maxlength="60" placeholder="City, e.g. Mumbai" required>
+                <input name="name" maxlength="60" aria-label="Guest name" placeholder="Name" required>
+                <input name="city" maxlength="60" aria-label="City" placeholder="City, e.g. Mumbai" required>
               </div>
               <button type="submit">Add a family pin</button>
             </form>
-            <div id="family-map" class="family-map"></div>
+            <div id="family-map" class="family-map" aria-label="Family locations map"></div>
             <div id="map-list" class="map-list"></div>
           <section class="people-arrivals" data-feature="guestRibbon" aria-label="Who was here">
             <form id="guest-form" class="hub-form compact">
               <h3>Who was here</h3>
               <div class="hub-form-row">
-                <input name="name" maxlength="60" placeholder="Name" required>
-                <input name="city" maxlength="60" placeholder="Joining from…">
+                <input name="name" maxlength="60" aria-label="Guest name" placeholder="Name" required>
+                <input name="city" maxlength="60" aria-label="Joining from" placeholder="Joining from…">
               </div>
               <button type="submit">Add arrival 👋</button>
             </form>

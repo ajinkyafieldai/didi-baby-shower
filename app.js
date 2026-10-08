@@ -224,6 +224,32 @@ const cityCoordinates = {
 };
 
 let guestName = "";
+let coarseLocation = null;
+const locationReady = (featureEnabled("familyMap") || featureEnabled("guestRibbon"))
+  ? fetch("/api/location", { cache: "no-store" }).then(async response => {
+      if (!response.ok) return null;
+      const value = await response.json();
+      if (typeof value.city !== "string") return null;
+      coarseLocation = value;
+      fillLocationForms();
+      return value;
+    }).catch(() => null)
+  : Promise.resolve(null);
+
+function fillLocationForms() {
+  for (const form of [mapForm, guestForm]) {
+    if (!form.elements.name.value) form.elements.name.value = guestName || guestNameInput.value.trim();
+    if (!form.elements.city.value && coarseLocation?.city) form.elements.city.value = coarseLocation.city;
+  }
+}
+
+function coordinatesForCity(city) {
+  if (coarseLocation?.city && city.trim().toLowerCase() === coarseLocation.city.toLowerCase()) {
+    return coarseLocation.coords || lookupCity(city);
+  }
+  return lookupCity(city);
+}
+
 let effectTimer = null;
 let groupEffectTimer = null;
 let audioContext = null;
@@ -457,7 +483,17 @@ joinForm.addEventListener("submit", async (event) => {
 
   frame.src = `/daily.html?name=${encodeURIComponent(guestName)}`;
   stage.classList.add("in-call");
-  if (featureEnabled("guestRibbon")) recordArrival(guestName, "");
+  fillLocationForms();
+  if (featureEnabled("guestRibbon")) {
+    recordArrival(guestName, coarseLocation?.city || "", coarseLocation?.coords);
+    locationReady.then(location => {
+      const arrival = familyStore.read().guests.find(guest => guest.name === guestName);
+      if (location && !arrival?.city) recordArrival(guestName, location.city, location.coords);
+      fillLocationForms();
+      renderGuests();
+      if (activeHubView === "map") renderMap();
+    });
+  }
 });
 
 window.addEventListener("message", (event) => {
@@ -877,7 +913,7 @@ function lookupCity(city) {
   return cityCoordinates[String(city || "").trim().toLowerCase()] || null;
 }
 
-function recordArrival(name, city) {
+function recordArrival(name, city, suppliedCoords = null) {
   const cleanName = String(name || "").trim();
   if (!cleanName) return;
 
@@ -888,10 +924,11 @@ function recordArrival(name, city) {
   );
 
   if (recent) {
-    if (city && !recent.city) {
+    if (city) {
       recent.city = String(city).trim().slice(0, 60);
-      const coords = lookupCity(recent.city);
+      const coords = suppliedCoords || coordinatesForCity(recent.city);
       if (coords) recent.coords = coords;
+      else delete recent.coords;
       familyStore.write(data);
     }
     return;
@@ -903,7 +940,7 @@ function recordArrival(name, city) {
     city: String(city || "").trim().slice(0, 60),
     at: Date.now()
   };
-  const coords = lookupCity(entry.city);
+  const coords = suppliedCoords || coordinatesForCity(entry.city);
   if (coords) entry.coords = coords;
   familyStore.add("guests", entry);
 }
@@ -954,51 +991,31 @@ async function renderTimeline() {
   timelineList.innerHTML = rows.join("");
 }
 
-function renderMap() {
+let mapRenderVersion = 0;
+async function renderMap() {
+  const version = ++mapRenderVersion;
+  fillLocationForms();
   const data = familyStore.read();
   const combined = [...data.pins];
-  data.guests.forEach((guest) => {
-    if (guest.city && !combined.some((pin) => pin.name === guest.name && pin.city === guest.city)) {
-      combined.push(guest);
-    }
+  data.guests.forEach(guest => {
+    if (!combined.some(pin => pin.name === guest.name && pin.city === guest.city)) combined.push(guest);
   });
-
-  familyMap.innerHTML = `
-    <div class="map-land map-land-a"></div>
-    <div class="map-land map-land-b"></div>
-    <div class="map-land map-land-c"></div>
-    <div class="map-land map-land-d"></div>
-  `;
-
-  const mapped = [];
-  const unmapped = [];
-  combined.forEach((pin) => {
-    const coords = pin.coords || lookupCity(pin.city);
-    if (!coords) {
-      unmapped.push(pin);
-      return;
-    }
-    const [x, y] = worldPoint(coords[0], coords[1]);
-    const dot = document.createElement("button");
-    dot.type = "button";
-    dot.className = "family-map-pin";
-    dot.style.left = `${x}%`;
-    dot.style.top = `${y}%`;
-    dot.title = `${pin.name} — ${pin.city}`;
-    dot.innerHTML = "<span>♥</span>";
-    familyMap.appendChild(dot);
-    mapped.push(pin);
-  });
-
-  mapList.innerHTML = combined.length
-    ? combined.map((pin) => `<span>📍 <strong>${escapeHtml(pin.name)}</strong>${pin.city ? " · " + escapeHtml(pin.city) : ""}</span>`).join("")
-    : '<p class="hub-empty">No family pins yet.</p>';
-
-  if (unmapped.length) {
-    const note = document.createElement("p");
-    note.className = "map-hint";
-    note.textContent = "Some cities are listed below but are not in the tiny offline map dictionary yet.";
-    mapList.appendChild(note);
+  const people = combined.map(person => ({ ...person, coords: person.coords || lookupCity(person.city) }));
+  mapList.innerHTML = people.length
+    ? people.map(person => `<span>📍 <strong>${escapeHtml(person.name)}</strong> · ${escapeHtml(person.city || "Location unavailable")}</span>`).join("")
+    : '<p class="hub-empty">Family locations appear here when you join.</p>';
+  try {
+    const { renderFamilyMap } = await import("./frontend/family-map.js");
+    if (version !== mapRenderVersion) return;
+    renderFamilyMap(familyMap, people);
+  } catch {
+    familyMap.textContent = "Map could not load. Family locations are listed below.";
+  }
+  if (people.some(person => !person.coords)) {
+    const hint = document.createElement("p");
+    hint.className = "map-hint";
+    hint.textContent = "Guests without map coordinates stay in the list.";
+    mapList.append(hint);
   }
 }
 
@@ -1170,13 +1187,14 @@ mapForm.addEventListener("submit", (event) => {
   const name = String(data.get("name") || "").trim();
   const city = String(data.get("city") || "").trim();
   const entry = { id: crypto.randomUUID(), name, city, at: Date.now() };
-  const coords = lookupCity(city);
+  const coords = coordinatesForCity(city);
   if (coords) entry.coords = coords;
   familyStore.add("pins", entry);
-  recordArrival(name, city);
-  event.currentTarget.reset();
+  recordArrival(name, city, coords);
+  fillLocationForms();
   playChime();
   renderMap();
+  renderGuests();
 });
 
 capsuleForm.addEventListener("submit", (event) => {
@@ -1220,10 +1238,13 @@ guestForm.addEventListener("submit", (event) => {
   if (!featureEnabled("guestRibbon")) return;
   event.preventDefault();
   const data = new FormData(event.currentTarget);
-  recordArrival(String(data.get("name") || "").trim(), String(data.get("city") || "").trim());
+  const city = String(data.get("city") || "").trim();
+  recordArrival(String(data.get("name") || "").trim(), city, coordinatesForCity(city));
   event.currentTarget.reset();
+  fillLocationForms();
   playChime();
   renderGuests();
+  if (activeHubView === "map") renderMap();
 });
 
 afterpartyPreview.addEventListener("click", () => {

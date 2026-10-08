@@ -2412,3 +2412,11 @@ body:not(.afterparty-mode) .call-status { background: #422f35c9; }
   }
   body:not(.afterparty-mode) .ritual-button { flex: 0 0 72px; }
 }
+
+.family-map.leaflet-container {
+  height: 300px; aspect-ratio: auto; z-index: 0;
+  background: #f5eee7; font-family: inherit;
+}
+.location-help { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+.family-map .leaflet-popup-content p { margin: 6px 0; }
+.family-map .leaflet-control-attribution { font-size: 10px; }
