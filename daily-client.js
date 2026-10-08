@@ -54,8 +54,13 @@ function fail(message) {
 
 async function startVideo() {
   if (new URLSearchParams(location.search).get("ui") !== "prebuilt") {
-    const { startCustomCall } = await import("./frontend/custom-call.js");
-    return startCustomCall({ root, bootMessage, name, report, fail });
+    try {
+      const { startCustomCall } = await import("./custom-call.js");
+      return await startCustomCall({ root, bootMessage, name, report, fail });
+    } catch (error) {
+      fail(error.message || "The call interface could not load. Please reload.");
+      return;
+    }
   }
   try {
     stage("Getting Daily room…");
