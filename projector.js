@@ -1,3 +1,11 @@
+import { loadEventPackage, applyEventTheme } from "./frontend/event-config.js";
+
+const EVENT_PACKAGE = await loadEventPackage();
+applyEventTheme(EVENT_PACKAGE);
+document.title = EVENT_PACKAGE.manifest.title + " Projector";
+const projectorEyebrow = document.querySelector(".projector-content .eyebrow");
+if (projectorEyebrow) projectorEyebrow.textContent = EVENT_PACKAGE.manifest.title;
+
 const clientId=crypto.randomUUID();
 const effectEl=document.getElementById("projector-effect");
 const titleEl=document.getElementById("projector-title");
