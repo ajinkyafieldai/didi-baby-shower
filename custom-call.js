@@ -7,6 +7,10 @@ const iconPaths = {
   fullscreen: '<path d="M8 3H3v5m13-5h5v5M3 16v5h5m8 0h5v-5"/>',
   view: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'
 };
+export function participantInitials(name) {
+  const words = (name || 'Guest').trim().split(/\s+/).filter(Boolean);
+  return [words[0] || 'Guest', ...(words.length > 1 ? [words.at(-1)] : [])].map(word => Array.from(word)[0]).join('').toLocaleUpperCase();
+}
 export function chooseCallLayout(width, height, aspect, count) {
   aspect = Number.isFinite(aspect) && aspect > 0 ? aspect : 16 / 9;
   const tileWidth = Math.min(164, Math.max(112, (width - 24) / Math.min(Math.max(count, 1), 3)));
@@ -36,7 +40,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   const shell = document.createElement('section');
   shell.className = 'custom-call';
   shell.innerHTML = `<div class="call-picture"></div><div class="call-thumbnails" aria-label="Family cameras"></div>
-    <footer class="call-footer"><span class="call-home">Home page <small class="call-count"></small></span>
+    <footer class="call-footer"><span class="call-home">Home page <small class="call-count"></small><small class="call-connection" role="status"></small></span><button class="show-controls" aria-label="Show video controls" hidden>•••</button><button class="more-people" aria-label="Scroll to more people" hidden>↓</button>
     <button data-action="mic" aria-label="Mute microphone">Mic</button><button data-action="camera" aria-label="Turn camera off">Camera</button>
     <button data-action="flip" aria-label="Flip camera">Flip</button><button data-action="audio" aria-label="Choose audio output">Audio</button>
     <button data-action="view" aria-label="Video modes and pinning">View</button><button data-action="fullscreen" aria-label="Fullscreen video">Fullscreen</button>
@@ -55,6 +59,28 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   const picture = shell.querySelector('.call-picture');
   const thumbnails = shell.querySelector('.call-thumbnails');
   const notice = shell.querySelector('.call-notice');
+  const connection = shell.querySelector('.call-connection');
+  const reveal = shell.querySelector('.show-controls');
+  const more = shell.querySelector('.more-people');
+  let controlsTimer;
+  let scrollFrame;
+  function showControls() {
+    clearTimeout(controlsTimer);
+    shell.classList.remove('controls-hidden'); reveal.hidden = true;
+    controlsTimer = setTimeout(() => {
+      if (!devicePanel.hidden || !viewPanel.hidden || shell.querySelector(':focus-visible') || shell.querySelector('[data-action]:disabled')) { showControls(); return; }
+      shell.classList.add('controls-hidden'); reveal.hidden = false;
+    }, 4000);
+  }
+  reveal.onclick = showControls;
+  for (const event of ['pointerdown', 'pointermove', 'keydown', 'focusin']) shell.addEventListener(event, showControls);
+  function updateScrollCue() {
+    const target = mode === 'grid' ? picture : thumbnails;
+    more.hidden = mode === 'focus' || target.scrollHeight - target.clientHeight - target.scrollTop < 8;
+  }
+  more.onclick = () => { const target = mode === 'grid' ? picture : thumbnails; target.scrollBy({ top: Math.max(80, target.clientHeight * .8), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }); };
+  picture.addEventListener('scroll', updateScrollCue);
+  thumbnails.addEventListener('scroll', updateScrollCue);
   function arrangeVideos() {
     const video = picture.querySelector('video');
     const settings = video?.srcObject?.getVideoTracks()[0]?.getSettings();
@@ -66,6 +92,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     shell.style.setProperty('--thumb-height', `${layout.tileHeight}px`);
     shell.style.setProperty('--rail-height', `${layout.rowSpace}px`);
     shell.style.setProperty('--rail-width', `${layout.railWidth}px`);
+    cancelAnimationFrame(scrollFrame); scrollFrame = requestAnimationFrame(updateScrollCue);
   }
   const layoutObserver = new ResizeObserver(arrangeVideos);
   layoutObserver.observe(shell);
@@ -163,7 +190,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
       let tile = tiles.get(p.session_id);
       if (!tile) {
         tile = document.createElement('div'); tile.className = 'camera-tile';
-        tile.innerHTML = '<video autoplay playsinline muted></video><span class="camera-name"></span><button type="button" class="video-pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6l-1 7 4 4v2H6v-2l4-4zM12 16v6"/></svg></button>';
+        tile.innerHTML = '<video autoplay playsinline muted></video><span class="camera-initials" aria-hidden="true"></span><span class="camera-name"></span><button type="button" class="video-pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6l-1 7 4 4v2H6v-2l4-4zM12 16v6"/></svg></button>';
         tile.querySelector('video').onloadedmetadata = arrangeVideos;
         let nameTimer;
         tile.addEventListener('click', () => { tile.classList.add('show-name'); clearTimeout(nameTimer); nameTimer = setTimeout(() => tile.classList.remove('show-name'), 2500); });
@@ -174,6 +201,8 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
       const track = isMain && p === shared ? p.tracks.screenVideo.persistentTrack : p.tracks?.video?.state === 'playable' ? p.tracks.video.persistentTrack : null;
       attach(tile.querySelector('video'), track);
       tile.classList.toggle('no-camera', !track);
+      tile.querySelector('.camera-initials').textContent = participantInitials(p.user_name);
+      tile.classList.toggle('active-speaker', p.session_id === speaker && ['playable', 'sendable'].includes(p.tracks?.audio?.state));
       tile.classList.toggle('self-camera', !!p.local && p !== shared);
       tile.classList.toggle('pinned-camera', pinned === p.session_id);
       tile.querySelector('.camera-name').textContent = `${p.user_name || 'Guest'}${p.local ? ' (you)' : ''}${['playable', 'sendable'].includes(p.tracks?.audio?.state) ? '' : ' · muted'}`;
@@ -221,10 +250,17 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     }, 20000);
     for (const event of ['participant-joined', 'participant-updated', 'participant-left', 'track-started', 'track-stopped']) call.on(event, render);
     call.on('active-speaker-change', e => { speaker = e.activeSpeaker?.peerId; render(); });
-    call.on('joined-meeting', () => { window.clearTimeout(joinTimer); bootMessage?.remove(); Object.values(buttons).forEach(b => b.disabled = false); render(); report('video-status', 'Live'); });
+    const interrupted = new Set();
+    function updateConnection() { connection.textContent = !navigator.onLine ? 'Offline · reconnecting…' : interrupted.size ? 'Connection interrupted · reconnecting…' : ''; }
+    const offline = () => updateConnection();
+    const online = () => updateConnection();
+    window.addEventListener('offline', offline); window.addEventListener('online', online);
+    call.on('network-connection', e => { const key = `${e.type}:${e.session_id || e.sfu_id || ''}`; if (e.event === 'interrupted') interrupted.add(key); if (e.event === 'connected') interrupted.delete(key); updateConnection(); });
+    call.on('network-quality-change', e => { if (!interrupted.size && navigator.onLine) connection.textContent = ['warning', 'bad'].includes(e.networkState) ? 'Weak connection' : ''; });
+    call.on('joined-meeting', () => { interrupted.clear(); updateConnection(); showControls(); window.clearTimeout(joinTimer); bootMessage?.remove(); Object.values(buttons).forEach(b => b.disabled = false); render(); report('video-status', 'Live'); });
     call.on('error', e => { notice.textContent = e.errorMsg || 'Call connection failed.'; report('video-status', notice.textContent); });
     call.on('camera-error', () => { notice.textContent = 'Check camera and microphone permissions.'; });
-    call.on('left-meeting', () => { for (const audio of audios.values()) audio.srcObject = null; Object.values(buttons).forEach(b => b.disabled = true); picture.replaceChildren(); thumbnails.replaceChildren(); notice.textContent = 'You left the call. Reload to join again.'; report('video-status', 'Call ended'); });
+    call.on('left-meeting', () => { for (const audio of audios.values()) { audio.srcObject = null; audio.remove(); } Object.values(buttons).forEach(b => b.disabled = true); picture.replaceChildren(); thumbnails.replaceChildren(); tiles.clear(); audios.clear(); connection.textContent = 'Disconnected'; notice.replaceChildren(document.createTextNode('Connection ended. ')); const retry = document.createElement('button'); retry.textContent = 'Rejoin'; retry.onclick = async () => { retry.disabled = true; connection.textContent = 'Reconnecting…'; try { await call.join({ url: config.roomUrl, userName: name }); notice.textContent = ''; } catch { connection.textContent = 'Could not reconnect'; retry.disabled = false; } }; notice.append(retry); showControls(); report('video-status', 'Disconnected'); });
     buttons.mic.onclick = () => act(buttons.mic, () => call.setLocalAudio(!call.localAudio()));
     buttons.camera.onclick = () => act(buttons.camera, () => call.setLocalVideo(!call.localVideo()));
     buttons.flip.onclick = () => act(buttons.flip, () => call.cycleCamera());
@@ -237,7 +273,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     };
     const devicesChanged = () => { if (!devicePanel.hidden) refreshDevices(); };
     navigator.mediaDevices.addEventListener('devicechange', devicesChanged);
-    window.addEventListener('pagehide', () => { layoutObserver.disconnect(); fullDocument.removeEventListener('fullscreenchange', updateFullscreen); navigator.mediaDevices.removeEventListener('devicechange', devicesChanged); call.destroy(); }, { once: true });
+    window.addEventListener('pagehide', () => { clearTimeout(controlsTimer); cancelAnimationFrame(scrollFrame); window.removeEventListener('offline', offline); window.removeEventListener('online', online); layoutObserver.disconnect(); fullDocument.removeEventListener('fullscreenchange', updateFullscreen); navigator.mediaDevices.removeEventListener('devicechange', devicesChanged); call.destroy(); }, { once: true });
     await call.join({ url: config.roomUrl, userName: name });
   } catch (error) { window.clearTimeout(joinTimer); fail(error.message || 'Could not join the call.'); await call?.destroy(); }
 }
