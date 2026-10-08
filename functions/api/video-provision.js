@@ -58,6 +58,25 @@ export async function onRequestPost(context) {
   }
 
   if (existing) {
+    try {
+      const chatStore = await realtime(context.env, "POST", {
+        type: "chat_room_set",
+        provider: "daily",
+        roomUrl: existing.roomUrl,
+        roomId: existing.roomId || null,
+        endDate: existing.endDate
+      });
+
+      if (!chatStore.response.ok) {
+        return json(
+          { error: chatStore.data.error || "Unable to store chat room." },
+          chatStore.response.status
+        );
+      }
+    } catch (error) {
+      return json({ error: error.message || "Unable to store chat room." }, 503);
+    }
+
     return json({
       ok: true,
       reused: true,
