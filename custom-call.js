@@ -24,7 +24,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     <footer class="call-footer"><span class="call-home">Home page <small class="call-count"></small></span>
     <button data-action="mic" aria-label="Mute microphone">Mic</button><button data-action="camera" aria-label="Turn camera off">Camera</button>
     <button data-action="flip" aria-label="Flip camera">Flip</button><button data-action="audio" aria-label="Choose audio output">Audio</button>
-    <button data-action="leave">Leave</button></footer><p class="call-notice" role="status"></p>`;
+    </footer><p class="call-notice" role="status"></p>`;
   root.append(shell);
   const devicePanel = document.createElement('section');
   devicePanel.className = 'call-devices'; devicePanel.hidden = true;
@@ -36,7 +36,6 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   const notice = shell.querySelector('.call-notice');
   const buttons = Object.fromEntries([...shell.querySelectorAll('[data-action]')].map(b => [b.dataset.action, b]));
   for (const [kind, button] of Object.entries(buttons)) { button.innerHTML = controlIcon(kind); button.title = button.getAttribute('aria-label') || 'Leave call'; }
-  buttons.leave.setAttribute('aria-label', 'Leave call');
   buttons.audio.setAttribute('aria-label', 'Choose microphone, camera and speaker');
   buttons.audio.setAttribute('aria-expanded', 'false');
   const selects = [...devicePanel.querySelectorAll('select')];
@@ -157,7 +156,6 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     buttons.mic.onclick = () => act(buttons.mic, () => call.setLocalAudio(!call.localAudio()));
     buttons.camera.onclick = () => act(buttons.camera, () => call.setLocalVideo(!call.localVideo()));
     buttons.flip.onclick = () => act(buttons.flip, () => call.cycleCamera());
-    buttons.leave.onclick = () => act(buttons.leave, () => call.leave());
     buttons.audio.onclick = async () => {
       for (const audio of audios.values()) audio.play().catch(() => {});
       devicePanel.hidden = !devicePanel.hidden;
