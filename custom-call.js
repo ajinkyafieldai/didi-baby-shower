@@ -37,7 +37,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   const viewPanel = document.createElement('section');
   viewPanel.className = 'call-devices'; viewPanel.hidden = true;
   viewPanel.setAttribute('aria-label', 'Video layout');
-  viewPanel.innerHTML = '<header><strong>Video layout</strong><button aria-label="Close video layout">×</button></header><label>View<select class="view-mode"><option value="speaker">Speaker — large video and thumbnails</option><option value="grid">Grid — everyone together</option><option value="focus">Focus — large video only</option></select></label><label>Pin video<select class="pin-person"><option value="">Automatic speaker</option></select></label><p class="device-help">Tap any video to pin it. Tap again to unpin.</p>';
+  viewPanel.innerHTML = '<header><strong>Video layout</strong><button aria-label="Close video layout">×</button></header><label>View<select class="view-mode"><option value="speaker">Speaker — large video and thumbnails</option><option value="grid">Grid — everyone together</option><option value="focus">Focus — large video only</option></select></label><label>Pin video<select class="pin-person"><option value="">Automatic speaker</option></select></label><p class="device-help">Use the pin at the top right of a video. Tap it again to unpin.</p>';
   shell.append(viewPanel);
   const picture = shell.querySelector('.call-picture');
   const thumbnails = shell.querySelector('.call-thumbnails');
@@ -135,9 +135,9 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     for (const p of people) {
       let tile = tiles.get(p.session_id);
       if (!tile) {
-        tile = document.createElement('button'); tile.className = 'camera-tile';
-        tile.innerHTML = '<video autoplay playsinline muted></video><span class="camera-name"></span>';
-        tile.onclick = () => { pinned = pinned === p.session_id ? null : p.session_id; if (pinned && mode === 'grid') mode = 'speaker'; render(); };
+        tile = document.createElement('div'); tile.className = 'camera-tile';
+        tile.innerHTML = '<video autoplay playsinline muted></video><span class="camera-name"></span><button type="button" class="video-pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6l-1 7 4 4v2H6v-2l4-4zM12 16v6"/></svg></button>';
+        tile.querySelector('.video-pin').onclick = () => { pinned = pinned === p.session_id ? null : p.session_id; if (pinned && mode === 'grid') mode = 'speaker'; render(); };
         tiles.set(p.session_id, tile);
       }
       const isMain = p === main;
@@ -147,7 +147,10 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
       tile.classList.toggle('self-camera', !!p.local && p !== shared);
       tile.classList.toggle('pinned-camera', pinned === p.session_id);
       tile.querySelector('.camera-name').textContent = `${p.user_name || 'Guest'}${p.local ? ' (you)' : ''}${['playable', 'sendable'].includes(p.tracks?.audio?.state) ? '' : ' · muted'}`;
-      tile.setAttribute('aria-label', `${p.user_name || 'Guest'}: ${pinned === p.session_id ? 'unpin' : 'pin'} video`);
+      const pin = tile.querySelector('.video-pin');
+      pin.setAttribute('aria-label', `${pinned === p.session_id ? 'Unpin' : 'Pin'} ${p.user_name || 'Guest'} video`);
+      pin.setAttribute('aria-pressed', String(pinned === p.session_id));
+      pin.title = pin.getAttribute('aria-label');
       const container = mode === 'grid' || isMain ? picture : thumbnails;
       if (tile.parentElement !== container) container.append(tile);
       if (!p.local) {

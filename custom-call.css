@@ -36,3 +36,10 @@
 .custom-call[data-mode=grid] .camera-tile { min-height:120px; }
 .custom-call[data-mode=grid] .call-thumbnails, .custom-call[data-mode=focus] .call-thumbnails { display:none; }
 .pinned-camera .camera-name::before { content:'Pinned · '; }
+
+.video-pin { position:absolute; top:6px; right:6px; width:44px; height:44px; display:grid; place-items:center; padding:10px; border:1px solid #ffffff60; border-radius:50%; background:#30262cb3; color:#fffaf2; cursor:pointer; }
+.video-pin svg { width:22px; height:22px; }
+.video-pin[aria-pressed=true] { background:#a94762; border-color:#fffaf2; }
+.video-pin[aria-pressed=true] svg { fill:currentColor; }
+.video-pin:focus-visible { outline:3px solid #fffaf2; outline-offset:2px; }
+.call-thumbnails .video-pin { top:2px; right:2px; }
