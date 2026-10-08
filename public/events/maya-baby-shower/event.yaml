@@ -1,0 +1,89 @@
+{
+  "id": "maya-baby-shower",
+  "title": "Maya's Baby Shower",
+  "template_id": "baby-shower-classic",
+  "template_version": 1,
+  "brand": "apsila",
+  "event_type": "baby-shower",
+  "theme": {
+    "preset": "baby-shower-classic"
+  },
+  "surfaces": {
+    "participant": true,
+    "projector": true,
+    "host": true,
+    "conference": true
+  },
+  "capabilities": {
+    "video": true,
+    "chat": true,
+    "reactions": true,
+    "family_photo": true
+  },
+  "rituals": [
+    {
+      "id": "ovalni",
+      "label": "Ovalni",
+      "icon": "🪔"
+    },
+    {
+      "id": "flowers",
+      "label": "Flowers",
+      "icon": "🌸"
+    },
+    {
+      "id": "ashirwad",
+      "label": "Ashirwad",
+      "icon": "🙌"
+    },
+    {
+      "id": "supari",
+      "label": "Supari",
+      "icon": "🌰"
+    },
+    {
+      "id": "haldi",
+      "label": "Haldi",
+      "icon": "🟡"
+    },
+    {
+      "id": "kunku",
+      "label": "Kunku",
+      "icon": "🔴"
+    },
+    {
+      "id": "oti",
+      "label": "Oti",
+      "icon": "🥥"
+    },
+    {
+      "id": "celebrate",
+      "label": "Celebrate",
+      "icon": "🎉"
+    }
+  ],
+  "modules": [
+    "baby-names",
+    "honoree-quiz",
+    "family-wall",
+    "family-timeline",
+    "family-map",
+    "time-capsule",
+    "recipe-book",
+    "photo-mosaic",
+    "guest-ribbon",
+    "keepsake",
+    "afterparty"
+  ],
+  "data": {
+    "honoree_name": "Maya",
+    "event_date": "2026-11-21",
+    "venue": "Pune",
+    "welcome_text": "Join us for Maya's baby shower.",
+    "family_hub_title": "Family corner",
+    "accent": "mehendi",
+    "enable_time_capsule": false,
+    "enable_recipe_book": false,
+    "enable_afterparty": true
+  }
+}
