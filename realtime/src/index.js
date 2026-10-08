@@ -375,7 +375,11 @@ export default {
       return json({ error: "Unauthorized" }, 401);
     }
 
-    const id = env.CELEBRATION_ROOM.idFromName("didi-baby-shower");
+    const url = new URL(request.url);
+    const roomName = url.searchParams.get("registry") === "1"
+      ? "event-registry"
+      : "didi-baby-shower";
+    const id = env.CELEBRATION_ROOM.idFromName(roomName);
     return env.CELEBRATION_ROOM.get(id).fetch(request);
   }
 };
