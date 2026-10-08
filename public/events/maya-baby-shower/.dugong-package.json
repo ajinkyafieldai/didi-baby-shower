@@ -1,0 +1,13 @@
+{
+  "event_id": "maya-baby-shower",
+  "files": {
+    "assets/.keep": "5a8886bdc518533aaf60258308078c87921887b76366f89faa97a8f8eeca9f6b",
+    "content/content.json": "678df8d3bbc90eb3e6778bb2857db48164693e4e9b98fe87caec54f14f763e27",
+    "event.yaml": "16a9308c2aeb8c425037b2867c29a3ca0c20a0f29e97ac994689d0aaabe34ddd",
+    "theme/theme.json": "627e4cd91ee58b381b7a480f9212ef3d2ffd12fe81c17808eb62c6c55a26294b"
+  },
+  "generator": "dugong",
+  "schema": 1,
+  "template_id": "baby-shower-classic",
+  "template_version": 1
+}
