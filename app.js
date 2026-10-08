@@ -1,3 +1,4 @@
+import { setupCelebrationLayout } from "./frontend/celebration-layout.js";
 import { FEATURES, featureEnabled, applyFeatureVisibility } from "./frontend/features.js";
 
 applyFeatureVisibility();
@@ -1450,6 +1451,7 @@ blessingLaunch.addEventListener("click", () => {
   if (!featureEnabled("familyHub")) return;
   ensureAudioContext();
   blessingPanel.hidden = false;
+  if (!afterpartyMode) blessingPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
   blessingPanel.classList.add("opening");
   requestAnimationFrame(() => {
     blessingPanel.classList.remove("opening");
@@ -1463,7 +1465,7 @@ blessingClose.addEventListener("click", () => {
 });
 
 blessingPanel.addEventListener("click", (event) => {
-  if (event.target === blessingPanel) blessingPanel.hidden = true;
+  if (afterpartyMode && event.target === blessingPanel) blessingPanel.hidden = true;
 });
 
 blessingMessage.addEventListener("input", () => {
@@ -1895,4 +1897,11 @@ showPhotoButton();
 
 if (photoHost) {
   console.info("Family photo host enabled for this browser.");
+}
+
+if (!afterpartyMode) {
+  setupCelebrationLayout({
+    stage, panel: blessingPanel, enabled: featureEnabled("familyHub"),
+    showView: switchHubView, close: blessingClose
+  });
 }

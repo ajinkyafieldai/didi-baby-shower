@@ -25,16 +25,15 @@ async function blendDaily(callFrame) {
     console.warn("Daily theme could not be applied", error);
   }
 
-  // Equal-size tiles are a better fit for a family gathering and avoid the
-  // large empty active-speaker canvas visible with only a few participants.
+  // Give the current speaker the main stage, with family thumbnails alongside.
   try {
-    await callFrame.setActiveSpeakerMode(false);
+    await callFrame.setActiveSpeakerMode(true);
   } catch (error) {
     console.warn("Daily grid mode could not be enabled", error);
   }
 
   try {
-    await callFrame.setShowParticipantsBar(false);
+    await callFrame.setShowParticipantsBar(true);
   } catch {}
 }
 
@@ -78,7 +77,7 @@ async function startVideo() {
 
     const callFrame = window.Daily.createFrame(root, {
       showLeaveButton: false,
-      activeSpeakerMode: false,
+      activeSpeakerMode: true,
       theme: APSILA_DAILY_THEME,
       iframeStyle: {
         width: "100%",
