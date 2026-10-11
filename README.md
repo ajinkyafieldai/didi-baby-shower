@@ -94,7 +94,12 @@ The keyword matcher is intentionally tolerant of noisy ASR output and supports L
 
 ## Photo workflow
 
-The native photobooth captures the visible meeting surface and uploads the image to the event backend.
+The guest frontend requests server-side family photos and displays the uploaded
+result. The Daily capture service still needs deployment; its implementation
+contract and live checks are in [docs/daily-family-photo.md](docs/daily-family-photo.md).
+
+The legacy native photobooth below captures the visible desktop surface. It is
+not the Daily server capture service.
 
 ```sh
 node photobooth.js run

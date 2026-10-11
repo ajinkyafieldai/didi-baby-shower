@@ -67,7 +67,6 @@ const guestNameInput = document.getElementById("guest-name");
 const joinButton = document.getElementById("join-button");
 const callStatus = document.querySelector(".call-status");
 const photoButton = document.querySelector(".photo-button");
-const photoHost = new URLSearchParams(location.search).get("photoHost") === "1";
 const gamePanel = document.getElementById("game-panel");
 const gameContent = document.getElementById("game-content");
 const gameClose = document.getElementById("game-close");
@@ -280,7 +279,9 @@ function coordinatesForCity(city) {
 let effectTimer = null;
 let groupEffectTimer = null;
 let audioContext = null;
-let photoCaptureStream = null;
+let photoResultTimer = null;
+let lastPhotoSeq = 0;
+let lastPhotoAt = 0;
 
 function showPhotoButton() {
   if (!featureEnabled("familyPhoto") || !photoButton) return;
@@ -292,121 +293,6 @@ function showPhotoButton() {
   photoButton.style.bottom = "14px";
 }
 
-async function saveFamilyPhotoBlob(blob) {
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filename = `baby-shower-${stamp}.jpg`;
-
-  const localUrl = URL.createObjectURL(blob);
-  const download = document.createElement("a");
-  download.href = localUrl;
-  download.download = filename;
-  download.style.display = "none";
-  document.body.appendChild(download);
-  download.click();
-  download.remove();
-  window.setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
-
-  const response = await fetch("/api/photos", {
-    method: "POST",
-    headers: {
-      "Content-Type": "image/jpeg",
-      "X-Photo-Name": filename
-    },
-    body: blob
-  });
-
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error("Cloud photo save failed" + (detail ? ": " + detail : ""));
-  }
-
-  return response.json();
-}
-
-async function ensurePhotoCapture() {
-  if (
-    photoCaptureStream &&
-    photoCaptureStream.getVideoTracks().some((track) => track.readyState === "live")
-  ) {
-    return photoCaptureStream;
-  }
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-    throw new Error("This browser cannot capture the family photo.");
-  }
-
-  // Prefer capturing this tab on Chromium. If a browser rejects these
-  // optional hints, retry with the standards-only request.
-  try {
-    photoCaptureStream = await navigator.mediaDevices.getDisplayMedia({
-      video: { displaySurface: "browser" },
-      audio: false,
-      preferCurrentTab: true,
-      selfBrowserSurface: "include",
-      surfaceSwitching: "include"
-    });
-  } catch (error) {
-    if (error && error.name === "TypeError") {
-      photoCaptureStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: false
-      });
-    } else {
-      throw error;
-    }
-  }
-
-  const [track] = photoCaptureStream.getVideoTracks();
-  if (track) {
-    track.addEventListener("ended", () => {
-      photoCaptureStream = null;
-    }, { once: true });
-  }
-
-  return photoCaptureStream;
-}
-
-async function captureFamilyPhoto() {
-  const stream = photoCaptureStream;
-  const track = stream && stream.getVideoTracks()[0];
-
-  if (!track || track.readyState !== "live") {
-    throw new Error("Photo capture is no longer active.");
-  }
-
-  const video = document.createElement("video");
-  video.muted = true;
-  video.playsInline = true;
-  video.srcObject = stream;
-
-  await new Promise((resolve, reject) => {
-    video.onloadedmetadata = resolve;
-    video.onerror = () => reject(new Error("Could not read the captured tab."));
-  });
-  await video.play();
-
-  const rect = stage.getBoundingClientRect();
-  const scaleX = video.videoWidth / window.innerWidth;
-  const scaleY = video.videoHeight / window.innerHeight;
-  const sx = Math.max(0, Math.round(rect.left * scaleX));
-  const sy = Math.max(0, Math.round(rect.top * scaleY));
-  const sw = Math.min(video.videoWidth - sx, Math.max(1, Math.round(rect.width * scaleX)));
-  const sh = Math.min(video.videoHeight - sy, Math.max(1, Math.round(rect.height * scaleY)));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = sw;
-  canvas.height = sh;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
-
-  video.pause();
-  video.srcObject = null;
-
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
-  if (!blob) throw new Error("Could not create the family photo.");
-
-  return saveFamilyPhotoBlob(blob);
-}
 
 function ensureAudioContext() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -620,6 +506,20 @@ async function pollEvents() {
     sharedRecipes.accept(data.family);
     const resumedAfterGap = now - lastPollCompletedAt > RESUME_GAP_MS;
     const shouldResync = resyncOnNextPoll || resumedAfterGap;
+    // Snapshot recovery also catches a completed capture after a polling gap.
+    const photo = data.latestPhoto;
+    if (photo && Number(photo.seq) > lastPhotoSeq) {
+      if (eventsInitialized && now - Number(photo.at || 0) <= 60000) {
+        window.clearTimeout(photoResultTimer);
+        window.clearTimeout(effectTimer);
+        showCapturedPhoto(photo.asset);
+        eventLabel.textContent = "Family photo saved ✓";
+        eventLabel.classList.add("visible");
+        effectTimer = window.setTimeout(() => eventLabel.classList.remove("visible"), 5200);
+      }
+      lastPhotoSeq = Number(photo.seq);
+      lastPhotoAt = Number(photo.at || 0);
+    }
 
     if (data.games) {
       const previous = JSON.stringify(gameState);
@@ -656,7 +556,8 @@ async function pollEvents() {
       events
         .filter((event) =>
           event &&
-          event.type === "effect" &&
+          (event.type === "effect" ||
+            (event.type === "command" && event.command === "photo.capture")) &&
           Number(event.seq || 0) > lastEventSeq &&
           now - Number(event.at || 0) <= MAX_EFFECT_AGE_MS
         )
@@ -664,7 +565,7 @@ async function pollEvents() {
         .forEach((event, index) => {
           window.setTimeout(() => {
             latestRenderLatencyMs = Math.max(0, Date.now() - Number(event.at || Date.now()));
-            playEffect(event.effect, event.sender || "Someone", event.effect === "photo" && photoHost);
+            playEffect(event.effect || "photo", event.sender || "Someone", Number(event.at) || Date.now());
             if (event.groupCelebration) {
               playGroupCelebration(event.effect, event.groupCount || 2, Boolean(event.groupBurst));
             }
@@ -695,8 +596,9 @@ async function sendEffect(effect) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        type: "effect",
-        effect,
+        ...(effect === "photo"
+          ? { type: "command", command: "photo.capture" }
+          : { type: "effect", effect }),
         sender: guestName || "Someone",
         senderId: participantId
       }),
@@ -714,7 +616,7 @@ async function sendEffect(effect) {
       lastEventSeq = Math.max(lastEventSeq, data.seq);
     }
 
-    playEffect(effect, guestName || "Someone", effect === "photo" && photoHost);
+    playEffect(effect, guestName || "Someone", Number(data.event?.at) || Date.now());
     if (data.event && data.event.groupCelebration) {
       playGroupCelebration(
         data.event.effect,
@@ -725,7 +627,12 @@ async function sendEffect(effect) {
   } catch (error) {
     console.error("Celebration sync send failed", error);
     statusText.textContent = "Celebration sync offline (" + (error.message || "error") + ")";
-    playEffect(effect, guestName || "Someone", effect === "photo" && photoHost);
+    if (effect === "photo") {
+      eventLabel.textContent = "Photo request failed. Please try again.";
+      eventLabel.classList.add("visible");
+    } else {
+      playEffect(effect, guestName || "Someone");
+    }
   }
 }
 
@@ -1699,7 +1606,7 @@ function clearNormalEffects() {
   });
 }
 
-function playEffect(effect, sender, capturePhoto = false) {
+function playEffect(effect, sender, requestedAt = Date.now()) {
   clearTimeout(effectTimer);
   clearNormalEffects();
 
@@ -1841,29 +1748,14 @@ function playEffect(effect, sender, capturePhoto = false) {
         if (snap) {
           playChime("photo");
 
-          if (capturePhoto) {
-            // Only the designated desktop/laptop photo host stores the image.
-            // Everyone else just participates in the synchronized countdown.
-            Promise.resolve()
-              .then(async () => {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-                  throw new Error("Photo host browser does not support tab capture.");
-                }
-                statusText.textContent = "Photo host: select this tab once…";
-                await ensurePhotoCapture();
-                return captureFamilyPhoto();
-              })
-              .then(() => {
-                eventLabel.textContent = "Family photo saved ✓";
-                eventLabel.classList.add("visible");
-                statusText.textContent = stage.classList.contains("in-call") ? "Live" : "Ready to join";
-              })
-              .catch((error) => {
-                console.error("Family photo save failed", error);
-                eventLabel.textContent = "Photo host failed to save: " + (error.message || "unknown error");
-                eventLabel.classList.add("visible");
-                statusText.textContent = stage.classList.contains("in-call") ? "Live" : "Ready to join";
-              });
+          if (lastPhotoAt < requestedAt) {
+            eventLabel.textContent = "Saving family photo…";
+            eventLabel.classList.add("visible");
+            window.clearTimeout(photoResultTimer);
+            photoResultTimer = window.setTimeout(() => {
+              eventLabel.textContent = "Photo has not arrived yet — ask the host to check capture.";
+              eventLabel.classList.add("visible");
+            }, 30000);
           }
 
           const flash = document.createElement("div");
@@ -1873,10 +1765,10 @@ function playEffect(effect, sender, capturePhoto = false) {
         } else {
           playChime("ritual");
         }
-      }, delay);
+      }, Math.max(0, requestedAt + delay - Date.now()));
     });
 
-    window.setTimeout(() => photo.remove(), 4600);
+    window.setTimeout(() => photo.remove(), Math.max(0, requestedAt + 4600 - Date.now()));
   }
 
   if (effect === "celebrate") {
@@ -1888,7 +1780,7 @@ function playEffect(effect, sender, capturePhoto = false) {
 
   effectTimer = window.setTimeout(() => {
     clearNormalEffects();
-    eventLabel.classList.remove("visible");
+    if (effect !== "photo") eventLabel.classList.remove("visible");
   }, 5200);
 }
 
@@ -2002,9 +1894,6 @@ window.babyShower = { playEffect, playGroupCelebration };
 showPhotoButton();
 
 
-if (photoHost) {
-  console.info("Family photo host enabled for this browser.");
-}
 
 if (!afterpartyMode) {
   setupCelebrationLayout({
