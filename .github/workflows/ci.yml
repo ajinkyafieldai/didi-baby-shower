@@ -88,6 +88,7 @@ jobs:
         run: |
           node scripts/test-pin-reset.mjs
           node scripts/test-reset-all.mjs
+          node scripts/test-reset-backup.mjs
 
       - name: Build and verify
         run: npm run build

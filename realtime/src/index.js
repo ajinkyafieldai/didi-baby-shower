@@ -98,6 +98,7 @@ export class CelebrationRoom {
       return json({
         seq: latest && Number(latest.seq) ? Number(latest.seq) : 0,
         events,
+        capabilities: { adminBackup: true, resetAll: true },
         games: await gameSnapshot(this.ctx),
         family: await familySnapshot(this.ctx.storage),
         telemetry: await telemetrySnapshot(this.ctx),
@@ -115,6 +116,10 @@ export class CelebrationRoom {
         return json({ error: "Invalid JSON" }, 400);
       }
 
+      if (body?.type === 'family_export') {
+        if (!this.adminSecret || request.headers.get('x-family-admin') !== this.adminSecret) return json({ error: 'Unauthorized' }, 401);
+        return json(await exportEventContent(this.ctx.storage));
+      }
       if (body?.type === "family_reset") {
         if (!this.adminSecret || request.headers.get("x-family-admin") !== this.adminSecret) {
           return json({ error: "Unauthorized" }, 401);
