@@ -715,7 +715,7 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 .meet-reaction-balloon.burst {
-  animation: meet-balloon-pop .48s ease-out forwards;
+  animation: meet-balloon-pop .85s ease-out forwards;
 }
 
 .meet-reaction-burst-piece {
@@ -725,7 +725,7 @@ button { -webkit-tap-highlight-color: transparent; }
   bottom: 63px;
   font-size: 24px;
   pointer-events: none;
-  animation: meet-reaction-burst 1.35s cubic-bezier(.18,.72,.2,1) forwards;
+  animation: meet-reaction-burst 2.6s cubic-bezier(.18,.72,.2,1) forwards;
 }
 
 @keyframes meet-balloon-wiggle {
@@ -785,13 +785,13 @@ button { -webkit-tap-highlight-color: transparent; }
 .meet-celebration-confetti {
   font-size: clamp(17px, 4vw, 27px);
   filter: drop-shadow(0 3px 6px rgba(0,0,0,.10));
-  animation: meet-confetti-pop 1.85s cubic-bezier(.16,.72,.22,1) forwards;
+  animation: meet-confetti-pop 3.1s cubic-bezier(.16,.72,.22,1) forwards;
 }
 
 .meet-celebration-balloon {
   font-size: clamp(30px, 7vw, 48px);
   filter: drop-shadow(0 5px 9px rgba(0,0,0,.12));
-  animation: meet-balloon-float 2.7s cubic-bezier(.2,.7,.22,1) forwards;
+  animation: meet-balloon-float 4s cubic-bezier(.2,.7,.22,1) forwards;
 }
 
 @keyframes meet-confetti-pop {

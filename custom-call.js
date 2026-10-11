@@ -11,7 +11,7 @@ const iconPaths = {
 };
 export function mobileAudioRoutes(devices, canSwitch) {
   const outputs = canSwitch ? devices.filter(d => d.kind === 'audiooutput' && d.deviceId) : [];
-  const bluetooth = outputs.find(d => /bluetooth|airpods|galaxy buds|pixel buds/i.test(d.label));
+  const bluetooth = outputs.find(d => /bluetooth|airpods|buds|headphones|headset|earbuds/i.test(d.label)) || outputs.find(d => d.label && !/default|communications|speaker|built.?in|earpiece/i.test(d.label));
   const speaker = outputs.find(d => /speaker|built.?in/i.test(d.label) && d !== bluetooth);
   return [{ kind: 'mute', label: 'Sound off' }, ...(bluetooth ? [{ kind: 'bluetooth', label: 'Bluetooth', id: bluetooth.deviceId }] : []), { kind: 'speaker', label: speaker ? 'Speaker' : 'Device audio', id: speaker?.deviceId || '' }];
 }
@@ -200,6 +200,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
       soundOff = next.kind === 'mute'; preferences.soundOff = soundOff;
       for (const audio of audios.values()) { audio.muted = soundOff; if (!soundOff) audio.play().catch(() => {}); }
       mobileRoute = next.kind; savePreferences(); updateAudioButton();
+      if (next.kind !== 'mute' && mobileRoutes.length === 2) showFeedback('For Bluetooth, choose your headphones in the phone audio settings.');
     } catch { showFeedback('Audio output unavailable'); }
     finally { buttons.audio.disabled = call.meetingState() !== 'joined-meeting'; }
   }
@@ -364,7 +365,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     call.on('error', e => { notice.textContent = e.errorMsg || 'Call connection failed.'; report('video-status', notice.textContent); });
     call.on('camera-error', () => { notice.textContent = 'Check camera and microphone permissions.'; });
     call.on('left-meeting', () => { reconnecting = true; shell.classList.add('reconnecting'); for (const audio of audios.values()) audio.srcObject = null; Object.values(buttons).forEach(b => b.disabled = true); connection.textContent = 'Disconnected'; notice.replaceChildren(document.createTextNode('Connection ended. ')); const retry = document.createElement('button'); retry.textContent = 'Rejoin'; retry.onclick = async () => { retry.disabled = true; connection.textContent = 'Reconnecting…'; try { await call.join({ url: config.roomUrl, userName: name }); notice.textContent = ''; } catch { connection.textContent = 'Could not reconnect'; retry.disabled = false; } }; notice.append(retry); showControls(); report('video-status', 'Disconnected'); });
-    buttons.mic.onclick = () => act(buttons.mic, async () => { await call.setLocalAudio(!call.localAudio()); showFeedback(call.localAudio() ? 'Mic on' : 'Mic off'); });
+    buttons.mic.onclick = () => act(buttons.mic, async () => { const enabled = !call.localAudio(); await call.setLocalAudio(enabled); showFeedback(enabled ? 'Mic on' : 'Mic off'); });
     buttons.camera.onclick = () => act(buttons.camera, () => call.setLocalVideo(!call.localVideo()));
     buttons.flip.onclick = () => act(buttons.flip, () => call.cycleCamera());
     buttons.audio.onclick = async () => {

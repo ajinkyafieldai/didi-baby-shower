@@ -1903,11 +1903,11 @@ function playGroupCelebration(effect, count = 2, burst = false) {
         piece.style.setProperty("--distance", `${90 + Math.random() * 180}px`);
         piece.style.animationDelay = `${Math.random() * 0.12}s`;
         effectLayer.appendChild(piece);
-        window.setTimeout(() => piece.remove(), 1500);
+        window.setTimeout(() => piece.remove(), 2900);
       }
     }
 
-    window.setTimeout(() => group.remove(), 520);
+    window.setTimeout(() => group.remove(), 900);
     return;
   }
 
@@ -1949,7 +1949,7 @@ function playMeetCelebrationBurst() {
   }
 
   effectLayer.appendChild(celebration);
-  window.setTimeout(() => celebration.remove(), 3200);
+  window.setTimeout(() => celebration.remove(), 4600);
 }
 
 // Expose only the small event-rendering boundary that the realtime layer needs.
