@@ -1,3 +1,5 @@
+import { familySnapshot, mutateFamily } from "./family-state.js";
+
 const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate", "photo"]);
 const COMMANDS = new Set(["photo.capture", "photo.show"]);
 const SYSTEM_EVENTS = new Set(["photo.captured"]);
@@ -85,6 +87,7 @@ export class CelebrationRoom {
         seq: latest && Number(latest.seq) ? Number(latest.seq) : 0,
         events,
         games: await gameSnapshot(this.ctx),
+        family: await familySnapshot(this.ctx.storage),
         telemetry: await telemetrySnapshot(this.ctx),
         latestPhoto: await this.ctx.storage.get("latestPhoto") || null,
         videoRoom: await this.ctx.storage.get("videoRoom") || null
@@ -98,6 +101,12 @@ export class CelebrationRoom {
         body = await request.json();
       } catch {
         return json({ error: "Invalid JSON" }, 400);
+      }
+
+      if (body && (body.type === "family_add" || body.type === "family_react")) {
+        const result = await mutateFamily(this.ctx.storage, body);
+        const { status = 200, ...payload } = result;
+        return json(payload, status);
       }
 
       if (body && body.type === "video_room_set") {
