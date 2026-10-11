@@ -67,6 +67,8 @@ jobs:
       - name: Event package runtime proof
         run: node scripts/test-event-package-runtime.mjs
 
+      - name: Shared family state contract
+        run: node scripts/test-family-state.mjs
       - name: Recording room contract
         run: node scripts/test-recording-room.mjs
 
