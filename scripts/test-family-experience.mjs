@@ -51,6 +51,11 @@ globalThis.fetch = async (url, options) => {
   if (String(url).startsWith('https://api.daily.co/')) {
     assert.equal(options.headers.authorization, 'Bearer daily-test-key');
     tokenProperties = JSON.parse(options.body).properties;
+    // Daily requires all six media types, including wildcard custom-track policies.
+    assert.deepEqual(tokenProperties.permissions.canReceive.base, {
+      video: true, audio: false, screenVideo: false, screenAudio: false,
+      customVideo: { '*': false }, customAudio: { '*': false }
+    });
     if (providerFailure) return Response.json({ info: 'Invalid canReceive daily-test-key family-test-key internal-test-secret' }, { status: 400 });
     return Response.json({ token: 'hidden-test-token' });
   }

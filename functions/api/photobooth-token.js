@@ -16,7 +16,10 @@ export async function onRequestPost({ request, env }) {
     body: JSON.stringify({ properties: { room_name: url.pathname.slice(1), user_id: 'daily-photobooth',
       user_name: 'Family Photobooth', exp: Math.floor(end / 1000), eject_at_token_exp: true,
       is_owner: false, start_audio_off: true, start_video_off: true,
-      permissions: { hasPresence: false, canSend: false, canAdmin: false, canReceive: { base: { video: true, audio: false, screenVideo: false, screenAudio: false } } }
+      permissions: { hasPresence: false, canSend: false, canAdmin: false, canReceive: { base: {
+        video: true, audio: false, screenVideo: false, screenAudio: false,
+        customVideo: { '*': false }, customAudio: { '*': false }
+      } } }
     } })
   });
   const data = await tokenResponse.json().catch(() => ({}));
