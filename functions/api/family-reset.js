@@ -12,9 +12,17 @@ export async function onRequest(context) {
     return json({ error: 'Unauthorized' }, 401);
   }
   if (context.request.method === 'GET') {
-    const url = new URL(REALTIME_URL); url.pathname = '/reset/export'; url.search = '';
-    const response = await fetch(url, { headers: { 'x-realtime-secret': REALTIME_SHARED_SECRET, 'x-family-admin': REALTIME_SHARED_SECRET } });
-    return new Response(response.body, { status: response.status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+    // Use the configured URL unchanged, just as reset POST does. Proxies may
+    // route only this URL or normalize paths before invoking the Worker.
+    const response = await fetch(REALTIME_URL, { method: 'POST', cache: 'no-store',
+      headers: { 'content-type': 'application/json', 'x-realtime-secret': REALTIME_SHARED_SECRET, 'x-family-admin': REALTIME_SHARED_SECRET },
+      body: JSON.stringify({ type: 'family_export' }) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return json({ error: data.error || `Realtime backup failed (HTTP ${response.status})` }, response.status);
+    if (!data.content || !Number.isSafeInteger(data.revision) || !Number.isSafeInteger(data.seq)) {
+      return json({ error: 'Realtime backup is unsupported. Deploy devel to the Worker used by REALTIME_URL.', code: 'backup_contract_missing' }, 502);
+    }
+    return json(data);
   }
   let body;
   try { body = await context.request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }

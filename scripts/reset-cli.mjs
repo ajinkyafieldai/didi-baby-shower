@@ -52,8 +52,8 @@ export async function resetAll({ confirm = false, backup, request = fetch } = {}
   if (!token) throw new Error('BABYSHOWER_ADMIN_TOKEN is required.');
   const options = { headers: { Authorization: `Bearer ${token}` }, redirect: 'error', signal: AbortSignal.timeout(15000), cache: 'no-store' };
   const response = await request(base + '/api/family-reset', options);
-  const snapshot = await response.json();
-  if (!response.ok || !snapshot.content || !Number.isSafeInteger(snapshot.revision) || !Number.isSafeInteger(snapshot.seq)) throw new Error(snapshot.error || 'Event backup unavailable.');
+  const snapshot = await response.json().catch(() => ({}));
+  if (!response.ok || !snapshot.content || !Number.isSafeInteger(snapshot.revision) || !Number.isSafeInteger(snapshot.seq)) throw new Error(snapshot.error || `Event backup unavailable (HTTP ${response.status}; response fields: ${Object.keys(snapshot).join(', ') || 'none'}). The Pages reset endpoint and its configured realtime Worker must both run the latest devel.`);
   const family = snapshot.content.sharedFamily || {};
   for (const key of ['blessings', 'recipes', 'pins', 'guests']) console.log(`${key}: ${(family[key] || []).length}`);
   for (const key of ['sealedCapsules', 'nameSuggestions', 'quizAnswers']) console.log(`${key}: ${(snapshot.content[key] || []).length}`);
