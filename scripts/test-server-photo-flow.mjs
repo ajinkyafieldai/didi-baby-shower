@@ -23,7 +23,7 @@ function guest() {
     lastPollCompletedAt: Date.now(), resyncOnNextPoll: false,
     RESUME_GAP_MS: 5000, MAX_EFFECT_AGE_MS: 4000,
     lastPhotoSeq: 0, lastPhotoAt: 0, photoResultTimer: null, effectTimer: null,
-    sharedRecipes: { accept() {} }, acceptKeepsakeSnapshot() {}, gameState: {}, activeGame: null,
+    sharedRecipes: { accept() {} }, sharedFamily: { accept() {} }, acceptKeepsakeSnapshot() {}, gameState: {}, activeGame: null,
     stage: { classList: { contains: () => true } },
     callStatus: { classList: { remove() {} } }, statusText: {}, eventLabel: label,
     guestName: 'Guest', participantId: crypto.randomUUID(),

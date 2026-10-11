@@ -1,4 +1,5 @@
 import { buildKeepsake, photoPath } from "./frontend/keepsake-data.js";
+import { createSharedFamily, sharedPhotoPath } from "./frontend/shared-family.js";
 import { setupCelebrationLayout } from "./frontend/celebration-layout.js";
 import { createSharedRecipes } from "./frontend/shared-recipes.js";
 import { clientEnvironment, createCallMetrics } from "./frontend/pilot-telemetry.js";
@@ -99,6 +100,30 @@ const sharedRecipes = createSharedRecipes({ changed: () => {
   if (activeHubView === "keepsake") renderKeepsakeSummary();
 } });
 let recipeDraft = null;
+const notesStatus = document.getElementById("notes-status");
+const mapStatus = document.getElementById("map-status");
+const guestStatus = document.getElementById("guest-status");
+const sharedFamily = createSharedFamily({ changed: () => {
+  if (activeHubView === 'wall') renderBlessings();
+  if (activeHubView === 'map') { renderMap(); renderGuests(); }
+  if (activeHubView === 'mosaic') renderMosaic();
+  if (activeHubView === 'keepsake') renderKeepsakeSummary();
+} });
+const familyDrafts = new WeakMap();
+const reactionDrafts = new Map();
+let wallPhotoDraft = null;
+function stableFamilyDraft(form, content) {
+  const fingerprint = JSON.stringify(content);
+  let draft = familyDrafts.get(form);
+  if (!draft || draft.fingerprint !== fingerprint) {
+    draft = { fingerprint, entry: { id: crypto.randomUUID(), ...content } };
+    familyDrafts.set(form, draft);
+  }
+  return draft.entry;
+}
+function wallItems() { return sharedFamily.list('blessings', blessingStore.list()); }
+function peopleItems(collection) { return sharedFamily.list(collection, familyStore.read()[collection]); }
+
 const photoMosaic = document.getElementById("photo-mosaic");
 const guestForm = document.getElementById("guest-form");
 const arrivalRibbon = document.getElementById("arrival-ribbon");
@@ -508,6 +533,7 @@ async function pollEvents() {
     const now = Date.now();
     sharedRecipes.accept(data.family);
     acceptKeepsakeSnapshot(data);
+    sharedFamily.accept(data.family);
     const resumedAfterGap = now - lastPollCompletedAt > RESUME_GAP_MS;
     const shouldResync = resyncOnNextPoll || resumedAfterGap;
     // Snapshot recovery also catches a completed capture after a polling gap.
@@ -952,13 +978,13 @@ async function renderMap() {
   const version = ++mapRenderVersion;
   fillLocationForms();
   const data = familyStore.read();
-  const combined = [...data.pins];
-  data.guests.forEach(guest => {
+  const combined = peopleItems("pins");
+  peopleItems("guests").forEach(guest => {
     if (!combined.some(pin => pin.name === guest.name && pin.city === guest.city)) combined.push(guest);
   });
   const people = combined.map(person => ({ ...person, coords: person.coords || lookupCity(person.city) }));
   mapList.innerHTML = people.length
-    ? people.map(person => `<span>📍 <strong>${escapeHtml(person.name)}</strong> · ${escapeHtml(person.city || "Location unavailable")}</span>`).join("")
+    ? people.map(person => `<span>📍 <strong>${escapeHtml(person.name)}</strong> · ${escapeHtml(person.city || "Location unavailable")}${person.localOnly ? ' <small>(on this device)</small>' : ''}</span>`).join("")
     : '<p class="hub-empty">Join the call to appear here, or add your name and city above.</p>';
   try {
     const { renderFamilyMap } = await import("./frontend/family-map.js");
@@ -1044,7 +1070,7 @@ async function renderRecipes() {
 async function renderMosaic() {
   mosaicObjectUrls.forEach(URL.revokeObjectURL);
   mosaicObjectUrls = [];
-  const photos = blessingStore.list().filter((item) => item.kind === "photo" && item.photoId);
+  const photos = wallItems().filter((item) => item.kind === "photo" && (item.photoId || sharedPhotoPath(item.asset)));
 
   if (!photos.length) {
     photoMosaic.innerHTML = '<p class="hub-empty">Your family photos will appear here. Open Wishes and choose Share a photo to add the first one.</p>';
@@ -1053,6 +1079,10 @@ async function renderMosaic() {
 
   const tiles = [];
   for (const item of photos.slice(0, 40)) {
+    if (sharedPhotoPath(item.asset)) {
+      tiles.push(`<figure><img src="${escapeHtml(sharedPhotoPath(item.asset))}" alt="${escapeHtml(item.caption || 'Family photo')}"><figcaption>${escapeHtml(item.caption || item.sender || '')}</figcaption></figure>`);
+      continue;
+    }
     try {
       const blob = await wallPhotoStore.get(item.photoId);
       if (!blob) continue;
@@ -1065,14 +1095,14 @@ async function renderMosaic() {
 }
 
 function renderGuests() {
-  const items = familyStore.read().guests.slice().reverse();
+  const items = peopleItems("guests");
   arrivalRibbon.innerHTML = items.length
     ? items.map((item, index) => `
       <article class="arrival-card">
         <span class="arrival-number">${items.length - index}</span>
         <div>
           <strong>👋 ${escapeHtml(item.name)}</strong>
-          <small>${item.city ? "joined from " + escapeHtml(item.city) : "was here"} · ${new Date(item.at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}</small>
+          <small>${item.city ? "joined from " + escapeHtml(item.city) : "was here"} · ${new Date(item.at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}${item.localOnly ? ' · on this device' : ''}</small>
         </div>
       </article>
     `).join("")
@@ -1081,7 +1111,7 @@ function renderGuests() {
 
 function renderKeepsakeSummary() {
   const hub = familyStore.read();
-  const wall = blessingStore.list();
+  const wall = wallItems();
   const photoCount = wall.filter((item) => item.kind === "photo").length;
   const noteCount = wall.filter((item) => item.kind !== "photo").length;
 
@@ -1096,7 +1126,7 @@ function renderKeepsakeSummary() {
       <div><strong>${hub.timeline.length}</strong><span>memories</span></div>
       <div><strong>${hub.capsules.length}</strong><span>time capsules</span></div>
       <div><strong>${sharedRecipes.list(hub.recipes).length}</strong><span>recipes</span></div>
-      <div><strong>${hub.guests.length}</strong><span>people here</span></div>
+      <div><strong>${peopleItems("guests").length}</strong><span>people here</span></div>
     </div>
     <div class="keepsake-callout">
       <strong>After the party</strong>
@@ -1145,22 +1175,39 @@ timelineForm.addEventListener("submit", async (event) => {
   renderTimeline();
 });
 
-mapForm.addEventListener("submit", (event) => {
+mapForm.addEventListener("submit", async (event) => {
   if (!featureEnabled("familyMap")) return;
   event.preventDefault();
-  const data = new FormData(event.currentTarget);
-  const name = String(data.get("name") || "").trim();
-  const city = String(data.get("city") || "").trim();
-  const entry = { id: crypto.randomUUID(), name, city, at: Date.now() };
-  const coords = coordinatesForCity(city);
-  if (coords) entry.coords = coords;
-  familyStore.add("pins", entry);
-  recordArrival(name, city, coords);
-  fillLocationForms();
-  playChime();
-  renderMap();
-  renderGuests();
+  await sharePeopleForm(mapForm, 'pins', mapStatus);
 });
+
+async function sharePeopleForm(form, collection, status) {
+  const submit = form.querySelector('[type="submit"]');
+  if (submit.disabled) return;
+  const data = new FormData(form);
+  const name = String(data.get('name') || '').trim();
+  const city = String(data.get('city') || '').trim();
+  if (!name) return;
+  const coords = coordinatesForCity(city);
+  const entry = stableFamilyDraft(form, { name, city, ...(coords ? { coords } : {}) });
+  const fields = [...form.elements].filter(element => element !== submit);
+  const disabled = fields.map(element => element.disabled);
+  fields.forEach(element => { element.disabled = true; });
+  setBusy(submit, true, 'Sharing…');
+  status.textContent = 'Sharing with the family…';
+  try {
+    await sharedFamily.add(collection, entry);
+    familyDrafts.delete(form);
+    form.reset();
+    status.textContent = 'Shared with everyone ✓';
+    renderMap(); renderGuests(); playChime();
+  } catch (error) {
+    status.textContent = error.message || 'Could not share. Your entry is still here; try again.';
+  } finally {
+    fields.forEach((element, i) => { element.disabled = disabled[i]; });
+    setBusy(submit, false);
+  }
+}
 
 capsuleForm.addEventListener("submit", (event) => {
   if (!featureEnabled("timeCapsule")) return;
@@ -1224,17 +1271,10 @@ recipeForm.addEventListener("submit", async (event) => {
   }
 });
 
-guestForm.addEventListener("submit", (event) => {
+guestForm.addEventListener("submit", async (event) => {
   if (!featureEnabled("guestRibbon")) return;
   event.preventDefault();
-  const data = new FormData(event.currentTarget);
-  const city = String(data.get("city") || "").trim();
-  recordArrival(String(data.get("name") || "").trim(), city, coordinatesForCity(city));
-  event.currentTarget.reset();
-  fillLocationForms();
-  playChime();
-  renderGuests();
-  if (activeHubView === "map") renderMap();
+  await sharePeopleForm(guestForm, 'guests', guestStatus);
 });
 
 afterpartyPreview.addEventListener("click", () => {
@@ -1250,8 +1290,11 @@ function clearWallObjectUrls() {
   wallObjectUrls = [];
 }
 
+let wallRenderVersion = 0;
 async function renderBlessings() {
-  const items = blessingStore.list();
+  const version = ++wallRenderVersion;
+  const nextUrls = [];
+  const items = wallItems();
   clearWallObjectUrls();
 
   if (!items.length) {
@@ -1262,13 +1305,15 @@ async function renderBlessings() {
   const rows = await Promise.all(items.map(async (item) => {
     const reactions = item.reactions || {};
 
-    if (item.kind === "photo" && item.photoId) {
-      let imageHtml = '<div class="wall-photo-missing">Photo unavailable on this device</div>';
+    if (item.kind === "photo" && (item.photoId || sharedPhotoPath(item.asset))) {
+      let imageHtml = sharedPhotoPath(item.asset)
+        ? `<img class="wall-photo" src="${escapeHtml(sharedPhotoPath(item.asset))}" alt="${escapeHtml(item.caption || 'Shared family photo')}">`
+        : '<div class="wall-photo-missing">Photo unavailable on this device</div>';
       try {
-        const blob = await wallPhotoStore.get(item.photoId);
+        const blob = item.photoId ? await wallPhotoStore.get(item.photoId) : null;
         if (blob) {
           const url = URL.createObjectURL(blob);
-          wallObjectUrls.push(url);
+          nextUrls.push(url);
           imageHtml = `<img class="wall-photo" src="${url}" alt="${escapeHtml(item.caption || "Shared family photo")}">`;
         }
       } catch (error) {
@@ -1281,9 +1326,10 @@ async function renderBlessings() {
           ${item.caption ? `<p class="wall-photo-caption">${escapeHtml(item.caption)}</p>` : ""}
           <footer>
             <strong>📷 ${escapeHtml(item.sender || "Someone")}</strong>
+            ${item.localOnly ? '<small>Saved on this device only</small>' : ""}
             <div class="blessing-reactions">
-              ${["❤️","🥹","😂"].map((emoji) => `
-                <button type="button" data-blessing-react="${emoji}">
+              ${["❤️","🥰","😂"].map((emoji) => `
+                <button type="button" data-blessing-react="${emoji}" ${item.localOnly || reactionDrafts.get(`${item.id}|${emoji}`)?.pending ? "disabled" : ""}>
                   <span>${emoji}</span>
                   <small>${Number(reactions[emoji] || 0) || ""}</small>
                 </button>
@@ -1304,9 +1350,10 @@ async function renderBlessings() {
         <p>${escapeHtml(item.message || "")}</p>
         <footer>
           <strong>— ${escapeHtml(item.sender || "Someone")}</strong>
-          <div class="blessing-reactions">
-            ${["❤️","🥹","😂"].map((emoji) => `
-              <button type="button" data-blessing-react="${emoji}">
+          ${item.localOnly ? '<small>Saved on this device only</small>' : ""}
+            <div class="blessing-reactions">
+            ${["❤️","🥰","😂"].map((emoji) => `
+              <button type="button" data-blessing-react="${emoji}" ${item.localOnly || reactionDrafts.get(`${item.id}|${emoji}`)?.pending ? "disabled" : ""}>
                 <span>${emoji}</span>
                 <small>${Number(reactions[emoji] || 0) || ""}</small>
               </button>
@@ -1317,15 +1364,31 @@ async function renderBlessings() {
     `;
   }));
 
+  if (version !== wallRenderVersion) { nextUrls.forEach(URL.revokeObjectURL); return; }
+  wallObjectUrls = nextUrls;
   blessingWall.innerHTML = rows.join("");
 
   blessingWall.querySelectorAll("[data-blessing-react]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const note = button.closest("[data-blessing-id]");
-      if (!note) return;
-      blessingStore.react(note.dataset.blessingId, button.dataset.blessingReact);
-      renderBlessings();
-      playChime();
+      if (!note || button.disabled) return;
+      const key = `${note.dataset.blessingId}|${button.dataset.blessingReact}`;
+      const previous = reactionDrafts.get(key);
+      if (previous?.pending) return;
+      const mutationId = previous?.mutationId || crypto.randomUUID();
+      reactionDrafts.set(key, { mutationId, pending: true });
+      button.disabled = true;
+      try {
+        await sharedFamily.react(note.dataset.blessingId, button.dataset.blessingReact, mutationId);
+        reactionDrafts.delete(key);
+        renderBlessings();
+        notesStatus.textContent = 'Reaction shared ✓';
+        playChime();
+      } catch (error) {
+        reactionDrafts.set(key, { mutationId, pending: false });
+        notesStatus.textContent = error.message || 'Could not share reaction. Tap again to retry.';
+        renderBlessings();
+      } finally { button.disabled = false; }
     });
   });
 }
@@ -1412,10 +1475,13 @@ async function exportBlessingsKeepsake() {
     } catch {
       warnings.push('Shared content could not be refreshed. This export includes the last available shared entries and entries saved on this device.');
     } finally { window.clearTimeout(timer); }
+    const currentFamily = sharedFamily.snapshot();
+    const family = currentFamily.revision > (keepsakeSharedSnapshot.family?.revision ?? -1)
+      ? currentFamily : keepsakeSharedSnapshot.family;
     const data = buildKeepsake({
       title: EVENT_TITLE, honoree: HONOREE_NAME,
       wall: blessingStore.list(), hub: familyStore.read(),
-      ...keepsakeSharedSnapshot, warnings
+      ...keepsakeSharedSnapshot, family, warnings
     });
     data.people = data.people.map(person => ({ ...person, coords: person.coords || lookupCity(person.city) }));
     const { createKeepsakePdf } = await import('./frontend/keepsake-pdf.js');
@@ -1481,73 +1547,78 @@ blessingMessage.addEventListener("input", () => {
   blessingCount.textContent = `${blessingMessage.value.length}/180`;
 });
 
-blessingForm.addEventListener("submit", (event) => {
+blessingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!featureEnabled("familyWall")) return;
+  const submit = blessingForm.querySelector('[type="submit"]');
+  if (submit.disabled) return;
   const data = new FormData(blessingForm);
-  const message = String(data.get("message") || "").trim();
+  const message = String(data.get('message') || '').trim();
   if (!message) return;
-
-  const entry = {
-    id: crypto.randomUUID(),
-    kind: "note",
-    sender: guestName || guestNameInput.value.trim() || "Someone",
-    audience: data.get("audience") === "didi" ? "didi" : "baby",
-    message,
-    at: Date.now(),
-    reactions: {}
-  };
-
-  blessingStore.add(entry);
-  blessingForm.reset();
-  blessingMessage.value = "";
-  blessingCount.textContent = "0/180";
-  showBlessingFloat(entry);
-  playChime("photo");
-  requestAnimationFrame(() => renderBlessings());
-});
-
-wallPhotoInput.addEventListener("change", async () => {
-  if (!featureEnabled("familyWall")) return;
-  const [file] = wallPhotoInput.files || [];
-  if (!file) return;
-
-  wallPhotoInput.disabled = true;
-  wallPhotoStatus.textContent = "Preparing photo…";
-  await nextFrame();
-
+  const entry = stableFamilyDraft(blessingForm, {
+    sender: guestName || guestNameInput.value.trim() || 'Someone',
+    audience: data.get('audience') === 'didi' ? 'didi' : 'baby', message
+  });
+  const fields = [...blessingForm.elements].filter(element => element !== submit);
+  const disabled = fields.map(element => element.disabled);
+  fields.forEach(element => { element.disabled = true; });
+  setBusy(submit, true, 'Sharing…'); notesStatus.textContent = 'Sharing note…';
   try {
-    const blob = await compressWallPhoto(file);
-    const photoId = crypto.randomUUID();
-    await wallPhotoStore.put(photoId, blob);
-
-    const entry = {
-      id: crypto.randomUUID(),
-      kind: "photo",
-      photoId,
-      sender: guestName || guestNameInput.value.trim() || "Someone",
-      caption: wallPhotoCaption.value.trim().slice(0, 80),
-      at: Date.now(),
-      reactions: {}
-    };
-
-    blessingStore.add(entry);
-    wallPhotoInput.value = "";
-    wallPhotoCaption.value = "";
-    wallPhotoStatus.textContent = "Added ✓";
-    await renderBlessings();
-    showBlessingFloat(entry);
-    playChime("photo");
-    window.setTimeout(() => {
-      wallPhotoStatus.textContent = "";
-    }, 2200);
+    await sharedFamily.add('blessings', entry);
+    familyDrafts.delete(blessingForm);
+    blessingForm.reset(); blessingMessage.value = ''; blessingCount.textContent = '0/180';
+    notesStatus.textContent = 'Shared with everyone ✓';
+    showBlessingFloat(entry); playChime('photo'); renderBlessings();
   } catch (error) {
-    console.error("Family wall photo failed", error);
-    wallPhotoStatus.textContent = error.message || "Could not add photo.";
+    notesStatus.textContent = error.message || 'Could not share. Your note is still here; try again.';
   } finally {
-    wallPhotoInput.disabled = false;
+    fields.forEach((element, i) => { element.disabled = disabled[i]; });
+    setBusy(submit, false);
   }
 });
+
+async function shareWallPhoto() {
+  if (!featureEnabled('familyWall') || wallPhotoInput.disabled) return;
+  const [file] = wallPhotoInput.files || [];
+  if (!file) return;
+  const content = {
+    sender: guestName || guestNameInput.value.trim() || 'Someone',
+    caption: wallPhotoCaption.value.trim().slice(0, 80)
+  };
+  const fingerprint = JSON.stringify(content);
+  if (!wallPhotoDraft || wallPhotoDraft.file !== file || wallPhotoDraft.fingerprint !== fingerprint) {
+    wallPhotoDraft = { file, fingerprint, entry: { id: crypto.randomUUID(), ...content } };
+  }
+  wallPhotoInput.disabled = true; wallPhotoCaption.disabled = true;
+  wallPhotoRetry.disabled = true;
+  wallPhotoStatus.textContent = 'Sharing photo…';
+  try {
+    if (!wallPhotoDraft.entry.asset) {
+      const blob = await compressWallPhoto(file);
+      const response = await fetch('/api/photos', { method: 'POST', headers: { 'Content-Type': 'image/jpeg', 'X-Photo-Name': 'family-wall.jpg' }, body: blob });
+      const uploaded = await response.json().catch(() => ({}));
+      if (!response.ok || !uploaded.ok || !uploaded.key) throw new Error(uploaded.error || 'Could not upload photo. Please retry.');
+      wallPhotoDraft.entry.asset = '/api/photos?key=' + encodeURIComponent(uploaded.key);
+    }
+    const entry = wallPhotoDraft.entry;
+    await sharedFamily.add('blessings', entry);
+    wallPhotoDraft = null;
+    wallPhotoInput.value = ''; wallPhotoCaption.value = '';
+    wallPhotoRetry.hidden = true;
+    wallPhotoStatus.textContent = 'Shared with everyone ✓';
+    renderBlessings();
+    showBlessingFloat({ ...entry, kind: 'photo' }); playChime('photo');
+  } catch (error) {
+    wallPhotoStatus.textContent = error.message || 'Could not share photo. Please retry.';
+    wallPhotoRetry.hidden = false;
+  } finally {
+    wallPhotoInput.disabled = false; wallPhotoCaption.disabled = false;
+    wallPhotoRetry.disabled = false;
+  }
+}
+const wallPhotoRetry = document.getElementById('wall-photo-retry');
+wallPhotoInput.addEventListener('change', shareWallPhoto);
+wallPhotoRetry.addEventListener('click', shareWallPhoto);
 
 blessingExport.addEventListener("click", exportBlessingsKeepsake);
 

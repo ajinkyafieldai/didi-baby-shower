@@ -1,7 +1,7 @@
 # Full keepsake PDF export
 
-Branch: `feature/didi-full-keepsake-pdf`, based on the pilot frontend integration
-in PR #15. This changes the Family Hub export button to **Export keepsake PDF**.
+Branch: `feature/didi-full-keepsake-pdf`, reconciled with the shared notes and pins
+frontend in PR #20. This changes the Family Hub export button to **Export keepsake PDF**.
 It is not deployed automatically.
 
 The PDF includes wishes and reactions, wall photos, the latest server family photo,
@@ -16,7 +16,8 @@ The photo endpoint accepts only event photo keys. All available images and the
 world map are embedded in the PDF; viewing the downloaded PDF requires no live
 site, IndexedDB, map tiles, or network connection.
 
-Offline or failed shared-state refreshes retain the last known shared snapshot.
+Offline or failed shared-state refreshes retain the latest known shared snapshot,
+including a successful form save that has not yet appeared in a poll response.
 Missing photos are identified beside their entry and in Export notes. Entries
 saved only on another device and not published to shared state cannot be included.
 The backend currently retains only the latest Daily capture in `latestPhoto`, so
