@@ -146,3 +146,22 @@ Legacy event IDs such as `?event=didi-baby-shower` remain accepted as compatibil
 Participant, host, and projector surfaces all load the same package. Event identity, copy, accent, and supported module overrides come from that package. Browser-local event data is namespaced by event ID so one event cannot reuse another event's local family-wall state.
 
 The JSON registry is deliberately the first registry adapter. A future database/API-backed registry can replace it while preserving the same slug -> record -> package contract.
+
+## Recording from the CLI
+
+Set `BABYSHOWER_URL=https://didi-baby-shower.pages.dev` and provide `DAILY_API_KEY` through your terminal environment. The CLI never sends the Daily key to Pages or prints it.
+
+```sh
+node babyshower.js recording
+```
+
+This resolves the current room, starts cloud recording, prints `RECORDING` only after the provider confirms `in-progress`, and stays running. Ctrl+C or SIGTERM requests stop for the same room it started, even if the current event room later changes. A signal received while start is pending waits for the response and then requests stop. Stop failures exit nonzero and print the manual recovery command.
+
+```sh
+node babyshower.js recording start
+node babyshower.js recording stop
+node babyshower.js recording status --id <recording-id>
+node babyshower.js recording stop --room <room-name>
+```
+
+`start` returns immediately after provider acceptance; `stop` without a room resolves the event's current room. Use the printed recording ID to verify finalization. `run`/the default keeps checking status and exits when recording finishes or is canceled. SIGKILL, machine shutdown or loss of network cannot guarantee cleanup; recover with `stop --room` from another terminal. An ambiguous start timeout may also require manual stop. Do not start multiple recording controllers for the same room: Daily's stop operation is room-wide. This command records Daily media, not Didi's page animations.

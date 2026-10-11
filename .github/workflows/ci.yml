@@ -70,5 +70,8 @@ jobs:
       - name: Recording room contract
         run: node scripts/test-recording-room.mjs
 
+      - name: Recording CLI lifecycle
+        run: node scripts/test-recording-cli.mjs
+
       - name: Build and verify
         run: npm run build
