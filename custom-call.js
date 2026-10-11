@@ -46,6 +46,22 @@ export function chooseCallLayout(width, height, aspect, count) {
   const columnScore = fittedArea(width - railWidth - 12, height) + Math.min(count, Math.floor(height / (railWidth * .7 + 6))) * 6000;
   return { rail: count && width >= 360 && width - railWidth >= 230 && columnScore > rowScore ? 'side' : 'bottom', tileWidth, tileHeight, rowSpace, railWidth };
 }
+export function chooseGridLayout(width, height, count) {
+  const gap = 8;
+  const availableWidth = Math.max(1, width - 16);
+  const availableHeight = Math.max(1, height - 16);
+  count = Math.max(1, count);
+  const maxColumns = Math.min(count, 6, Math.max(1, Math.floor((availableWidth + gap) / 148)));
+  let best;
+  for (let columns = 1; columns <= maxColumns; columns++) {
+    const rows = Math.ceil(count / columns);
+    const tileWidth = Math.min((availableWidth - (columns - 1) * gap) / columns, Math.max(88, (availableHeight - (rows - 1) * gap) / rows) * 16 / 9);
+    const overflow = Math.max(1, (rows * (tileWidth * 9 / 16 + gap) - gap) / availableHeight);
+    const score = tileWidth * tileWidth * (count / (rows * columns)) / overflow;
+    if (!best || score > best.score) best = { columns, rows, tileWidth, tileHeight: tileWidth * 9 / 16, score };
+  }
+  return best;
+}
 function controlIcon(kind, off = false) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[kind]}${off ? '<path d="m3 3 18 18"/>' : ''}</svg>`;
 }
@@ -131,6 +147,15 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   picture.addEventListener('scroll', updateScrollCue);
   thumbnails.addEventListener('scroll', updateScrollCue);
   function arrangeVideos() {
+    if (mode === 'grid') {
+      const layout = chooseGridLayout(picture.clientWidth, picture.clientHeight, picture.children.length);
+      picture.style.setProperty('--grid-columns', layout.columns);
+      picture.style.setProperty('--grid-tile-width', `${layout.tileWidth}px`);
+      picture.style.setProperty('--grid-tile-height', `${layout.tileHeight}px`);
+      picture.classList.toggle('grid-overflow', layout.rows * (layout.tileHeight + 8) + 8 > picture.clientHeight);
+      cancelAnimationFrame(scrollFrame); scrollFrame = requestAnimationFrame(updateScrollCue);
+      return;
+    }
     const video = picture.querySelector('video');
     const settings = video?.srcObject?.getVideoTracks()[0]?.getSettings();
     const aspect = video?.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : settings?.aspectRatio || (settings?.width && settings?.height ? settings.width / settings.height : 16 / 9);
