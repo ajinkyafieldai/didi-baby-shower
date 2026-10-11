@@ -23,9 +23,13 @@ Room creation is deliberate and does not require a Pages redeploy.
 ```sh
 node babyshower.js room create --hours 8 --dry-run
 node babyshower.js room create --hours 8
+# Deliberately switch future joins to a new cloud-recording-capable room:
+node babyshower.js room create --hours 8 --recording cloud --force
 ```
 
 The CLI calls `/api/video-provision`. The Pages Function uses the server-side `DAILY_API_KEY`, creates or reuses a Daily meeting, and stores the current room in the existing realtime Durable Object.
+
+Cloud recording capability does not start recording automatically. Start recording separately through Daily after participants join. `--force` stores the new room for future joins; existing participants remain in the previous room until they leave/rejoin.
 
 Guests call `/api/video-config`, which reads that stored room from realtime state and returns only the guest room URL and metadata needed by the browser. The Daily API key is never exposed to the client.
 
