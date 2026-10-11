@@ -5,3 +5,7 @@ dist/
 !.env.example
 *.log
 .venv-whisper/
+
+.venv-photobooth/
+__pycache__/
+*.pyc

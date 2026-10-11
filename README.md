@@ -23,9 +23,13 @@ Room creation is deliberate and does not require a Pages redeploy.
 ```sh
 node babyshower.js room create --hours 8 --dry-run
 node babyshower.js room create --hours 8
+# Deliberately switch future joins to a new cloud-recording-capable room:
+node babyshower.js room create --hours 8 --recording cloud --force
 ```
 
 The CLI calls `/api/video-provision`. The Pages Function uses the server-side `DAILY_API_KEY`, creates or reuses a Daily meeting, and stores the current room in the existing realtime Durable Object.
+
+Cloud recording capability does not start recording automatically. Start recording separately through Daily after participants join. `--force` stores the new room for future joins; existing participants remain in the previous room until they leave/rejoin.
 
 Guests call `/api/video-config`, which reads that stored room from realtime state and returns only the guest room URL and metadata needed by the browser. The Daily API key is never exposed to the client.
 
@@ -94,22 +98,18 @@ The keyword matcher is intentionally tolerant of noisy ASR output and supports L
 
 ## Photo workflow
 
-The native photobooth captures the visible meeting surface and uploads the image to the event backend.
+The server photobooth receives participant camera frames from the active Daily room,
+composes a named family grid at the three-second countdown deadline, and uploads a JPEG.
+Its camera and microphone publishing stay disabled.
 
 ```sh
-node photobooth.js run
+python3 -m pip install -r requirements-photobooth.txt
+BABYSHOWER_URL=https://didi-baby-shower.pages.dev python3 server/daily_photobooth.py
 ```
 
-The shared flow is:
-
-```text
-photo.capture
-  -> native photobooth
-  -> upload
-  -> photo.captured(asset)
-  -> photo.show(asset)
-  -> guest/projector display
-```
+The shared flow is `photo.capture` → Daily camera grid → upload →
+`photo.captured(asset)` → `latestPhoto` → guest/projector display.
+See [server setup, telemetry and verification](docs/daily-photobooth-server.md).
 
 ## Development
 

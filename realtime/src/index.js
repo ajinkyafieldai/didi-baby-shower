@@ -1,5 +1,6 @@
 import { familySnapshot, mutateFamily } from "./family-state.js";
 
+import { sanitizePhotobooth, photoboothSnapshot } from "./photobooth-telemetry.js";
 const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate", "photo"]);
 const COMMANDS = new Set(["photo.capture", "photo.show"]);
 const SYSTEM_EVENTS = new Set(["photo.captured"]);
@@ -34,6 +35,7 @@ async function telemetrySnapshot(ctx) {
   const startedAt = Number(await ctx.storage.get("startedAt") || now);
   return {
     activeClients: active.length,
+    photobooth: photoboothSnapshot(clients, now, TELEMETRY_ACTIVE_MS),
     byRole,
     latencyMs: {
       p50: percentile(latencies, 0.50),
@@ -147,6 +149,7 @@ export class CelebrationRoom {
         const stored = await this.ctx.storage.get("telemetryClients");
         const clients = stored && typeof stored === "object" ? stored : {};
         clients[clientId] = {
+          ...sanitizePhotobooth(body),
           role: String(body.role || "guest").trim().slice(0, 30) || "guest",
           lastSeen: Date.now(),
           latencyMs: Number.isFinite(Number(body.latencyMs)) ? Math.max(0, Math.min(60_000, Number(body.latencyMs))) : null,
