@@ -67,5 +67,10 @@ jobs:
       - name: Event package runtime proof
         run: node scripts/test-event-package-runtime.mjs
 
+      - name: Pilot call telemetry
+        run: |
+          node scripts/test-pilot-telemetry.mjs
+          node scripts/test-call-pin-restoration.mjs
+
       - name: Build and verify
         run: npm run build

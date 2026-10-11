@@ -1,4 +1,5 @@
 import { setupCelebrationLayout } from "./frontend/celebration-layout.js";
+import { clientEnvironment, createCallMetrics } from "./frontend/pilot-telemetry.js";
 import {
   FEATURES,
   featureEnabled,
@@ -455,6 +456,10 @@ const participantId = (() => {
 })();
 
 let latestRenderLatencyMs = null;
+const callMetrics = createCallMetrics();
+const telemetryId = crypto.randomUUID(); // A page session, not a unique person.
+const environment = clientEnvironment(navigator, window.innerWidth);
+let telemetryRevision = 0;
 
 async function sendTelemetry() {
   try {
@@ -463,11 +468,14 @@ async function sendTelemetry() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         type: "telemetry",
-        clientId: participantId,
+        clientId: telemetryId,
         role: "guest",
         latencyMs: latestRenderLatencyMs,
         lastEventSeq,
-        visible: document.visibilityState === "visible"
+        visible: document.visibilityState === "visible",
+        environment,
+        revision: ++telemetryRevision,
+        call: callMetrics.snapshot()
       }),
       cache: "no-store"
     });
@@ -501,6 +509,7 @@ joinForm.addEventListener("submit", async (event) => {
   statusText.textContent = "Connecting to video call…";
 
   frame.src = `/daily.html?name=${encodeURIComponent(guestName)}&event=${encodeURIComponent(EVENT_ID)}`;
+  callMetrics.signal('joining');
   stage.classList.add("in-call");
   fillLocationForms();
   if (featureEnabled("guestRibbon")) {
@@ -516,9 +525,14 @@ joinForm.addEventListener("submit", async (event) => {
 });
 
 window.addEventListener("message", (event) => {
-  if (event.origin !== window.location.origin) return;
+  if (event.origin !== window.location.origin || event.source !== frame.contentWindow) return;
 
   const message = event.data || {};
+  if (message.type === 'call-metric') {
+    callMetrics.signal(message.text);
+    sendTelemetry();
+    return;
+  }
 
   if (message.type === "video-status") {
     statusText.textContent = message.text || "Video call";
@@ -529,10 +543,13 @@ window.addEventListener("message", (event) => {
   }
 
   if (message.type === "video-config-error") {
+    callMetrics.signal('error');
     stage.classList.remove("in-call");
     joinMessage.textContent = message.text || "Video call is not configured yet.";
     statusText.textContent = "Video setup needed";
     callStatus.classList.remove("compact");
+    joinButton.disabled = !guestNameInput.value.trim();
+    joinButton.textContent = 'Join';
   }
 });
 

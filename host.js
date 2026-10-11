@@ -28,7 +28,7 @@ let lastEventSeq=0;
 let initialized=false;
 let latestLatency=null;
 
-function fmtMs(value){return Number.isFinite(Number(value))?Math.round(Number(value))+" ms":"—"}
+function fmtMs(value){return typeof value === 'number' && Number.isFinite(value)?Math.round(value)+" ms":"—"}
 function fmtUptime(ms){
   const total=Math.max(0,Math.floor(Number(ms||0)/1000));
   const h=Math.floor(total/3600),m=Math.floor((total%3600)/60);
@@ -40,17 +40,38 @@ function setHealth(kind,text){
 }
 function updateTelemetry(t){
   if(!t)return;
+  updatePilot(t.pilot);
   els.clients.textContent=t.activeClients??"—";
   els.guests.textContent=t.byRole?.guest??0;
   els.projectors.textContent=t.byRole?.projector??0;
   els.p50.textContent=fmtMs(t.latencyMs?.p50);
   els.p95.textContent=fmtMs(t.latencyMs?.p95);
   els.uptime.textContent=fmtUptime(t.uptimeMs);
-  const p95=Number(t.latencyMs?.p95);
+  const p95=t.latencyMs?.p95;
   if(!t.activeClients)setHealth("warn","No clients");
   else if(Number.isFinite(p95)&&p95>2500)setHealth("warn","Degraded");
-  else setHealth("good","Healthy");
+  else setHealth("good","Realtime reachable");
 }
+let latestPilot = null;
+function updatePilot(pilot) {
+  if (!pilot) return;
+  latestPilot = pilot;
+  document.getElementById('export-pilot').disabled = false;
+  document.getElementById('pilot-summary').textContent = `${pilot.activeCalls} connected · ${pilot.joining} joining · ${pilot.reconnecting} reconnecting. ${pilot.successes}/${pilot.attempts} successful attempts · ${pilot.failures} failed · ${pilot.errors} call errors · ${pilot.permissionErrors} device/permission errors · ${pilot.reconnects} interruptions · ${pilot.weakConnectionEvents} weak-connection periods. Join mean ${fmtMs(pilot.joinMeanMs)}, max ${fmtMs(pilot.joinMaxMs)}. Estimated connected minutes: ${pilot.participantMinutesEstimate}.`;
+  const list = document.getElementById('pilot-environments');
+  list.replaceChildren();
+  for (const [group, counts] of Object.entries(pilot.environments)) {
+    const row = document.createElement('li');
+    row.textContent = `${group}: ${counts.successes}/${counts.attempts} joins, ${counts.failures} failed, ${counts.permissionErrors} device errors, ${counts.reconnects} interruptions`;
+    list.append(row);
+  }
+}
+document.getElementById('export-pilot').addEventListener('click', () => {
+  if (!latestPilot) return;
+  const url = URL.createObjectURL(new Blob([JSON.stringify({ eventId: EVENT_PACKAGE.manifest.id, exportedAt: new Date().toISOString(), pilot: latestPilot }, null, 2)], { type: 'application/json' }));
+  const link = document.createElement('a'); link.href = url; link.download = 'didi-pilot-metrics.json'; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
 function prependEvent(event){
   const li=document.createElement("li");
   const time=document.createElement("time");

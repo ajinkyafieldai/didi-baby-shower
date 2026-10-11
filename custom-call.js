@@ -1,4 +1,4 @@
-
+import { observeCall, weakConnection } from './frontend/pilot-telemetry.js';
 const iconPaths = {
   mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/>',
   camera: '<rect x="2" y="5" width="14" height="14" rx="2"/><path d="m16 10 6-4v12l-6-4"/>',
@@ -328,6 +328,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     const config = await response.json();
     if (!response.ok || config.provider !== 'daily') throw new Error(config.error || 'Daily room is not configured.');
     call = window.Daily.createCallObject();
+    observeCall(call, signal => report('call-metric', signal));
     if (bootMessage) bootMessage.textContent = 'Joining… Allow camera and microphone if prompted.';
     joinTimer = window.setTimeout(() => {
       if (bootMessage?.isConnected) bootMessage.textContent = 'Still connecting. Check camera permissions, then reload to try again.';
@@ -346,7 +347,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     const online = () => updateConnection();
     window.addEventListener('offline', offline); window.addEventListener('online', online);
     call.on('network-connection', e => { const key = `${e.type}:${e.session_id || e.sfu_id || ''}`; if (e.event === 'interrupted') interrupted.add(key); if (e.event === 'connected') interrupted.delete(key); updateConnection(); });
-    call.on('network-quality-change', e => { if (!reconnecting && !interrupted.size && navigator.onLine) connection.textContent = ['warning', 'bad'].includes(e.networkState) ? 'Weak connection' : ''; });
+    call.on('network-quality-change', e => { if (!reconnecting && !interrupted.size && navigator.onLine) connection.textContent = weakConnection(e) ? 'Weak connection' : ''; });
     async function restoreDevices() {
       restoringDevices = true; buttons.audio.disabled = true;
       try {
