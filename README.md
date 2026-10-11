@@ -161,3 +161,9 @@ node babyshower.js recording stop --room <room-name>
 ```
 
 `start` returns immediately after provider acceptance; `stop` without a room resolves the event's current room. Use the printed recording ID to verify finalization. `run`/the default keeps checking status and exits when recording finishes or is canceled. SIGKILL, machine shutdown or loss of network cannot guarantee cleanup; recover with `stop --room` from another terminal. An ambiguous start timeout may also require manual stop. Do not start multiple recording controllers for the same room: Daily's stop operation is room-wide. This command records Daily media, not Didi's page animations.
+
+## Reset map pins
+
+`node babyshower.js reset pins` previews shared manual pins. Add `--confirm` to
+back them up and clear them with the operator admin token. See
+[setup and reset scope](docs/map-pin-reset.md).
