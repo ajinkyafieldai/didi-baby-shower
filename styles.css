@@ -2518,3 +2518,8 @@ body:not(.afterparty-mode) .app-shell { padding-top: 8px; }
 .back-to-call[hidden] { display:none; }
 .back-to-call:focus-visible { outline:3px solid #a94762; outline-offset:3px; }
 .utility-icon { width:22px; height:22px; vertical-align:middle; flex-shrink:0; }
+
+.family-toast{position:fixed;z-index:10000;bottom:28px;left:50%;transform:translateX(-50%);max-width:min(90vw,560px);padding:14px 20px;border-radius:16px;background:#422f35;color:white;box-shadow:0 6px 30px #0004;pointer-events:none;font-size:16px}
+.screen-awake-status{position:fixed;bottom:0;left:0;margin:0;padding:2px 8px;font-size:10px;color:#786970;background:#fffaf7;pointer-events:none}
+
+.keepsake-export-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.keepsake-export-actions .blessing-export{margin-top:0}.family-toast[hidden]{display:none}.screen-awake-status:empty{display:none}

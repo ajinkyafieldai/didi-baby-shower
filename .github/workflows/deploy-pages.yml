@@ -30,6 +30,7 @@ jobs:
           node scripts/test-shared-recipes.mjs
           node scripts/test-keepsake-export.mjs
           node scripts/test-server-photo-flow.mjs
+          node scripts/test-family-experience.mjs
       - name: Build site and Functions
         run: npm run build
       - name: Resolve the existing Pages production branch

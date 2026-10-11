@@ -124,6 +124,8 @@ async function startVideo() {
       report("video-status", "Live");
     });
 
+    callFrame.on("left-meeting", () => report("video-status", "Disconnected"));
+
     callFrame.on("error", (event) => {
       window.clearTimeout(loadTimeout);
       const message = event?.errorMsg || event?.error?.msg || "Daily call failed.";

@@ -2,6 +2,25 @@ import { loadEventPackage, applyEventTheme } from "./frontend/event-config.js";
 
 const EVENT_PACKAGE = await loadEventPackage();
 applyEventTheme(EVENT_PACKAGE);
+const capsuleDownloadForm = document.getElementById('capsule-download-form');
+capsuleDownloadForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const input = document.getElementById('capsule-download-key');
+  const status = document.getElementById('capsule-download-status');
+  const button = capsuleDownloadForm.querySelector('button');
+  if (button.disabled) return;
+  button.disabled = true; status.textContent = 'Preparing private download…';
+  try {
+    const response = await fetch('/api/capsule-export', { headers: { authorization: `Bearer ${input.value}` }, cache: 'no-store' });
+    if (!response.ok) throw new Error((await response.json()).error || 'Download failed.');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url; link.download = 'didi-time-capsules.json'; document.body.append(link); link.click(); link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    status.textContent = 'Time capsules downloaded. Keep this file for the family.';
+  } catch (error) { status.textContent = error.message || 'Download failed. Please retry.'; }
+  finally { input.value = ''; button.disabled = false; }
+});
 document.title = EVENT_PACKAGE.manifest.title + " Host";
 const hostEyebrow = document.querySelector(".host-header .eyebrow");
 if (hostEyebrow) hostEyebrow.textContent = EVENT_PACKAGE.manifest.title;

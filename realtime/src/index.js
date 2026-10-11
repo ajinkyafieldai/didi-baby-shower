@@ -1,5 +1,5 @@
 import { sanitizePilot, summarizePilot } from './pilot-metrics.js';
-import { familySnapshot, mutateFamily, resetFamilyPins } from "./family-state.js";
+import { familySnapshot, mutateFamily, sealCapsule, resetFamilyPins } from "./family-state.js";
 
 import { sanitizePhotobooth, photoboothSnapshot } from "./photobooth-telemetry.js";
 const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate", "photo"]);
@@ -79,6 +79,9 @@ export class CelebrationRoom {
   }
 
   async fetch(request) {
+    if (new URL(request.url).pathname === '/capsules/export' && request.method === 'GET') {
+      return json({ exportedAt: Date.now(), capsules: await this.ctx.storage.get('sealedCapsules') || [] });
+    }
     if (request.method === "GET") {
       const url = new URL(request.url);
       const since = Math.max(0, Number(url.searchParams.get("since") || 0));
@@ -117,7 +120,8 @@ export class CelebrationRoom {
       }
 
       if (body && (body.type === "family_add" || body.type === "family_react")) {
-        const result = await mutateFamily(this.ctx.storage, body);
+        const result = body.type === 'family_add' && body.collection === 'capsules'
+          ? await sealCapsule(this.ctx.storage, body.entry) : await mutateFamily(this.ctx.storage, body);
         const { status = 200, ...payload } = result;
         return json(payload, status);
       }
@@ -366,6 +370,10 @@ export default {
 
     if (request.headers.get("x-realtime-secret") !== env.REALTIME_SHARED_SECRET) {
       return json({ error: "Unauthorized" }, 401);
+    }
+
+    if (new URL(request.url).pathname === '/capsules/export') {
+      if (request.headers.get('x-family-admin') !== env.REALTIME_SHARED_SECRET) return json({ error: 'Unauthorized' }, 401);
     }
 
     const id = env.CELEBRATION_ROOM.idFromName("didi-baby-shower");

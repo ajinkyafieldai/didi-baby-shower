@@ -1,3 +1,4 @@
+import { visibleCallPeople } from './frontend/call-people.js';
 import { observeCall, weakConnection } from './frontend/pilot-telemetry.js';
 const iconPaths = {
   mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/>',
@@ -103,6 +104,13 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     </footer><p class="call-notice" role="status"></p>`;
   root.append(shell);
   const feedback = document.createElement('div'); feedback.className = 'call-feedback'; feedback.setAttribute('role', 'status'); shell.append(feedback);
+  const familyToast = document.createElement('div'); familyToast.className = 'call-family-toast'; familyToast.setAttribute('role', 'status'); familyToast.hidden = true; shell.append(familyToast);
+  function updateFamilyToast() { familyToast.hidden = !familyToast.textContent || !document.fullscreenElement; }
+  document.addEventListener('fullscreenchange', updateFamilyToast);
+  window.addEventListener('message', event => {
+    if (event.origin !== location.origin || event.source !== parent || event.data?.type !== 'family-toast') return;
+    familyToast.textContent = String(event.data.text || ''); updateFamilyToast();
+  });
   let feedbackTimer;
   function showFeedback(text) { clearTimeout(feedbackTimer); feedback.textContent = text; feedbackTimer = setTimeout(() => { feedback.textContent = ''; }, 1800); }
   const devicePanel = document.createElement('section');
@@ -281,7 +289,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   }
   function render() {
     if (reconnecting) return;
-    const people = Object.values(call.participants());
+    const people = visibleCallPeople(call.participants());
     pinned = resolvePinnedParticipant(people, pinTarget)?.session_id;
     shell.dataset.mode = mode;
     viewPanel.querySelector('.view-mode').value = mode;

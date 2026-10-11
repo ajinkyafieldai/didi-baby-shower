@@ -1,3 +1,4 @@
+import { visibleCallPeople } from './call-people.js';
 import './custom-call.css';
 
 export async function startCustomCall({ root, bootMessage, name, report, fail }) {
@@ -26,7 +27,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     if (track) element.play().catch(() => { if (element.tagName === 'AUDIO') notice.textContent = 'Tap Audio to hear the call.'; });
   }
   function render() {
-    const people = Object.values(call.participants());
+    const people = visibleCallPeople(call.participants());
     const ids = new Set(people.map(p => p.session_id));
     for (const p of people) if (!p.local) for (const kind of ['audio', 'screenAudio']) ids.add(`${p.session_id}:${kind}`);
     for (const [id, tile] of tiles) if (!ids.has(id)) { tile.remove(); tiles.delete(id); }

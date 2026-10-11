@@ -103,3 +103,7 @@
 .call-footer .mobile-audio { padding:3px; gap:1px; }
 .mobile-audio svg { width:19px; height:19px; }
 .mobile-audio small { font-size:8px; line-height:1; text-align:center; }
+
+.call-family-toast{position:absolute;z-index:50;bottom:80px;left:50%;transform:translateX(-50%);width:max-content;max-width:85%;padding:14px 18px;border-radius:16px;background:#422f35;color:white;box-shadow:0 4px 24px #0005;pointer-events:none;font-size:16px}
+
+.call-family-toast[hidden]{display:none}

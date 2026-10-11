@@ -203,6 +203,18 @@ class Photobooth:
             return
         self.join_started = now_ms()
         self.status = "joining"
+        token = self.token
+        admin_key = os.getenv("BABYSHOWER_ADMIN_TOKEN")
+        if admin_key:
+            try:
+                issued = self.api.request('/api/photobooth-token', {},
+                                          {"Authorization": "Bearer " + admin_key})
+                if issued.get('roomUrl') != room['roomUrl'] or not issued.get('token'):
+                    raise RuntimeError('Room changed while issuing token')
+                token = issued['token']
+            except Exception:
+                self.failure('hidden_token_failed')
+                return
         client = CallClient(event_handler=RoomEvents(self, generation))
         with self.lock:
             self.client = client
@@ -224,7 +236,7 @@ class Photobooth:
             for p in client.participants().values():
                 self.participant(p, generation)
             LOG.info("Joined active Daily room; camera/mic publishing disabled")
-        client.join(room["roomUrl"], meeting_token=self.token, client_settings=SAFE_SETTINGS, completion=joined)
+        client.join(room["roomUrl"], meeting_token=token, client_settings=SAFE_SETTINGS, completion=joined)
 
     def schedule(self, event):
         if not ((event.get("type") == "command" and event.get("command") == "photo.capture") or
