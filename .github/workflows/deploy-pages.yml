@@ -24,6 +24,7 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Check shared family and PDF export
         run: |
+          node scripts/test-pin-reset.mjs
           node scripts/test-family-state.mjs
           node scripts/test-shared-family-frontend.mjs
           node scripts/test-shared-recipes.mjs

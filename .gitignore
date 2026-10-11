@@ -9,3 +9,5 @@ dist/
 .venv-photobooth/
 __pycache__/
 *.pyc
+
+didi-pins-backup-*.json

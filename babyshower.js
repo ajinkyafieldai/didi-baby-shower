@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { resetPins } from "./scripts/reset-cli.mjs";
 import { recordingCommand } from "./scripts/recording-cli.mjs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -22,6 +23,7 @@ function usage(){
   babyshower trigger <name> [--force] [--dry-run]
   babyshower room create [--hours <n>] [--recording cloud] [--force] [--dry-run]
   babyshower recording [run|start|stop|status] [--room <name>] [--id <recording-id>]
+  babyshower reset pins [--confirm] [--backup <file>]
   babyshower photobooth [run|capture|health]
 
 Allowed triggers:
@@ -131,6 +133,10 @@ try{
     await createRoom(args.includes("--dry-run"));
   }else if(args[0]==="recording"){
     await recordingCommand(args[1] && !args[1].startsWith("--") ? args[1] : "run", {room:parseOption("--room"),id:parseOption("--id")});
+  }else if(args[0]==="reset"){
+    if(args[1]!=="pins") throw new Error("Use reset pins [--confirm] [--backup <file>].");
+    if(args.includes("--backup")&&!parseOption("--backup")) throw new Error("--backup requires a filename.");
+    await resetPins({confirm:args.includes("--confirm"),backup:parseOption("--backup")});
   }else if(args[0]==="photobooth"){
     runPhotobooth(args.slice(1));
   }else{
