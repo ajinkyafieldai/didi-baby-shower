@@ -1,3 +1,4 @@
+import { observeCall } from './frontend/pilot-telemetry.js';
 const root = document.getElementById("video-root");
 const bootMessage = document.getElementById("boot-message");
 const name = new URLSearchParams(location.search).get("name") || "Guest";
@@ -97,6 +98,7 @@ async function startVideo() {
       }
     });
 
+    observeCall(callFrame, signal => report('call-metric', signal));
     let joined = false;
     let loaded = false;
 

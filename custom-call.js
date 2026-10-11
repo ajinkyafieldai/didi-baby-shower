@@ -1,4 +1,4 @@
-
+import { observeCall, weakConnection } from './frontend/pilot-telemetry.js';
 const iconPaths = {
   mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/>',
   camera: '<rect x="2" y="5" width="14" height="14" rx="2"/><path d="m16 10 6-4v12l-6-4"/>',
@@ -11,7 +11,7 @@ const iconPaths = {
 };
 export function mobileAudioRoutes(devices, canSwitch) {
   const outputs = canSwitch ? devices.filter(d => d.kind === 'audiooutput' && d.deviceId) : [];
-  const bluetooth = outputs.find(d => /bluetooth|airpods|galaxy buds|pixel buds/i.test(d.label));
+  const bluetooth = outputs.find(d => /bluetooth|airpods|buds|headphones|headset|earbuds/i.test(d.label)) || outputs.find(d => d.label && !/default|communications|speaker|built.?in|earpiece/i.test(d.label));
   const speaker = outputs.find(d => /speaker|built.?in/i.test(d.label) && d !== bluetooth);
   return [{ kind: 'mute', label: 'Sound off' }, ...(bluetooth ? [{ kind: 'bluetooth', label: 'Bluetooth', id: bluetooth.deviceId }] : []), { kind: 'speaker', label: speaker ? 'Speaker' : 'Device audio', id: speaker?.deviceId || '' }];
 }
@@ -45,6 +45,22 @@ export function chooseCallLayout(width, height, aspect, count) {
   const rowScore = fittedArea(width, Math.max(1, height - rowSpace)) + Math.min(count, across * rows) * 6000;
   const columnScore = fittedArea(width - railWidth - 12, height) + Math.min(count, Math.floor(height / (railWidth * .7 + 6))) * 6000;
   return { rail: count && width >= 360 && width - railWidth >= 230 && columnScore > rowScore ? 'side' : 'bottom', tileWidth, tileHeight, rowSpace, railWidth };
+}
+export function chooseGridLayout(width, height, count) {
+  const gap = 8;
+  const availableWidth = Math.max(1, width - 16);
+  const availableHeight = Math.max(1, height - 16);
+  count = Math.max(1, count);
+  const maxColumns = Math.min(count, 6, Math.max(1, Math.floor((availableWidth + gap) / 148)));
+  let best;
+  for (let columns = 1; columns <= maxColumns; columns++) {
+    const rows = Math.ceil(count / columns);
+    const tileWidth = Math.min((availableWidth - (columns - 1) * gap) / columns, Math.max(88, (availableHeight - (rows - 1) * gap) / rows) * 16 / 9);
+    const overflow = Math.max(1, (rows * (tileWidth * 9 / 16 + gap) - gap) / availableHeight);
+    const score = tileWidth * tileWidth * (count / (rows * columns)) / overflow;
+    if (!best || score > best.score) best = { columns, rows, tileWidth, tileHeight: tileWidth * 9 / 16, score };
+  }
+  return best;
 }
 function controlIcon(kind, off = false) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[kind]}${off ? '<path d="m3 3 18 18"/>' : ''}</svg>`;
@@ -131,6 +147,15 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
   picture.addEventListener('scroll', updateScrollCue);
   thumbnails.addEventListener('scroll', updateScrollCue);
   function arrangeVideos() {
+    if (mode === 'grid') {
+      const layout = chooseGridLayout(picture.clientWidth, picture.clientHeight, picture.children.length);
+      picture.style.setProperty('--grid-columns', layout.columns);
+      picture.style.setProperty('--grid-tile-width', `${layout.tileWidth}px`);
+      picture.style.setProperty('--grid-tile-height', `${layout.tileHeight}px`);
+      picture.classList.toggle('grid-overflow', layout.rows * (layout.tileHeight + 8) + 8 > picture.clientHeight);
+      cancelAnimationFrame(scrollFrame); scrollFrame = requestAnimationFrame(updateScrollCue);
+      return;
+    }
     const video = picture.querySelector('video');
     const settings = video?.srcObject?.getVideoTracks()[0]?.getSettings();
     const aspect = video?.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : settings?.aspectRatio || (settings?.width && settings?.height ? settings.width / settings.height : 16 / 9);
@@ -200,6 +225,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
       soundOff = next.kind === 'mute'; preferences.soundOff = soundOff;
       for (const audio of audios.values()) { audio.muted = soundOff; if (!soundOff) audio.play().catch(() => {}); }
       mobileRoute = next.kind; savePreferences(); updateAudioButton();
+      if (next.kind !== 'mute' && mobileRoutes.length === 2) showFeedback('For Bluetooth, choose your headphones in the phone audio settings.');
     } catch { showFeedback('Audio output unavailable'); }
     finally { buttons.audio.disabled = call.meetingState() !== 'joined-meeting'; }
   }
@@ -328,6 +354,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     const config = await response.json();
     if (!response.ok || config.provider !== 'daily') throw new Error(config.error || 'Daily room is not configured.');
     call = window.Daily.createCallObject();
+    observeCall(call, signal => report('call-metric', signal));
     if (bootMessage) bootMessage.textContent = 'Joining… Allow camera and microphone if prompted.';
     joinTimer = window.setTimeout(() => {
       if (bootMessage?.isConnected) bootMessage.textContent = 'Still connecting. Check camera permissions, then reload to try again.';
@@ -346,7 +373,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     const online = () => updateConnection();
     window.addEventListener('offline', offline); window.addEventListener('online', online);
     call.on('network-connection', e => { const key = `${e.type}:${e.session_id || e.sfu_id || ''}`; if (e.event === 'interrupted') interrupted.add(key); if (e.event === 'connected') interrupted.delete(key); updateConnection(); });
-    call.on('network-quality-change', e => { if (!reconnecting && !interrupted.size && navigator.onLine) connection.textContent = ['warning', 'bad'].includes(e.networkState) ? 'Weak connection' : ''; });
+    call.on('network-quality-change', e => { if (!reconnecting && !interrupted.size && navigator.onLine) connection.textContent = weakConnection(e) ? 'Weak connection' : ''; });
     async function restoreDevices() {
       restoringDevices = true; buttons.audio.disabled = true;
       try {
@@ -363,7 +390,7 @@ export async function startCustomCall({ root, bootMessage, name, report, fail })
     call.on('error', e => { notice.textContent = e.errorMsg || 'Call connection failed.'; report('video-status', notice.textContent); });
     call.on('camera-error', () => { notice.textContent = 'Check camera and microphone permissions.'; });
     call.on('left-meeting', () => { reconnecting = true; shell.classList.add('reconnecting'); for (const audio of audios.values()) audio.srcObject = null; Object.values(buttons).forEach(b => b.disabled = true); connection.textContent = 'Disconnected'; notice.replaceChildren(document.createTextNode('Connection ended. ')); const retry = document.createElement('button'); retry.textContent = 'Rejoin'; retry.onclick = async () => { retry.disabled = true; connection.textContent = 'Reconnecting…'; try { await call.join({ url: config.roomUrl, userName: name }); notice.textContent = ''; } catch { connection.textContent = 'Could not reconnect'; retry.disabled = false; } }; notice.append(retry); showControls(); report('video-status', 'Disconnected'); });
-    buttons.mic.onclick = () => act(buttons.mic, async () => { await call.setLocalAudio(!call.localAudio()); showFeedback(call.localAudio() ? 'Mic on' : 'Mic off'); });
+    buttons.mic.onclick = () => act(buttons.mic, async () => { const enabled = !call.localAudio(); await call.setLocalAudio(enabled); showFeedback(enabled ? 'Mic on' : 'Mic off'); });
     buttons.camera.onclick = () => act(buttons.camera, () => call.setLocalVideo(!call.localVideo()));
     buttons.flip.onclick = () => act(buttons.flip, () => call.cycleCamera());
     buttons.audio.onclick = async () => {

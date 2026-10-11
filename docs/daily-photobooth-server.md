@@ -78,12 +78,14 @@ and confirm both frontends display the same asset without browser permissions or
 
 Feature branch: `feature/didi-server-family-photo`, target `devel`.
 Local verification: nine Python tests and the realtime telemetry persistence test pass;
-Daily's native SDK installs and initializes. Live Daily capture is **not verified** in the
-restricted authoring workspace: direct SDK room lookup fails DNS and its HTTP proxy is
-incompatible with Daily's proxy API. No live photo success was published.
+Daily's native SDK installs and initializes. The operator verified a real two-person
+capture (2 participants, 2 frames) and the live SDK test on 2026-10-11. The latter captured
+4 participants / 4 frames (the two existing participants plus two synthetic test peers),
+passed JPEG/latestPhoto checks and reported 0 ms deadline delay. A consumer cleanup error
+was logged after PASS. The authoring workspace itself cannot connect to Daily media.
 
-No changes from this feature are deployed by preparing this branch. Merging into `devel`
-triggers the existing Cloudflare realtime deploy workflow for the telemetry changes;
+PR #19 is merged into `devel` and its realtime telemetry workflow succeeded. Pushing a
+feature branch can create a Pages preview. Merging realtime changes into `devel` triggers the existing Cloudflare realtime deploy workflow for the telemetry changes;
 Pages needs the PR #15 frontend and existing `/api/photos` R2 binding. Cloudflare cannot
 run this native Python process: the command above must still be started on a separate
 server with Daily connectivity. Confirm the live test there before declaring capture ready.

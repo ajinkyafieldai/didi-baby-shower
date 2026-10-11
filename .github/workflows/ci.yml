@@ -67,6 +67,12 @@ jobs:
       - name: Event package runtime proof
         run: node scripts/test-event-package-runtime.mjs
 
+      - name: Pilot call telemetry
+        run: |
+          node scripts/test-pilot-telemetry.mjs
+          node scripts/test-call-pin-restoration.mjs
+          node scripts/test-shared-recipes.mjs
+          node scripts/test-server-photo-flow.mjs
       - name: Shared family state contract
         run: node scripts/test-family-state.mjs
       - name: Recording room contract

@@ -715,7 +715,7 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 .meet-reaction-balloon.burst {
-  animation: meet-balloon-pop .48s ease-out forwards;
+  animation: meet-balloon-pop .85s ease-out forwards;
 }
 
 .meet-reaction-burst-piece {
@@ -725,7 +725,7 @@ button { -webkit-tap-highlight-color: transparent; }
   bottom: 63px;
   font-size: 24px;
   pointer-events: none;
-  animation: meet-reaction-burst 1.35s cubic-bezier(.18,.72,.2,1) forwards;
+  animation: meet-reaction-burst 2.6s cubic-bezier(.18,.72,.2,1) forwards;
 }
 
 @keyframes meet-balloon-wiggle {
@@ -785,13 +785,13 @@ button { -webkit-tap-highlight-color: transparent; }
 .meet-celebration-confetti {
   font-size: clamp(17px, 4vw, 27px);
   filter: drop-shadow(0 3px 6px rgba(0,0,0,.10));
-  animation: meet-confetti-pop 1.85s cubic-bezier(.16,.72,.22,1) forwards;
+  animation: meet-confetti-pop 3.1s cubic-bezier(.16,.72,.22,1) forwards;
 }
 
 .meet-celebration-balloon {
   font-size: clamp(30px, 7vw, 48px);
   filter: drop-shadow(0 5px 9px rgba(0,0,0,.12));
-  animation: meet-balloon-float 2.7s cubic-bezier(.2,.7,.22,1) forwards;
+  animation: meet-balloon-float 4s cubic-bezier(.2,.7,.22,1) forwards;
 }
 
 @keyframes meet-confetti-pop {
@@ -2483,6 +2483,36 @@ body:not(.afterparty-mode) .app-shell { padding-top: 8px; }
 }
 
 .video-stage.in-call > .video-fullscreen { display:none; }
+
+/* Keep the call and its celebration controls together in the visible viewport. */
+@media (min-width: 980px) {
+  body:not(.afterparty-mode) .app-shell {
+    height: 100dvh;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    align-content: start;
+    align-items: stretch;
+  }
+  body:not(.afterparty-mode) .video-stage:not(:fullscreen):not(.video-expanded) {
+    height: 100%; min-height: 0;
+  }
+  body:not(.afterparty-mode) .blessing-panel {
+    min-height: 0; max-height: 100%; overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  body:not(.afterparty-mode) .blessing-card { min-height: 0; }
+  body:not(.afterparty-mode) .ritual-dock {
+    flex-wrap: nowrap; overflow-x: auto; align-items: center;
+    justify-content: flex-start;
+  }
+  body:not(.afterparty-mode) .ritual-button { flex: 1 0 68px; height: 56px; }
+}
+@media (max-width: 979px) {
+  body:not(.afterparty-mode) .video-stage:not(:fullscreen):not(.video-expanded) {
+    height: clamp(180px, calc(100dvh - 160px - env(safe-area-inset-bottom)), 780px);
+    min-height: 0;
+  }
+}
 
 .back-to-call { position:fixed; bottom:calc(16px + env(safe-area-inset-bottom)); right:16px; z-index:30; min-height:44px; padding:10px 16px; border:1px solid #e8d8c7; border-radius:24px; background:#fffaf2; color:#a94762; box-shadow:0 3px 16px #422f3526; font:600 14px system-ui; }
 .back-to-call[hidden] { display:none; }

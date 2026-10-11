@@ -1,4 +1,6 @@
 import { setupCelebrationLayout } from "./frontend/celebration-layout.js";
+import { createSharedRecipes } from "./frontend/shared-recipes.js";
+import { clientEnvironment, createCallMetrics } from "./frontend/pilot-telemetry.js";
 import {
   FEATURES,
   featureEnabled,
@@ -65,7 +67,6 @@ const guestNameInput = document.getElementById("guest-name");
 const joinButton = document.getElementById("join-button");
 const callStatus = document.querySelector(".call-status");
 const photoButton = document.querySelector(".photo-button");
-const photoHost = new URLSearchParams(location.search).get("photoHost") === "1";
 const gamePanel = document.getElementById("game-panel");
 const gameContent = document.getElementById("game-content");
 const gameClose = document.getElementById("game-close");
@@ -89,6 +90,12 @@ const capsuleForm = document.getElementById("capsule-form");
 const capsuleList = document.getElementById("capsule-list");
 const recipeForm = document.getElementById("recipe-form");
 const recipeList = document.getElementById("recipe-list");
+const recipeStatus = document.getElementById("recipe-status");
+const sharedRecipes = createSharedRecipes({ changed: () => {
+  if (activeHubView === "recipes") renderRecipes();
+  if (activeHubView === "keepsake") renderKeepsakeSummary();
+} });
+let recipeDraft = null;
 const photoMosaic = document.getElementById("photo-mosaic");
 const guestForm = document.getElementById("guest-form");
 const arrivalRibbon = document.getElementById("arrival-ribbon");
@@ -272,7 +279,9 @@ function coordinatesForCity(city) {
 let effectTimer = null;
 let groupEffectTimer = null;
 let audioContext = null;
-let photoCaptureStream = null;
+let photoResultTimer = null;
+let lastPhotoSeq = 0;
+let lastPhotoAt = 0;
 
 function showPhotoButton() {
   if (!featureEnabled("familyPhoto") || !photoButton) return;
@@ -284,121 +293,6 @@ function showPhotoButton() {
   photoButton.style.bottom = "14px";
 }
 
-async function saveFamilyPhotoBlob(blob) {
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filename = `baby-shower-${stamp}.jpg`;
-
-  const localUrl = URL.createObjectURL(blob);
-  const download = document.createElement("a");
-  download.href = localUrl;
-  download.download = filename;
-  download.style.display = "none";
-  document.body.appendChild(download);
-  download.click();
-  download.remove();
-  window.setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
-
-  const response = await fetch("/api/photos", {
-    method: "POST",
-    headers: {
-      "Content-Type": "image/jpeg",
-      "X-Photo-Name": filename
-    },
-    body: blob
-  });
-
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error("Cloud photo save failed" + (detail ? ": " + detail : ""));
-  }
-
-  return response.json();
-}
-
-async function ensurePhotoCapture() {
-  if (
-    photoCaptureStream &&
-    photoCaptureStream.getVideoTracks().some((track) => track.readyState === "live")
-  ) {
-    return photoCaptureStream;
-  }
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-    throw new Error("This browser cannot capture the family photo.");
-  }
-
-  // Prefer capturing this tab on Chromium. If a browser rejects these
-  // optional hints, retry with the standards-only request.
-  try {
-    photoCaptureStream = await navigator.mediaDevices.getDisplayMedia({
-      video: { displaySurface: "browser" },
-      audio: false,
-      preferCurrentTab: true,
-      selfBrowserSurface: "include",
-      surfaceSwitching: "include"
-    });
-  } catch (error) {
-    if (error && error.name === "TypeError") {
-      photoCaptureStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: false
-      });
-    } else {
-      throw error;
-    }
-  }
-
-  const [track] = photoCaptureStream.getVideoTracks();
-  if (track) {
-    track.addEventListener("ended", () => {
-      photoCaptureStream = null;
-    }, { once: true });
-  }
-
-  return photoCaptureStream;
-}
-
-async function captureFamilyPhoto() {
-  const stream = photoCaptureStream;
-  const track = stream && stream.getVideoTracks()[0];
-
-  if (!track || track.readyState !== "live") {
-    throw new Error("Photo capture is no longer active.");
-  }
-
-  const video = document.createElement("video");
-  video.muted = true;
-  video.playsInline = true;
-  video.srcObject = stream;
-
-  await new Promise((resolve, reject) => {
-    video.onloadedmetadata = resolve;
-    video.onerror = () => reject(new Error("Could not read the captured tab."));
-  });
-  await video.play();
-
-  const rect = stage.getBoundingClientRect();
-  const scaleX = video.videoWidth / window.innerWidth;
-  const scaleY = video.videoHeight / window.innerHeight;
-  const sx = Math.max(0, Math.round(rect.left * scaleX));
-  const sy = Math.max(0, Math.round(rect.top * scaleY));
-  const sw = Math.min(video.videoWidth - sx, Math.max(1, Math.round(rect.width * scaleX)));
-  const sh = Math.min(video.videoHeight - sy, Math.max(1, Math.round(rect.height * scaleY)));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = sw;
-  canvas.height = sh;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
-
-  video.pause();
-  video.srcObject = null;
-
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
-  if (!blob) throw new Error("Could not create the family photo.");
-
-  return saveFamilyPhotoBlob(blob);
-}
 
 function ensureAudioContext() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -455,6 +349,10 @@ const participantId = (() => {
 })();
 
 let latestRenderLatencyMs = null;
+const callMetrics = createCallMetrics();
+const telemetryId = crypto.randomUUID(); // A page session, not a unique person.
+const environment = clientEnvironment(navigator, window.innerWidth);
+let telemetryRevision = 0;
 
 async function sendTelemetry() {
   try {
@@ -463,11 +361,14 @@ async function sendTelemetry() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         type: "telemetry",
-        clientId: participantId,
+        clientId: telemetryId,
         role: "guest",
         latencyMs: latestRenderLatencyMs,
         lastEventSeq,
-        visible: document.visibilityState === "visible"
+        visible: document.visibilityState === "visible",
+        environment,
+        revision: ++telemetryRevision,
+        call: callMetrics.snapshot()
       }),
       cache: "no-store"
     });
@@ -501,6 +402,7 @@ joinForm.addEventListener("submit", async (event) => {
   statusText.textContent = "Connecting to video call…";
 
   frame.src = `/daily.html?name=${encodeURIComponent(guestName)}&event=${encodeURIComponent(EVENT_ID)}`;
+  callMetrics.signal('joining');
   stage.classList.add("in-call");
   fillLocationForms();
   if (featureEnabled("guestRibbon")) {
@@ -516,9 +418,14 @@ joinForm.addEventListener("submit", async (event) => {
 });
 
 window.addEventListener("message", (event) => {
-  if (event.origin !== window.location.origin) return;
+  if (event.origin !== window.location.origin || event.source !== frame.contentWindow) return;
 
   const message = event.data || {};
+  if (message.type === 'call-metric') {
+    callMetrics.signal(message.text);
+    sendTelemetry();
+    return;
+  }
 
   if (message.type === "video-status") {
     statusText.textContent = message.text || "Video call";
@@ -529,10 +436,13 @@ window.addEventListener("message", (event) => {
   }
 
   if (message.type === "video-config-error") {
+    callMetrics.signal('error');
     stage.classList.remove("in-call");
     joinMessage.textContent = message.text || "Video call is not configured yet.";
     statusText.textContent = "Video setup needed";
     callStatus.classList.remove("compact");
+    joinButton.disabled = !guestNameInput.value.trim();
+    joinButton.textContent = 'Join';
   }
 });
 
@@ -593,8 +503,23 @@ async function pollEvents() {
 
     const data = await response.json();
     const now = Date.now();
+    sharedRecipes.accept(data.family);
     const resumedAfterGap = now - lastPollCompletedAt > RESUME_GAP_MS;
     const shouldResync = resyncOnNextPoll || resumedAfterGap;
+    // Snapshot recovery also catches a completed capture after a polling gap.
+    const photo = data.latestPhoto;
+    if (photo && Number(photo.seq) > lastPhotoSeq) {
+      if (eventsInitialized && now - Number(photo.at || 0) <= 60000) {
+        window.clearTimeout(photoResultTimer);
+        window.clearTimeout(effectTimer);
+        showCapturedPhoto(photo.asset);
+        eventLabel.textContent = "Family photo saved ✓";
+        eventLabel.classList.add("visible");
+        effectTimer = window.setTimeout(() => eventLabel.classList.remove("visible"), 5200);
+      }
+      lastPhotoSeq = Number(photo.seq);
+      lastPhotoAt = Number(photo.at || 0);
+    }
 
     if (data.games) {
       const previous = JSON.stringify(gameState);
@@ -631,7 +556,8 @@ async function pollEvents() {
       events
         .filter((event) =>
           event &&
-          event.type === "effect" &&
+          (event.type === "effect" ||
+            (event.type === "command" && event.command === "photo.capture")) &&
           Number(event.seq || 0) > lastEventSeq &&
           now - Number(event.at || 0) <= MAX_EFFECT_AGE_MS
         )
@@ -639,7 +565,7 @@ async function pollEvents() {
         .forEach((event, index) => {
           window.setTimeout(() => {
             latestRenderLatencyMs = Math.max(0, Date.now() - Number(event.at || Date.now()));
-            playEffect(event.effect, event.sender || "Someone", event.effect === "photo" && photoHost);
+            playEffect(event.effect || "photo", event.sender || "Someone", Number(event.at) || Date.now());
             if (event.groupCelebration) {
               playGroupCelebration(event.effect, event.groupCount || 2, Boolean(event.groupBurst));
             }
@@ -670,8 +596,9 @@ async function sendEffect(effect) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        type: "effect",
-        effect,
+        ...(effect === "photo"
+          ? { type: "command", command: "photo.capture" }
+          : { type: "effect", effect }),
         sender: guestName || "Someone",
         senderId: participantId
       }),
@@ -689,7 +616,7 @@ async function sendEffect(effect) {
       lastEventSeq = Math.max(lastEventSeq, data.seq);
     }
 
-    playEffect(effect, guestName || "Someone", effect === "photo" && photoHost);
+    playEffect(effect, guestName || "Someone", Number(data.event?.at) || Date.now());
     if (data.event && data.event.groupCelebration) {
       playGroupCelebration(
         data.event.effect,
@@ -700,7 +627,12 @@ async function sendEffect(effect) {
   } catch (error) {
     console.error("Celebration sync send failed", error);
     statusText.textContent = "Celebration sync offline (" + (error.message || "error") + ")";
-    playEffect(effect, guestName || "Someone", effect === "photo" && photoHost);
+    if (effect === "photo") {
+      eventLabel.textContent = "Photo request failed. Please try again.";
+      eventLabel.classList.add("visible");
+    } else {
+      playEffect(effect, guestName || "Someone");
+    }
   }
 }
 
@@ -872,6 +804,7 @@ function renderGame(game) {
 let activeHubView = "wall";
 let timelineObjectUrls = [];
 let recipeObjectUrls = [];
+let recipeRenderVersion = 0;
 let mosaicObjectUrls = [];
 
 function safeGuestName() {
@@ -1055,10 +988,12 @@ function renderCapsules() {
 }
 
 async function renderRecipes() {
-  recipeObjectUrls.forEach(URL.revokeObjectURL);
-  recipeObjectUrls = [];
-  const items = familyStore.read().recipes.slice().reverse();
+  const version = ++recipeRenderVersion;
+  const nextObjectUrls = [];
+  const items = sharedRecipes.list(familyStore.read().recipes);
   if (!items.length) {
+    recipeObjectUrls.forEach(URL.revokeObjectURL);
+    recipeObjectUrls = [];
     recipeList.innerHTML = '<p class="hub-empty">No recipes yet. Someone has to preserve the family food lore 🍲</p>';
     return;
   }
@@ -1066,12 +1001,15 @@ async function renderRecipes() {
   const rows = [];
   for (const item of items) {
     let photo = "";
+    if (typeof item.asset === "string" && /^\/api\/photos\?key=photos(?:%2[fF]|\/)[a-zA-Z0-9%._-]+$/.test(item.asset)) {
+      photo = `<img src="${escapeHtml(item.asset)}" alt="Dish photo">`;
+    }
     if (item.photoId) {
       try {
         const blob = await wallPhotoStore.get(item.photoId);
         if (blob) {
           const url = URL.createObjectURL(blob);
-          recipeObjectUrls.push(url);
+          nextObjectUrls.push(url);
           photo = `<img src="${url}" alt="">`;
         }
       } catch {}
@@ -1088,10 +1026,14 @@ async function renderRecipes() {
             <pre>${escapeHtml(item.recipe)}</pre>
           </details>
           <small>— ${escapeHtml(item.sender)}</small>
+          ${item.localOnly ? '<small>Saved on this device only</small>' : ''}
         </div>
       </article>
     `);
   }
+  if (version !== recipeRenderVersion) { nextObjectUrls.forEach(URL.revokeObjectURL); return; }
+  recipeObjectUrls.forEach(URL.revokeObjectURL);
+  recipeObjectUrls = nextObjectUrls;
   recipeList.innerHTML = rows.join("");
 }
 
@@ -1149,7 +1091,7 @@ function renderKeepsakeSummary() {
       <div><strong>${photoCount}</strong><span>photos</span></div>
       <div><strong>${hub.timeline.length}</strong><span>memories</span></div>
       <div><strong>${hub.capsules.length}</strong><span>time capsules</span></div>
-      <div><strong>${hub.recipes.length}</strong><span>recipes</span></div>
+      <div><strong>${sharedRecipes.list(hub.recipes).length}</strong><span>recipes</span></div>
       <div><strong>${hub.guests.length}</strong><span>people here</span></div>
     </div>
     <div class="keepsake-callout">
@@ -1236,21 +1178,46 @@ capsuleForm.addEventListener("submit", (event) => {
 recipeForm.addEventListener("submit", async (event) => {
   if (!featureEnabled("recipeBook")) return;
   event.preventDefault();
-  const data = new FormData(event.currentTarget);
-  const photoId = await storeOptionalPhoto(event.currentTarget.elements.photo.files[0]);
-  familyStore.add("recipes", {
-    id: crypto.randomUUID(),
+  const form = event.currentTarget;
+  const submit = form.querySelector('[type="submit"]');
+  if (submit.disabled) return;
+  const data = new FormData(form);
+  const file = form.elements.photo.files[0];
+  const content = {
     name: String(data.get("name") || "").trim().slice(0, 80),
     why: String(data.get("why") || "").trim().slice(0, 180),
     recipe: String(data.get("recipe") || "").trim().slice(0, 900),
-    photoId,
-    sender: safeGuestName(),
-    at: Date.now()
-  });
-  event.currentTarget.reset();
-  setBusy(submit, false);
-  playChime("photo");
-  renderRecipes();
+    sender: safeGuestName()
+  };
+  const fingerprint = JSON.stringify(content);
+  if (!recipeDraft || recipeDraft.fingerprint !== fingerprint || recipeDraft.file !== file) {
+    recipeDraft = { fingerprint, file, entry: { id: crypto.randomUUID(), ...content } };
+  }
+  const fields = [...form.elements].filter(element => element !== submit);
+  const disabled = fields.map(element => element.disabled);
+  fields.forEach(element => { element.disabled = true; });
+  setBusy(submit, true, "Sharing…");
+  recipeStatus.textContent = "Sharing recipe…";
+  try {
+    if (file && !recipeDraft.entry.asset) {
+      const blob = await compressWallPhoto(file);
+      const response = await fetch('/api/photos', { method: 'POST', headers: { 'Content-Type': 'image/jpeg', 'X-Photo-Name': 'recipe.jpg' }, body: blob });
+      const uploaded = await response.json();
+      if (!response.ok || !uploaded.ok || !uploaded.key) throw new Error(uploaded.error || 'Could not upload dish photo. Try again.');
+      recipeDraft.entry.asset = '/api/photos?key=' + encodeURIComponent(uploaded.key);
+    }
+    await sharedRecipes.add(recipeDraft.entry);
+    form.reset();
+    recipeDraft = null;
+    recipeStatus.textContent = "Shared with everyone ✓";
+    playChime("photo");
+    renderRecipes();
+  } catch (error) {
+    recipeStatus.textContent = error.message || "Could not share recipe. Your recipe is still here; try again.";
+  } finally {
+    fields.forEach((element, index) => { element.disabled = disabled[index]; });
+    setBusy(submit, false);
+  }
 });
 
 guestForm.addEventListener("submit", (event) => {
@@ -1639,7 +1606,7 @@ function clearNormalEffects() {
   });
 }
 
-function playEffect(effect, sender, capturePhoto = false) {
+function playEffect(effect, sender, requestedAt = Date.now()) {
   clearTimeout(effectTimer);
   clearNormalEffects();
 
@@ -1781,29 +1748,14 @@ function playEffect(effect, sender, capturePhoto = false) {
         if (snap) {
           playChime("photo");
 
-          if (capturePhoto) {
-            // Only the designated desktop/laptop photo host stores the image.
-            // Everyone else just participates in the synchronized countdown.
-            Promise.resolve()
-              .then(async () => {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-                  throw new Error("Photo host browser does not support tab capture.");
-                }
-                statusText.textContent = "Photo host: select this tab once…";
-                await ensurePhotoCapture();
-                return captureFamilyPhoto();
-              })
-              .then(() => {
-                eventLabel.textContent = "Family photo saved ✓";
-                eventLabel.classList.add("visible");
-                statusText.textContent = stage.classList.contains("in-call") ? "Live" : "Ready to join";
-              })
-              .catch((error) => {
-                console.error("Family photo save failed", error);
-                eventLabel.textContent = "Photo host failed to save: " + (error.message || "unknown error");
-                eventLabel.classList.add("visible");
-                statusText.textContent = stage.classList.contains("in-call") ? "Live" : "Ready to join";
-              });
+          if (lastPhotoAt < requestedAt) {
+            eventLabel.textContent = "Saving family photo…";
+            eventLabel.classList.add("visible");
+            window.clearTimeout(photoResultTimer);
+            photoResultTimer = window.setTimeout(() => {
+              eventLabel.textContent = "Photo has not arrived yet — ask the host to check capture.";
+              eventLabel.classList.add("visible");
+            }, 30000);
           }
 
           const flash = document.createElement("div");
@@ -1813,10 +1765,10 @@ function playEffect(effect, sender, capturePhoto = false) {
         } else {
           playChime("ritual");
         }
-      }, delay);
+      }, Math.max(0, requestedAt + delay - Date.now()));
     });
 
-    window.setTimeout(() => photo.remove(), 4600);
+    window.setTimeout(() => photo.remove(), Math.max(0, requestedAt + 4600 - Date.now()));
   }
 
   if (effect === "celebrate") {
@@ -1828,7 +1780,7 @@ function playEffect(effect, sender, capturePhoto = false) {
 
   effectTimer = window.setTimeout(() => {
     clearNormalEffects();
-    eventLabel.classList.remove("visible");
+    if (effect !== "photo") eventLabel.classList.remove("visible");
   }, 5200);
 }
 
@@ -1886,11 +1838,11 @@ function playGroupCelebration(effect, count = 2, burst = false) {
         piece.style.setProperty("--distance", `${90 + Math.random() * 180}px`);
         piece.style.animationDelay = `${Math.random() * 0.12}s`;
         effectLayer.appendChild(piece);
-        window.setTimeout(() => piece.remove(), 1500);
+        window.setTimeout(() => piece.remove(), 2900);
       }
     }
 
-    window.setTimeout(() => group.remove(), 520);
+    window.setTimeout(() => group.remove(), 900);
     return;
   }
 
@@ -1932,7 +1884,7 @@ function playMeetCelebrationBurst() {
   }
 
   effectLayer.appendChild(celebration);
-  window.setTimeout(() => celebration.remove(), 3200);
+  window.setTimeout(() => celebration.remove(), 4600);
 }
 
 // Expose only the small event-rendering boundary that the realtime layer needs.
@@ -1942,9 +1894,6 @@ window.babyShower = { playEffect, playGroupCelebration };
 showPhotoButton();
 
 
-if (photoHost) {
-  console.info("Family photo host enabled for this browser.");
-}
 
 if (!afterpartyMode) {
   setupCelebrationLayout({
