@@ -71,6 +71,7 @@ jobs:
         run: |
           node scripts/test-pilot-telemetry.mjs
           node scripts/test-call-pin-restoration.mjs
+          node scripts/test-shared-recipes.mjs
 
       - name: Build and verify
         run: npm run build

@@ -1,4 +1,5 @@
 import { setupCelebrationLayout } from "./frontend/celebration-layout.js";
+import { createSharedRecipes } from "./frontend/shared-recipes.js";
 import { clientEnvironment, createCallMetrics } from "./frontend/pilot-telemetry.js";
 import {
   FEATURES,
@@ -90,6 +91,12 @@ const capsuleForm = document.getElementById("capsule-form");
 const capsuleList = document.getElementById("capsule-list");
 const recipeForm = document.getElementById("recipe-form");
 const recipeList = document.getElementById("recipe-list");
+const recipeStatus = document.getElementById("recipe-status");
+const sharedRecipes = createSharedRecipes({ changed: () => {
+  if (activeHubView === "recipes") renderRecipes();
+  if (activeHubView === "keepsake") renderKeepsakeSummary();
+} });
+let recipeDraft = null;
 const photoMosaic = document.getElementById("photo-mosaic");
 const guestForm = document.getElementById("guest-form");
 const arrivalRibbon = document.getElementById("arrival-ribbon");
@@ -610,6 +617,7 @@ async function pollEvents() {
 
     const data = await response.json();
     const now = Date.now();
+    sharedRecipes.accept(data.family);
     const resumedAfterGap = now - lastPollCompletedAt > RESUME_GAP_MS;
     const shouldResync = resyncOnNextPoll || resumedAfterGap;
 
@@ -889,6 +897,7 @@ function renderGame(game) {
 let activeHubView = "wall";
 let timelineObjectUrls = [];
 let recipeObjectUrls = [];
+let recipeRenderVersion = 0;
 let mosaicObjectUrls = [];
 
 function safeGuestName() {
@@ -1072,10 +1081,12 @@ function renderCapsules() {
 }
 
 async function renderRecipes() {
-  recipeObjectUrls.forEach(URL.revokeObjectURL);
-  recipeObjectUrls = [];
-  const items = familyStore.read().recipes.slice().reverse();
+  const version = ++recipeRenderVersion;
+  const nextObjectUrls = [];
+  const items = sharedRecipes.list(familyStore.read().recipes);
   if (!items.length) {
+    recipeObjectUrls.forEach(URL.revokeObjectURL);
+    recipeObjectUrls = [];
     recipeList.innerHTML = '<p class="hub-empty">No recipes yet. Someone has to preserve the family food lore 🍲</p>';
     return;
   }
@@ -1083,12 +1094,15 @@ async function renderRecipes() {
   const rows = [];
   for (const item of items) {
     let photo = "";
+    if (typeof item.asset === "string" && /^\/api\/photos\?key=photos(?:%2[fF]|\/)[a-zA-Z0-9%._-]+$/.test(item.asset)) {
+      photo = `<img src="${escapeHtml(item.asset)}" alt="Dish photo">`;
+    }
     if (item.photoId) {
       try {
         const blob = await wallPhotoStore.get(item.photoId);
         if (blob) {
           const url = URL.createObjectURL(blob);
-          recipeObjectUrls.push(url);
+          nextObjectUrls.push(url);
           photo = `<img src="${url}" alt="">`;
         }
       } catch {}
@@ -1105,10 +1119,14 @@ async function renderRecipes() {
             <pre>${escapeHtml(item.recipe)}</pre>
           </details>
           <small>— ${escapeHtml(item.sender)}</small>
+          ${item.localOnly ? '<small>Saved on this device only</small>' : ''}
         </div>
       </article>
     `);
   }
+  if (version !== recipeRenderVersion) { nextObjectUrls.forEach(URL.revokeObjectURL); return; }
+  recipeObjectUrls.forEach(URL.revokeObjectURL);
+  recipeObjectUrls = nextObjectUrls;
   recipeList.innerHTML = rows.join("");
 }
 
@@ -1166,7 +1184,7 @@ function renderKeepsakeSummary() {
       <div><strong>${photoCount}</strong><span>photos</span></div>
       <div><strong>${hub.timeline.length}</strong><span>memories</span></div>
       <div><strong>${hub.capsules.length}</strong><span>time capsules</span></div>
-      <div><strong>${hub.recipes.length}</strong><span>recipes</span></div>
+      <div><strong>${sharedRecipes.list(hub.recipes).length}</strong><span>recipes</span></div>
       <div><strong>${hub.guests.length}</strong><span>people here</span></div>
     </div>
     <div class="keepsake-callout">
@@ -1253,21 +1271,46 @@ capsuleForm.addEventListener("submit", (event) => {
 recipeForm.addEventListener("submit", async (event) => {
   if (!featureEnabled("recipeBook")) return;
   event.preventDefault();
-  const data = new FormData(event.currentTarget);
-  const photoId = await storeOptionalPhoto(event.currentTarget.elements.photo.files[0]);
-  familyStore.add("recipes", {
-    id: crypto.randomUUID(),
+  const form = event.currentTarget;
+  const submit = form.querySelector('[type="submit"]');
+  if (submit.disabled) return;
+  const data = new FormData(form);
+  const file = form.elements.photo.files[0];
+  const content = {
     name: String(data.get("name") || "").trim().slice(0, 80),
     why: String(data.get("why") || "").trim().slice(0, 180),
     recipe: String(data.get("recipe") || "").trim().slice(0, 900),
-    photoId,
-    sender: safeGuestName(),
-    at: Date.now()
-  });
-  event.currentTarget.reset();
-  setBusy(submit, false);
-  playChime("photo");
-  renderRecipes();
+    sender: safeGuestName()
+  };
+  const fingerprint = JSON.stringify(content);
+  if (!recipeDraft || recipeDraft.fingerprint !== fingerprint || recipeDraft.file !== file) {
+    recipeDraft = { fingerprint, file, entry: { id: crypto.randomUUID(), ...content } };
+  }
+  const fields = [...form.elements].filter(element => element !== submit);
+  const disabled = fields.map(element => element.disabled);
+  fields.forEach(element => { element.disabled = true; });
+  setBusy(submit, true, "Sharing…");
+  recipeStatus.textContent = "Sharing recipe…";
+  try {
+    if (file && !recipeDraft.entry.asset) {
+      const blob = await compressWallPhoto(file);
+      const response = await fetch('/api/photos', { method: 'POST', headers: { 'Content-Type': 'image/jpeg', 'X-Photo-Name': 'recipe.jpg' }, body: blob });
+      const uploaded = await response.json();
+      if (!response.ok || !uploaded.ok || !uploaded.key) throw new Error(uploaded.error || 'Could not upload dish photo. Try again.');
+      recipeDraft.entry.asset = '/api/photos?key=' + encodeURIComponent(uploaded.key);
+    }
+    await sharedRecipes.add(recipeDraft.entry);
+    form.reset();
+    recipeDraft = null;
+    recipeStatus.textContent = "Shared with everyone ✓";
+    playChime("photo");
+    renderRecipes();
+  } catch (error) {
+    recipeStatus.textContent = error.message || "Could not share recipe. Your recipe is still here; try again.";
+  } finally {
+    fields.forEach((element, index) => { element.disabled = disabled[index]; });
+    setBusy(submit, false);
+  }
 });
 
 guestForm.addEventListener("submit", (event) => {
