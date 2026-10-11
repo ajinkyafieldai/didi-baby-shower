@@ -67,5 +67,8 @@ jobs:
       - name: Event package runtime proof
         run: node scripts/test-event-package-runtime.mjs
 
+      - name: Recording room contract
+        run: node scripts/test-recording-room.mjs
+
       - name: Build and verify
         run: npm run build

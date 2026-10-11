@@ -19,7 +19,7 @@ const TRIGGERS=Object.freeze({
 function usage(){
   console.log(`Usage:
   babyshower trigger <name> [--force] [--dry-run]
-  babyshower room create [--hours <n>] [--dry-run]
+  babyshower room create [--hours <n>] [--recording cloud] [--force] [--dry-run]
   babyshower photobooth [run|capture|health]
 
 Allowed triggers:
@@ -75,6 +75,10 @@ function parseOption(name, fallback=null){
 
 async function createRoom(dryRun=false){
   const hours=Number(parseOption("--hours","8"));
+  const recording=parseOption("--recording");
+  const force=args.includes("--force");
+  if(args.includes("--recording") && recording!=="cloud") throw new Error('--recording must be cloud.');
+  const payload={hours,...(recording?{recording}:{}),...(force?{force:true}:{})};
 
   if(!Number.isFinite(hours)||hours<=0||hours>24){
     throw new Error("--hours must be between 0 and 24.");
@@ -85,7 +89,7 @@ async function createRoom(dryRun=false){
       ok:true,
       dryRun:true,
       provider:"daily",
-      hours,
+      ...payload,
       endpoint:"/api/video-provision"
     },null,2));
     return;
@@ -96,7 +100,7 @@ async function createRoom(dryRun=false){
   const response=await fetch(baseUrl+"/api/video-provision",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({hours}),
+    body:JSON.stringify(payload),
     cache:"no-store"
   });
 
