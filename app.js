@@ -1,3 +1,4 @@
+import { buildKeepsake, photoPath } from "./frontend/keepsake-data.js";
 import { createSharedFamily, sharedPhotoPath } from "./frontend/shared-family.js";
 import { setupCelebrationLayout } from "./frontend/celebration-layout.js";
 import { createSharedRecipes } from "./frontend/shared-recipes.js";
@@ -79,6 +80,8 @@ const blessingMessage = document.getElementById("blessing-message");
 const blessingCount = document.getElementById("blessing-count");
 const blessingWall = document.getElementById("blessing-wall");
 const blessingExport = document.getElementById("blessing-export");
+const keepsakeExportStatus = document.getElementById("keepsake-export-status");
+let keepsakeSharedSnapshot = {};
 const wallPhotoInput = document.getElementById("wall-photo-input");
 const wallPhotoCaption = document.getElementById("wall-photo-caption");
 const wallPhotoStatus = document.getElementById("wall-photo-status");
@@ -529,6 +532,7 @@ async function pollEvents() {
     const data = await response.json();
     const now = Date.now();
     sharedRecipes.accept(data.family);
+    acceptKeepsakeSnapshot(data);
     sharedFamily.accept(data.family);
     const resumedAfterGap = now - lastPollCompletedAt > RESUME_GAP_MS;
     const shouldResync = resyncOnNextPoll || resumedAfterGap;
@@ -1443,91 +1447,78 @@ async function compressWallPhoto(file) {
   }
 }
 
+function acceptKeepsakeSnapshot(data) {
+  if (data.family && Number.isSafeInteger(data.family.revision) &&
+      data.family.revision >= (keepsakeSharedSnapshot.family?.revision ?? -1)) {
+    keepsakeSharedSnapshot.family = data.family;
+  }
+  if (data.latestPhoto && Number(data.latestPhoto.seq) > Number(keepsakeSharedSnapshot.latestPhoto?.seq || 0)) {
+    keepsakeSharedSnapshot.latestPhoto = data.latestPhoto;
+  }
+}
+
 async function exportBlessingsKeepsake() {
+  if (blessingExport.disabled) return;
   blessingExport.disabled = true;
-  blessingExport.textContent = "Preparing…";
-
+  blessingExport.textContent = "Preparing PDF…";
+  keepsakeExportStatus.textContent = "Collecting the family keepsake…";
+  const warnings = [];
   try {
-    const items = wallItems().slice().reverse();
-    const rows = [];
-
-    for (const item of items) {
-      if (item.kind === "photo" && (item.photoId || sharedPhotoPath(item.asset))) {
-        let photoHtml = "";
-        try {
-          let blob;
-          if (sharedPhotoPath(item.asset)) {
-            const response = await fetch(sharedPhotoPath(item.asset), { cache: 'no-store' });
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch('/api/events', { cache: 'no-store', signal: controller.signal });
+      if (!response.ok) throw new Error('Shared content unavailable');
+      const snapshot = await response.json();
+      acceptKeepsakeSnapshot(snapshot);
+      if (!snapshot.family) warnings.push('Shared family content is not available from the server yet. This export includes entries available on this device.');
+    } catch {
+      warnings.push('Shared content could not be refreshed. This export includes the last available shared entries and entries saved on this device.');
+    } finally { window.clearTimeout(timer); }
+    const currentFamily = sharedFamily.snapshot();
+    const family = currentFamily.revision > (keepsakeSharedSnapshot.family?.revision ?? -1)
+      ? currentFamily : keepsakeSharedSnapshot.family;
+    const data = buildKeepsake({
+      title: EVENT_TITLE, honoree: HONOREE_NAME,
+      wall: blessingStore.list(), hub: familyStore.read(),
+      ...keepsakeSharedSnapshot, family, warnings
+    });
+    data.people = data.people.map(person => ({ ...person, coords: person.coords || lookupCity(person.city) }));
+    const { createKeepsakePdf } = await import('./frontend/keepsake-pdf.js');
+    const result = await createKeepsakePdf(data, {
+      progress: section => { keepsakeExportStatus.textContent = `Preparing ${section.toLowerCase()}…`; },
+      loadPhoto: async item => {
+        const path = photoPath(item.asset);
+        if (path) {
+          const controller = new AbortController();
+          const timer = window.setTimeout(() => controller.abort(), 10000);
+          try {
+            const response = await fetch(path, { cache: 'no-store', signal: controller.signal });
             if (!response.ok) throw new Error('Photo unavailable');
-            blob = await response.blob();
-          } else {
-            blob = await wallPhotoStore.get(item.photoId);
-          }
-          if (blob) {
-            const dataUrl = await blobToDataUrl(blob);
-            photoHtml = `<img src="${dataUrl}" alt="${escapeHtml(item.caption || "Family photo")}">`;
-          }
-        } catch (error) {
-          console.warn("Could not export wall photo", error);
+            return await response.blob();
+          } catch (error) { if (!item.photoId) throw error; }
+          finally { window.clearTimeout(timer); }
         }
-
-        rows.push(`
-          <article>
-            <div class="meta">Family photo · ${new Date(item.at).toLocaleString()}</div>
-            ${photoHtml}
-            ${item.caption ? `<blockquote>${escapeHtml(item.caption)}</blockquote>` : ""}
-            <div class="from">— ${escapeHtml(item.sender || "Someone")}</div>
-          </article>
-        `);
-        continue;
+        return item.photoId ? wallPhotoStore.get(item.photoId) : null;
       }
-
-      const title = item.audience === "didi" ? `${HONOREE_NAME ? "For " + HONOREE_NAME : "For the honoree"}` : "For the baby";
-      rows.push(`
-        <article>
-          <div class="meta">${title} · ${new Date(item.at).toLocaleString()}</div>
-          <blockquote>${escapeHtml(item.message || "")}</blockquote>
-          <div class="from">— ${escapeHtml(item.sender || "Someone")}</div>
-        </article>
-      `);
-    }
-
-    const html = `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>${EVENT_TITLE} — Family Wall</title>
-<style>
-  body{font-family:Georgia,serif;margin:0;padding:48px;background:#fffaf7;color:#422f35}
-  main{max-width:820px;margin:auto}
-  h1{font-size:42px;margin:0 0 8px}
-  .sub{color:#7a6970;margin-bottom:36px}
-  article{break-inside:avoid;margin:0 0 18px;padding:22px;border:1px solid #eadfdc;border-radius:18px;background:white}
-  article img{display:block;width:100%;max-height:620px;object-fit:contain;border-radius:14px;margin:10px 0}
-  .meta{font:700 12px system-ui;color:#a94762;text-transform:uppercase;letter-spacing:.06em}
-  blockquote{margin:12px 0;font-size:22px;line-height:1.45}
-  .from{text-align:right;font-weight:700}
-  @media print{body{padding:0}article{box-shadow:none}}
-</style>
-</head>
-<body><main>
-<h1>${EVENT_TITLE}</h1>
-<p class="sub">Family Wall — notes, memories and photos 💛</p>
-${rows.join("") || "<p>The wall is empty.</p>"}
-</main></body></html>`;
-
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
+    });
+    const url = URL.createObjectURL(result.blob);
+    const link = document.createElement('a');
     link.href = url;
-    link.download = `${EVENT_ID}-family-wall.html`;
+    link.download = `${EVENT_ID}-family-keepsake.pdf`;
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    keepsakeExportStatus.textContent = result.warnings.length
+      ? `PDF ready (${result.pages} pages). Some content was unavailable; see Export notes in the PDF.`
+      : `PDF ready (${result.pages} pages). Photos and map are included for offline sharing.`;
+  } catch (error) {
+    console.error('Keepsake PDF export failed', error);
+    keepsakeExportStatus.textContent = 'Could not prepare the PDF. Please try again.';
   } finally {
     blessingExport.disabled = false;
-    blessingExport.textContent = "Export keepsake";
+    blessingExport.textContent = 'Export keepsake PDF';
   }
 }
 

@@ -27,6 +27,7 @@ await poll(pc);
 assert.equal(pc.list('blessings')[0].reactions['🥰'], 1);
 assert.equal(pc.accept(old), false);
 assert.equal(pc.list('pins').length, 1);
+assert.ok(pc.snapshot().revision > old.revision);
 await pc.add('blessings', { id: 'note', message: 'Retry', sender: 'PC' });
 assert.equal(pc.list('blessings').length, 1);
 room = new CelebrationRoom(ctx); // Recreate the authority and both page clients.

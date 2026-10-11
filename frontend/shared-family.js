@@ -29,7 +29,7 @@ export function createSharedFamily({ request = fetch, changed = () => {} } = {})
       ...shared.map(item => ({ ...item, localOnly: false }))].sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
   }
   return {
-    accept, list,
+    accept, list, snapshot: () => state,
     add: (collection, entry) => mutate({ type: 'family_add', collection, entry }),
     react: (id, emoji, mutationId) => mutate({ type: 'family_react', collection: 'blessings', id, emoji, mutationId })
   };
