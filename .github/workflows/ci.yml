@@ -73,6 +73,7 @@ jobs:
           node scripts/test-call-pin-restoration.mjs
           node scripts/test-shared-recipes.mjs
           node scripts/test-server-photo-flow.mjs
+          node scripts/test-shared-family-frontend.mjs
       - name: Shared family state contract
         run: node scripts/test-family-state.mjs
       - name: Recording room contract
