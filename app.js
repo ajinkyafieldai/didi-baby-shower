@@ -1512,6 +1512,7 @@ async function compressWallPhoto(file) {
 }
 
 function acceptKeepsakeSnapshot(data) {
+  if (data.games) keepsakeSharedSnapshot.games = data.games;
   if (data.family && Number.isSafeInteger(data.family.revision) &&
       data.family.revision >= (keepsakeSharedSnapshot.family?.revision ?? -1)) {
     keepsakeSharedSnapshot.family = data.family;
@@ -1546,7 +1547,7 @@ async function exportBlessingsKeepsake(format = 'pdf') {
     const data = buildKeepsake({
       title: EVENT_TITLE, honoree: HONOREE_NAME,
       wall: blessingStore.list(), hub: familyStore.read(),
-      ...keepsakeSharedSnapshot, family, warnings
+      ...keepsakeSharedSnapshot, games: keepsakeSharedSnapshot.games || gameState, family, warnings
     });
     data.people = data.people.map(person => ({ ...person, coords: person.coords || lookupCity(person.city) }));
     const createExport = format === 'html'

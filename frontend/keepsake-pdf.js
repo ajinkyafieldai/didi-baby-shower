@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { feature } from 'topojson-client';
 import land from 'world-atlas/land-110m.json' with { type: 'json' };
+import { quizQuestions } from './keepsake-extras.js';
 
 const WIDTH = 794, HEIGHT = 1123, MARGIN = 62, BOTTOM = 1040;
 const landFeatures = feature(land, land.objects.land);
@@ -166,6 +167,17 @@ export async function createKeepsakePdf(data, {
   for (const item of data.capsules) {
     room(95); text(item.title || 'A message from the family', { bold: true });
     text(`Open at age ${item.openAt || '18'}. Message remains sealed.`, { size: 15 }); meta(item);
+  }
+  const games = data.games || { names: [], quiz: [] };
+  section('Baby-name poll', games.names.length);
+  for (const item of games.names) {
+    text(item.name, { bold: true });
+    text(`${item.votes} votes | Suggested by ${item.sender}`, { size: 14 });
+  }
+  section('Didi quiz', games.quiz.length);
+  for (const item of games.quiz) {
+    text(item.sender, { size: 20, bold: true });
+    quizQuestions.forEach((question, i) => text(`${question}: ${item.answers[i] || 'No answer'}`));
   }
   if (warnings.length) { section('Export notes', warnings.length); for (const warning of warnings) text(warning, { size: 14 }); }
   flushPage();

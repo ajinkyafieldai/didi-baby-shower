@@ -1,3 +1,4 @@
+import { keepsakeGames } from './keepsake-extras.js';
 const list = value => Array.isArray(value) ? value : [];
 
 export function mergeEntries(local, shared) {
@@ -7,7 +8,7 @@ export function mergeEntries(local, shared) {
   return [...entries.values()].sort((a, b) => Number(a.at || 0) - Number(b.at || 0));
 }
 
-export function buildKeepsake({ title, honoree, wall, hub = {}, family = {}, latestPhoto, warnings = [] }) {
+export function buildKeepsake({ title, honoree, wall, hub = {}, family = {}, games = {}, latestPhoto, warnings = [] }) {
   const notes = mergeEntries(wall, family.blessings);
   const places = mergeEntries(hub.pins, family.pins);
   const guests = mergeEntries(hub.guests, family.guests);
@@ -22,7 +23,7 @@ export function buildKeepsake({ title, honoree, wall, hub = {}, family = {}, lat
     photos.push({ ...latestPhoto, caption: 'Family photo moment', sender: 'Family', kind: 'photo' });
   }
   return {
-    title, honoree, exportedAt: Date.now(), warnings: [...warnings],
+    title, honoree, exportedAt: Date.now(), warnings: [...warnings], games: keepsakeGames(games),
     notes: notes.filter(item => item.kind !== 'photo'), photos,
     moments: mergeEntries(hub.timeline, family.timeline),
     people: [...people.values()],
