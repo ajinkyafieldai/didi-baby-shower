@@ -1,3 +1,4 @@
+import { applyEventReset } from './frontend/event-reset.js';
 import { createScreenAwake } from './frontend/screen-awake.js';
 import { createFamilyNotifications } from './frontend/family-notifications.js';
 import { buildKeepsake, photoPath } from "./frontend/keepsake-data.js";
@@ -563,10 +564,20 @@ async function pollEvents() {
 
     const data = await response.json();
     const now = Date.now();
+    const didReset = applyEventReset(localStorage, EVENT_ID, data.family?.reset);
+    if (didReset) {
+      keepsakeSharedSnapshot = {};
+      wallPhotoDraft = null; recipeDraft = null;
+      window.clearTimeout(photoResultTimer); window.clearTimeout(effectTimer);
+      document.querySelector('#shared-photo-overlay')?.remove();
+      eventLabel.classList.remove('visible');
+      resyncOnNextPoll = true;
+    }
     familyNotifications(data.family);
     sharedRecipes.accept(data.family);
     acceptKeepsakeSnapshot(data);
     sharedFamily.accept(data.family);
+    if (didReset) renderHubView(activeHubView);
     const resumedAfterGap = now - lastPollCompletedAt > RESUME_GAP_MS;
     const shouldResync = resyncOnNextPoll || resumedAfterGap;
     // Snapshot recovery also catches a completed capture after a polling gap.

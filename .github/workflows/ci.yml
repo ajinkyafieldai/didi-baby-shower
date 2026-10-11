@@ -85,7 +85,9 @@ jobs:
         run: node scripts/test-recording-cli.mjs
 
       - name: Admin map pin reset
-        run: node scripts/test-pin-reset.mjs
+        run: |
+          node scripts/test-pin-reset.mjs
+          node scripts/test-reset-all.mjs
 
       - name: Build and verify
         run: npm run build

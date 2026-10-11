@@ -1,5 +1,5 @@
 import { sanitizePilot, summarizePilot } from './pilot-metrics.js';
-import { familySnapshot, mutateFamily, sealCapsule, resetFamilyPins } from "./family-state.js";
+import { familySnapshot, mutateFamily, sealCapsule, resetFamilyPins, resetAllContent, exportEventContent } from "./family-state.js";
 
 import { sanitizePhotobooth, photoboothSnapshot } from "./photobooth-telemetry.js";
 const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate", "photo"]);
@@ -79,6 +79,10 @@ export class CelebrationRoom {
   }
 
   async fetch(request) {
+    if (new URL(request.url).pathname === '/reset/export' && request.method === 'GET') {
+      if (!this.adminSecret || request.headers.get('x-family-admin') !== this.adminSecret) return json({ error: 'Unauthorized' }, 401);
+      return json(await exportEventContent(this.ctx.storage));
+    }
     if (new URL(request.url).pathname === '/capsules/export' && request.method === 'GET') {
       return json({ exportedAt: Date.now(), capsules: await this.ctx.storage.get('sealedCapsules') || [] });
     }
@@ -115,7 +119,7 @@ export class CelebrationRoom {
         if (!this.adminSecret || request.headers.get("x-family-admin") !== this.adminSecret) {
           return json({ error: "Unauthorized" }, 401);
         }
-        const { status = 200, ...payload } = await resetFamilyPins(this.ctx.storage, body);
+        const { status = 200, ...payload } = await (body.collection === 'all' ? resetAllContent : resetFamilyPins)(this.ctx.storage, body);
         return json(payload, status);
       }
 
@@ -252,7 +256,10 @@ export class CelebrationRoom {
         const asset = String(body.asset || "").trim().slice(0, 500);
         if (!asset) return json({ error: "Missing photo asset" }, 400);
 
-        const previous = await this.ctx.storage.get("latest");
+        return this.ctx.storage.transaction(async tx => {
+        const family = await familySnapshot(tx);
+        if (family.reset && body.resetId !== family.reset.id) return json({ error: 'Capture belongs to an earlier event reset' }, 409);
+        const previous = await tx.get("latest");
         const seq = previous && Number(previous.seq) ? Number(previous.seq) + 1 : 1;
         const event = {
           type: "system",
@@ -265,15 +272,16 @@ export class CelebrationRoom {
           seq
         };
 
-        const storedEvents = await this.ctx.storage.get("events");
+        const storedEvents = await tx.get("events");
         const events = Array.isArray(storedEvents) ? storedEvents : [];
         events.push(event);
         const latestPhoto = { asset, at: event.at, seq, senderId: event.senderId };
 
-        await this.ctx.storage.put("latest", { seq, event });
-        await this.ctx.storage.put("latestPhoto", latestPhoto);
-        await this.ctx.storage.put("events", events.slice(-80));
+        await tx.put("latest", { seq, event });
+        await tx.put("latestPhoto", latestPhoto);
+        await tx.put("events", events.slice(-80));
         return json({ seq, event, latestPhoto });
+        });
       }
 
       if (body && body.type === "command" && COMMANDS.has(body.command)) {

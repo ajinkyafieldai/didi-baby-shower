@@ -104,3 +104,41 @@ export async function resetFamilyPins(storage, body) {
     return { ok: true, removed, family };
   });
 }
+
+// Private, consistent backup. Capsule messages never enter the public snapshot.
+export async function exportEventContent(storage) {
+  return storage.transaction(async tx => {
+    const content = {};
+    for (const key of ['sharedFamily', 'sealedCapsules', 'nameSuggestions', 'quizAnswers',
+      'latestPhoto', 'latest', 'events', 'recentCelebrations', 'familyReactionIds']) {
+      content[key] = await tx.get(key) ?? null;
+    }
+    return { content, revision: (await familySnapshot(tx)).revision, seq: content.latest?.seq || 0 };
+  });
+}
+
+export async function resetAllContent(storage, body) {
+  if (body.collection !== 'all' || !Number.isSafeInteger(body.expectedRevision) || body.expectedRevision < 0 ||
+      !Number.isSafeInteger(body.expectedSeq) || body.expectedSeq < 0 ||
+      !/^[a-zA-Z0-9_-]{1,100}$/.test(body.mutationId || '')) return { status: 400, error: 'Invalid event reset' };
+  return storage.transaction(async tx => {
+    const family = await familySnapshot(tx);
+    const receipts = await tx.get('familyAllResetReceipts') || [];
+    if (receipts.includes(body.mutationId)) return { ok: true, duplicate: true, family };
+    const latest = await tx.get('latest');
+    const games = { nameSuggestions: await tx.get('nameSuggestions') ?? null, quizAnswers: await tx.get('quizAnswers') ?? null };
+    if (JSON.stringify(body.expectedGames) !== JSON.stringify(games)) return { status: 409, error: 'Game content changed. Run reset again for a fresh backup.' };
+    if (family.revision !== body.expectedRevision || (latest?.seq || 0) !== body.expectedSeq) {
+      return { status: 409, error: 'Event content changed. Run the reset again to save a fresh backup.' };
+    }
+    const reset = { id: body.mutationId, at: Date.now() };
+    const cleared = { ...empty(), revision: family.revision + 1, reset };
+    await tx.put(KEY, cleared);
+    for (const key of ['sealedCapsules', 'nameSuggestions', 'quizAnswers', 'events', 'recentCelebrations', 'familyReactionIds']) await tx.put(key, []);
+    await tx.put('latestPhoto', null);
+    // Existing polling clients must retain a monotonically increasing cursor.
+    await tx.put('latest', { seq: body.expectedSeq + 1, event: null });
+    await tx.put('familyAllResetReceipts', [...receipts, body.mutationId].slice(-100));
+    return { ok: true, family: await familySnapshot(tx) };
+  });
+}

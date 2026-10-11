@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { CelebrationRoom } from '../realtime/src/index.js';
+import { applyEventReset } from '../frontend/event-reset.js';
 import { createFamilyNotifications } from '../frontend/family-notifications.js';
 
 // Execute the actual guest request/poll boundary against the realtime authority.
@@ -10,7 +11,7 @@ const source = await readFile(new URL('../app.js', import.meta.url), 'utf8');
 const boundary = source.slice(source.indexOf('async function pollEvents()'), source.indexOf('document.querySelectorAll("[data-effect]")'));
 const storage = new Map();
 const room = new CelebrationRoom({
-  storage: { get: async key => storage.get(key), put: async (key, value) => storage.set(key, value) },
+  storage: { get: async key => storage.get(key), put: async (key, value) => storage.set(key, value), transaction: async fn => fn(room.ctx.storage) },
   blockConcurrencyWhile: fn => fn()
 });
 const request = (path, options = {}) => room.fetch(new Request('https://event.test' + path, options));
@@ -18,6 +19,7 @@ function guest() {
   const effects = [], photos = [];
   const label = { textContent: '', classList: { add() {}, remove() {} } };
   const context = vm.createContext({
+    applyEventReset, localStorage: {}, EVENT_ID: "test",
     fetch: request, Date, console: { error() {} },
     window: { setTimeout: (fn, delay) => { if (delay < 1000) fn(); return 1; }, clearTimeout() {} },
     lastEventSeq: 0, eventsInitialized: false, syncBusy: false,

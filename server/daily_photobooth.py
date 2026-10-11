@@ -129,6 +129,8 @@ class Photobooth:
         self.cursor = None
         self.seen = OrderedDict()
         self.pending = {}
+        self.reset_id = None
+        self.capture_resets = {}
         self.pool = ThreadPoolExecutor(max_workers=1)
         self.status = "starting"
         self.last_error = None
@@ -271,6 +273,7 @@ class Photobooth:
                 self.failure("capture_busy", rid)
                 return
             generation = self.generation
+            self.capture_resets[rid] = self.reset_id
             self.last_request = rid
             self.status = "countdown"
             timer = threading.Timer(max(0, (target - now_ms()) / 1000), self.freeze,
@@ -284,7 +287,7 @@ class Photobooth:
             self.pending.pop(rid, None)
             if self.stop.is_set():
                 return
-            if generation != self.generation or not self.ready:
+            if generation != self.generation or not self.ready or self.capture_resets.get(rid) != self.reset_id:
                 self.failure("room_changed", rid)
                 return
             stamp = now_ms()
@@ -308,7 +311,7 @@ class Photobooth:
         try:
             jpeg = compose_grid(tiles)
             with self.lock:
-                if generation != self.generation or self.stop.is_set():
+                if generation != self.generation or self.stop.is_set() or self.capture_resets.get(rid) != self.reset_id:
                     raise RuntimeError("Room changed")
             stage = "upload"
             result = self.api.request("/api/photos", jpeg,
@@ -317,11 +320,11 @@ class Photobooth:
             if not key.startswith("photos/") or ".." in key:
                 raise RuntimeError("Invalid upload asset")
             with self.lock:
-                if generation != self.generation or self.stop.is_set():
+                if generation != self.generation or self.stop.is_set() or self.capture_resets.get(rid) != self.reset_id:
                     raise RuntimeError("Room changed")
                 stage = "publish"
                 self.api.request("/api/events", {"type": "system", "event": "photo.captured", "asset": key,
-                                                 "sender": "Photobooth", "senderId": BOT_ID})
+                                                 "sender": "Photobooth", "senderId": BOT_ID, "resetId": self.capture_resets.get(rid)})
                 self.last_capture = {"requestId": rid, "asset": key, "at": int(now_ms()),
                                      "participants": len(tiles), "frameCount": sum(t[1] is not None for t in tiles),
                                      "deadlineDelayMs": round(delay)}
@@ -348,6 +351,16 @@ class Photobooth:
     def poll(self):
         snapshot = self.api.request("/api/events?since=" + str(self.cursor or 0))
         self.last_snapshot = now_ms()
+        reset_id = (snapshot.get("family", {}).get("reset") or {}).get("id")
+        with self.lock:
+            if reset_id != self.reset_id:
+                self.reset_id = reset_id
+                for timer in self.pending.values():
+                    timer.cancel()
+                self.pending.clear()
+                self.last_capture = None
+                if self.ready:
+                    self.status = "ready"
         room = snapshot.get("videoRoom")
         if room:
             url = urlparse(room.get("roomUrl", ""))
