@@ -1,3 +1,4 @@
+import { createRecordingNotes } from './recording-notes.mjs';
 const API = 'https://api.daily.co/v1';
 
 export async function recordingCommand(action = 'run', options = {}) {
@@ -60,6 +61,7 @@ export async function recordingCommand(action = 'run', options = {}) {
   let accepted = false;
   let finished = false;
   let recordingId;
+  let notes;
   try {
     if (interrupted) return;
     console.log(`Starting cloud recording in ${room}…`);
@@ -81,7 +83,11 @@ export async function recordingCommand(action = 'run', options = {}) {
         throw error;
       }
       if (info.status === 'in-progress') {
-        if (!active) console.log('● RECORDING — Ctrl+C to stop.');
+        if (!active) {
+          console.log('● RECORDING — Ctrl+C to stop.');
+          try { notes = createRecordingNotes({ recordingId, room, startTs: info.start_ts, filename: options.notes, interrupt: onSignal }); }
+          catch (error) { console.error(`Notes unavailable: ${error.message}. Recording continues.`); }
+        }
         active = true;
       } else if (info.status === 'finished' || info.status === 'canceled') {
         finished = true;
@@ -94,6 +100,8 @@ export async function recordingCommand(action = 'run', options = {}) {
       await pause(3000);
     }
   } finally {
+    try { notes?.close(); }
+    catch (error) { console.error(`Notes cleanup failed: ${error.message}. Stopping recording anyway.`); }
     try {
       if (accepted && !finished) {
         console.log('Stopping recording…');

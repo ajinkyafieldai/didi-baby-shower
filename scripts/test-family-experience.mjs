@@ -46,11 +46,12 @@ await assert.rejects(pc.add('capsules', { ...seal, id: 'bad', openAt: '2' }));
 await assert.rejects(pc.add('capsules', { ...seal, id: 'bad', message: '' }));
 
 const originalFetch = globalThis.fetch;
-let tokenProperties;
+let tokenProperties, providerFailure = false;
 globalThis.fetch = async (url, options) => {
   if (String(url).startsWith('https://api.daily.co/')) {
     assert.equal(options.headers.authorization, 'Bearer daily-test-key');
     tokenProperties = JSON.parse(options.body).properties;
+    if (providerFailure) return Response.json({ info: 'Invalid canReceive daily-test-key family-test-key internal-test-secret' }, { status: 400 });
     return Response.json({ token: 'hidden-test-token' });
   }
   return worker.fetch(new Request(url, options), env);
@@ -70,6 +71,13 @@ try {
   assert.equal(tokenProperties.permissions.canSend, false);
   assert.equal(tokenProperties.permissions.canAdmin, false);
   assert.equal(tokenProperties.user_id, 'daily-photobooth');
+  providerFailure = true;
+  const rejected = await token({ request: new Request('https://pages.test/api/photobooth-token', { method: 'POST', headers: { authorization: 'Bearer family-test-key' } }), env });
+  assert.equal(rejected.status, 502);
+  const detail = (await rejected.json()).error;
+  assert.match(detail, /HTTP 400.*Invalid canReceive/);
+  for (const key of ['daily-test-key', 'family-test-key', 'internal-test-secret']) assert.equal(detail.includes(key), false);
+
 } finally { globalThis.fetch = originalFetch; }
 
 const notifications = [];

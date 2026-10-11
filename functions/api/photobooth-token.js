@@ -20,6 +20,13 @@ export async function onRequestPost({ request, env }) {
     } })
   });
   const data = await tokenResponse.json().catch(() => ({}));
-  if (!tokenResponse.ok || !data.token) return reply({ error: 'Could not issue hidden photobooth token.' }, 502);
+  if (!tokenResponse.ok || !data.token) {
+    let detail = String(data.info || data.error || 'No token returned').replace(/[\x00-\x1f\x7f]/g, ' ');
+    for (const secret of [env.DAILY_API_KEY, env.BABYSHOWER_ADMIN_TOKEN, env.REALTIME_SHARED_SECRET]) {
+      if (secret) detail = detail.split(secret).join('[redacted]');
+    }
+    detail = detail.replace(/eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g, '[redacted token]').slice(0, 300);
+    return reply({ error: `Daily token request failed (HTTP ${tokenResponse.status}): ${detail}` }, 502);
+  }
   return reply({ token: data.token, roomUrl: room.roomUrl });
 }

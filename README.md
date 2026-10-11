@@ -153,6 +153,16 @@ node babyshower.js recording
 
 This resolves the current room, starts cloud recording, prints `RECORDING` only after the provider confirms `in-progress`, and stays running. Ctrl+C or SIGTERM requests stop for the same room it started, even if the current event room later changes. A signal received while start is pending waits for the response and then requests stop. Stop failures exit nonzero and print the manual recovery command.
 
+While recording in an interactive terminal, press any key (for example Space) to
+print the current `HH:MM:SS` recording time. Type your message and press Enter to
+save it. The timestamp belongs to the keypress, so time spent typing does not move
+the bookmark. Esc cancels a note; Ctrl+C saves a partially typed message and stops.
+Notes are saved locally to `didi-recording-<recording-id>-notes.jsonl`, with the
+recording ID, seconds, timestamp and message. Use `--notes <file>` to choose another
+path; existing files are never overwritten. Notes use Daily's `start_ts`; if it is
+missing, times are explicitly labelled estimated from first active confirmation.
+A noninteractive terminal or a notes-file error does not stop the recording.
+
 ```sh
 node babyshower.js recording start
 node babyshower.js recording stop
