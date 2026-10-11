@@ -11,3 +11,5 @@ __pycache__/
 *.pyc
 
 didi-pins-backup-*.json
+
+didi-all-backup-*.json

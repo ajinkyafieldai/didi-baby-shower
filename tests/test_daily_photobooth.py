@@ -128,6 +128,23 @@ class CaptureTests(unittest.TestCase):
         self.assertFalse(w.ready)
         self.assertFalse(w.people)
 
+    def test_reset_cancels_pending_capture_without_leaving_room(self):
+        w = self.worker
+        timer = SimpleNamespace(cancel=lambda: cancelled.append(True))
+        cancelled = []
+        w.pending['old'] = timer
+        w.capture_resets['old'] = None
+        self.api.snapshot['family'] = {'reset': {'id': 'reset1'}}
+        w.last_capture = {'asset': 'photos/old.jpg'}
+        w.poll()
+        self.assertEqual(cancelled, [True])
+        self.assertEqual(w.pending, {})
+        self.assertIsNone(w.last_capture)
+        self.assertEqual(w.reset_id, 'reset1')
+        before = len([c for c in self.api.calls if c[0] == '/api/photos'])
+        w.complete('old', w.generation, [], 0)
+        self.assertEqual(len([c for c in self.api.calls if c[0] == '/api/photos']), before)
+
     def test_follows_snapshot_room_and_expiry(self):
         from datetime import datetime, timezone, timedelta
         w = self.worker
