@@ -9,7 +9,29 @@ function empty() {
   return { revision: 0, ...Object.fromEntries(Object.keys(FIELDS).map(key => [key, []])) };
 }
 export async function familySnapshot(storage) {
-  return await storage.get(KEY) || empty();
+  const family = await storage.get(KEY) || empty();
+  const capsules = await storage.get('sealedCapsules') || [];
+  return { ...family, capsules: capsules.map(({ message, ...metadata }) => metadata) };
+}
+export async function sealCapsule(storage, source) {
+  if (!source || typeof source !== 'object' || Array.isArray(source) ||
+      !/^[a-zA-Z0-9_-]{1,100}$/.test(source.id || '') ||
+      !['1', '5', '10', '18', '21'].includes(String(source.openAt))) return { status: 400, error: 'Invalid capsule' };
+  const message = String(source.message || '').trim().slice(0, 500);
+  const id = String(source.id);
+  if (!message) return { status: 400, error: 'Supply a message' };
+  return storage.transaction(async tx => {
+    const capsules = await tx.get('sealedCapsules') || [];
+    if (capsules.some(item => item.id === id)) return { ok: true, duplicate: true, family: await familySnapshot(tx) };
+    if (capsules.length >= 200) return { status: 409, error: 'Time capsule collection is full' };
+    capsules.push({ id, message, openAt: String(source.openAt),
+      title: String(source.title || '').trim().slice(0, 60), sender: String(source.sender || '').trim().slice(0, 60), at: Date.now() });
+    await tx.put('sealedCapsules', capsules);
+    const family = await tx.get(KEY) || empty();
+    family.revision += 1;
+    await tx.put(KEY, family);
+    return { ok: true, family: await familySnapshot(tx) };
+  });
 }
 export async function mutateFamily(storage, body) {
   const collection = body.collection;

@@ -1,3 +1,5 @@
+import { createScreenAwake } from './frontend/screen-awake.js';
+import { createFamilyNotifications } from './frontend/family-notifications.js';
 import { buildKeepsake, photoPath } from "./frontend/keepsake-data.js";
 import { createSharedFamily, sharedPhotoPath } from "./frontend/shared-family.js";
 import { setupCelebrationLayout } from "./frontend/celebration-layout.js";
@@ -82,6 +84,33 @@ const blessingWall = document.getElementById("blessing-wall");
 const blessingExport = document.getElementById("blessing-export");
 const keepsakeExportStatus = document.getElementById("keepsake-export-status");
 let keepsakeSharedSnapshot = {};
+const htmlExport = document.getElementById('blessing-export-html');
+const capsuleStatus = document.getElementById('capsule-status');
+const capsuleBackup = document.getElementById('capsule-backup');
+const screenAwakeStatus = document.getElementById('screen-awake-status');
+const screenAwake = createScreenAwake({ changed: text => { screenAwakeStatus.textContent = text; } });
+const familyToast = document.getElementById('family-toast');
+document.addEventListener('fullscreenchange', () => {
+  const full = document.fullscreenElement;
+  (full && full.tagName !== 'IFRAME' ? full : document.body).append(familyToast);
+});
+const toastQueue = [];
+let toastShowing = false;
+function showFamilyToast(text) {
+  toastQueue.push(text);
+  if (toastShowing) return;
+  function next() {
+    const message = toastQueue.shift();
+    toastShowing = Boolean(message);
+    familyToast.hidden = !message;
+    familyToast.textContent = message || '';
+    // The call iframe can enter fullscreen, so forward to its own toast surface too.
+    frame.contentWindow?.postMessage({ type: 'family-toast', text: message || '' }, location.origin);
+    if (message) window.setTimeout(next, 5500);
+  }
+  next();
+}
+const familyNotifications = createFamilyNotifications(showFamilyToast);
 const wallPhotoInput = document.getElementById("wall-photo-input");
 const wallPhotoCaption = document.getElementById("wall-photo-caption");
 const wallPhotoStatus = document.getElementById("wall-photo-status");
@@ -107,6 +136,7 @@ const sharedFamily = createSharedFamily({ changed: () => {
   if (activeHubView === 'wall') renderBlessings();
   if (activeHubView === 'map') { renderMap(); renderGuests(); }
   if (activeHubView === 'mosaic') renderMosaic();
+  if (activeHubView === 'capsule') renderCapsules();
   if (activeHubView === 'keepsake') renderKeepsakeSummary();
 } });
 const familyDrafts = new WeakMap();
@@ -456,6 +486,7 @@ window.addEventListener("message", (event) => {
   }
 
   if (message.type === "video-status") {
+    screenAwake.setActive(message.text === "Live");
     statusText.textContent = message.text || "Video call";
     callStatus.classList.toggle("compact", message.text === "Live");
     if (message.text === "Live") {
@@ -464,6 +495,7 @@ window.addEventListener("message", (event) => {
   }
 
   if (message.type === "video-config-error") {
+    screenAwake.setActive(false);
     callMetrics.signal('error');
     stage.classList.remove("in-call");
     joinMessage.textContent = message.text || "Video call is not configured yet.";
@@ -531,6 +563,7 @@ async function pollEvents() {
 
     const data = await response.json();
     const now = Date.now();
+    familyNotifications(data.family);
     sharedRecipes.accept(data.family);
     acceptKeepsakeSnapshot(data);
     sharedFamily.accept(data.family);
@@ -1002,7 +1035,10 @@ async function renderMap() {
 }
 
 function renderCapsules() {
-  const items = familyStore.read().capsules.slice().reverse();
+  const items = sharedFamily.list('capsules', familyStore.read().capsules);
+  const localCount = items.filter(item => item.localOnly).length;
+  capsuleBackup.hidden = !localCount;
+  capsuleBackup.textContent = `Back up ${localCount} message${localCount === 1 ? '' : 's'} from this device`;
   capsuleList.innerHTML = items.length
     ? items.map((item) => `
       <article class="capsule-card">
@@ -1010,7 +1046,7 @@ function renderCapsules() {
         <div>
           <small>Open at age ${escapeHtml(item.openAt)}</small>
           <strong>${escapeHtml(item.title || "A message from the family")}</strong>
-          <span>Sealed by ${escapeHtml(item.sender)}</span>
+          <span>Sealed by ${escapeHtml(item.sender)}${item.localOnly ? " · saved on this device only" : " · backed up"}</span>
         </div>
       </article>
     `).join("")
@@ -1124,7 +1160,7 @@ function renderKeepsakeSummary() {
       <div><strong>${noteCount}</strong><span>notes</span></div>
       <div><strong>${photoCount}</strong><span>photos</span></div>
       <div><strong>${hub.timeline.length}</strong><span>memories</span></div>
-      <div><strong>${hub.capsules.length}</strong><span>time capsules</span></div>
+      <div><strong>${sharedFamily.list("capsules", hub.capsules).length}</strong><span>time capsules</span></div>
       <div><strong>${sharedRecipes.list(hub.recipes).length}</strong><span>recipes</span></div>
       <div><strong>${peopleItems("guests").length}</strong><span>people here</span></div>
     </div>
@@ -1209,21 +1245,38 @@ async function sharePeopleForm(form, collection, status) {
   }
 }
 
-capsuleForm.addEventListener("submit", (event) => {
-  if (!featureEnabled("timeCapsule")) return;
+capsuleForm.addEventListener('submit', async event => {
+  if (!featureEnabled('timeCapsule')) return;
   event.preventDefault();
-  const data = new FormData(event.currentTarget);
-  familyStore.add("capsules", {
-    id: crypto.randomUUID(),
-    openAt: String(data.get("openAt") || "18"),
-    title: String(data.get("title") || "").trim().slice(0, 60),
-    message: String(data.get("message") || "").trim().slice(0, 500),
-    sender: safeGuestName(),
-    at: Date.now()
+  const form = event.currentTarget, submit = form.querySelector('[type="submit"]');
+  if (submit.disabled) return;
+  const data = new FormData(form);
+  const entry = stableFamilyDraft(form, {
+    openAt: String(data.get('openAt') || '18'), title: String(data.get('title') || '').trim().slice(0, 60),
+    message: String(data.get('message') || '').trim().slice(0, 500), sender: safeGuestName()
   });
-  event.currentTarget.reset();
-  playChime("photo");
-  renderCapsules();
+  const fields = Array.from(form.elements), disabled = fields.map(field => field.disabled);
+  fields.forEach(field => { field.disabled = true; });
+  capsuleStatus.textContent = 'Sealing and backing up…';
+  try {
+    await sharedFamily.add('capsules', entry);
+    familyDrafts.delete(form); form.reset();
+    capsuleStatus.textContent = 'Message sealed and backed up ✓';
+    playChime('photo'); renderCapsules();
+  } catch (error) { capsuleStatus.textContent = error.message || 'Could not back up. Your draft is still here.'; }
+  finally { fields.forEach((field, i) => { field.disabled = disabled[i]; }); }
+});
+capsuleBackup.addEventListener('click', async () => {
+  if (capsuleBackup.disabled) return;
+  capsuleBackup.disabled = true;
+  try {
+    for (const item of sharedFamily.list('capsules', familyStore.read().capsules).filter(item => item.localOnly)) {
+      await sharedFamily.add('capsules', item);
+    }
+    capsuleStatus.textContent = 'Messages from this device are backed up ✓';
+    renderCapsules();
+  } catch (error) { capsuleStatus.textContent = error.message || 'Backup paused. Retry to continue.'; }
+  finally { capsuleBackup.disabled = false; }
 });
 
 recipeForm.addEventListener("submit", async (event) => {
@@ -1457,11 +1510,12 @@ function acceptKeepsakeSnapshot(data) {
   }
 }
 
-async function exportBlessingsKeepsake() {
+async function exportBlessingsKeepsake(format = 'pdf') {
   if (blessingExport.disabled) return;
   blessingExport.disabled = true;
-  blessingExport.textContent = "Preparing PDF…";
-  keepsakeExportStatus.textContent = "Collecting the family keepsake…";
+  htmlExport.disabled = true;
+  const label = format.toUpperCase();
+  keepsakeExportStatus.textContent = `Collecting the family keepsake for ${label}…`;
   const warnings = [];
   try {
     const controller = new AbortController();
@@ -1484,8 +1538,10 @@ async function exportBlessingsKeepsake() {
       ...keepsakeSharedSnapshot, family, warnings
     });
     data.people = data.people.map(person => ({ ...person, coords: person.coords || lookupCity(person.city) }));
-    const { createKeepsakePdf } = await import('./frontend/keepsake-pdf.js');
-    const result = await createKeepsakePdf(data, {
+    const createExport = format === 'html'
+      ? (await import('./frontend/keepsake-html.js')).createKeepsakeHtml
+      : (await import('./frontend/keepsake-pdf.js')).createKeepsakePdf;
+    const result = await createExport(data, {
       progress: section => { keepsakeExportStatus.textContent = `Preparing ${section.toLowerCase()}…`; },
       loadPhoto: async item => {
         const path = photoPath(item.asset);
@@ -1505,20 +1561,20 @@ async function exportBlessingsKeepsake() {
     const url = URL.createObjectURL(result.blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${EVENT_ID}-family-keepsake.pdf`;
+    link.download = `${EVENT_ID}-family-keepsake.${format}`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 60000);
     keepsakeExportStatus.textContent = result.warnings.length
-      ? `PDF ready (${result.pages} pages). Some content was unavailable; see Export notes in the PDF.`
-      : `PDF ready (${result.pages} pages). Photos and map are included for offline sharing.`;
+      ? `${label} ready. Some content was unavailable; see Export notes in the download.`
+      : `${label} ready${result.pages ? ` (${result.pages} pages)` : ""}. Photos and map are included for offline sharing.`;
   } catch (error) {
-    console.error('Keepsake PDF export failed', error);
-    keepsakeExportStatus.textContent = 'Could not prepare the PDF. Please try again.';
+    console.error('Keepsake export failed', error);
+    keepsakeExportStatus.textContent = 'Could not prepare the download. Please try again.';
   } finally {
     blessingExport.disabled = false;
-    blessingExport.textContent = 'Export keepsake PDF';
+    htmlExport.disabled = false;
   }
 }
 
@@ -1620,7 +1676,9 @@ const wallPhotoRetry = document.getElementById('wall-photo-retry');
 wallPhotoInput.addEventListener('change', shareWallPhoto);
 wallPhotoRetry.addEventListener('click', shareWallPhoto);
 
-blessingExport.addEventListener("click", exportBlessingsKeepsake);
+blessingExport.addEventListener('click', () => exportBlessingsKeepsake('pdf'));
+htmlExport.addEventListener('click', () => exportBlessingsKeepsake('html'));
+window.addEventListener('pagehide', () => screenAwake.setActive(false));
 
 document.querySelectorAll("[data-game]").forEach((button) => {
   button.addEventListener("click", () => {

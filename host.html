@@ -26,6 +26,16 @@
       <article><span>Uptime</span><strong id="metric-uptime">—</strong></article>
     </section>
 
+    <section class="panel" aria-label="Family downloads">
+      <h2>Private time capsule download</h2>
+      <p>Download backed-up messages for the family to keep until their opening ages.</p>
+      <form id="capsule-download-form">
+        <label>Family download key <input id="capsule-download-key" type="password" autocomplete="off" required></label>
+        <button type="submit">Download time capsules (JSON)</button>
+      </form>
+      <p id="capsule-download-status" class="status-line" role="status" aria-live="polite"></p>
+    </section>
+
     <section class="panel" aria-label="Pilot call metrics">
       <div class="panel-head"><h2>Pilot calls</h2><button id="export-pilot" type="button" disabled>Download metrics</button></div>
       <p id="pilot-summary" class="status-line">Waiting for call metrics…</p>

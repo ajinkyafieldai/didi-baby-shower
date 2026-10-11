@@ -29,6 +29,21 @@ def person(pid, name, state='playable', local=False):
 
 
 class CaptureTests(unittest.TestCase):
+    def test_fetches_room_scoped_hidden_token(self):
+        w = self.worker
+        w.client = None
+        room = {'roomUrl': 'https://test.daily.co/one'}
+        with patch.dict('os.environ', {'FAMILY_ADMIN_KEY': 'test-key'}), \
+                patch.object(self.api, 'request', return_value={'token': 'hidden-token', 'roomUrl': room['roomUrl']}) as request, \
+                patch('server.daily_photobooth.CallClient') as clients:
+            w.switch_room(room)
+            request.assert_called_once_with('/api/photobooth-token', {}, {'Authorization': 'Bearer test-key'})
+            self.assertEqual(clients.return_value.join.call_args.kwargs['meeting_token'], 'hidden-token')
+            request.return_value = {'token': 'wrong-room', 'roomUrl': 'https://test.daily.co/two'}
+            w.switch_room(room)
+            self.assertEqual(w.last_error['code'], 'hidden_token_failed')
+            self.assertEqual(clients.return_value.join.call_count, 1)
+
     def setUp(self):
         self.api = API()
         self.worker = Photobooth(self.api)

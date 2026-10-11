@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { CelebrationRoom } from '../realtime/src/index.js';
+import { createFamilyNotifications } from '../frontend/family-notifications.js';
 
 // Execute the actual guest request/poll boundary against the realtime authority.
 // Daily capture is represented by its upload-completed event, not a browser screenshot.
@@ -23,6 +24,7 @@ function guest() {
     lastPollCompletedAt: Date.now(), resyncOnNextPoll: false,
     RESUME_GAP_MS: 5000, MAX_EFFECT_AGE_MS: 4000,
     lastPhotoSeq: 0, lastPhotoAt: 0, photoResultTimer: null, effectTimer: null,
+    familyNotifications: createFamilyNotifications(() => {}),
     sharedRecipes: { accept() {} }, sharedFamily: { accept() {} }, acceptKeepsakeSnapshot() {}, gameState: {}, activeGame: null,
     stage: { classList: { contains: () => true } },
     callStatus: { classList: { remove() {} } }, statusText: {}, eventLabel: label,

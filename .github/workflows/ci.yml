@@ -75,6 +75,7 @@ jobs:
           node scripts/test-server-photo-flow.mjs
           node scripts/test-keepsake-export.mjs
           node scripts/test-shared-family-frontend.mjs
+          node scripts/test-family-experience.mjs
       - name: Shared family state contract
         run: node scripts/test-family-state.mjs
       - name: Recording room contract

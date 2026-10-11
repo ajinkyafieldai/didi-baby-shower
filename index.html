@@ -76,9 +76,12 @@
               <h2 id="blessing-title" data-event-family-hub-title>With the family</h2>
               <p>Everything the family leaves behind for Didi and the baby.</p>
             </div>
-            <button id="blessing-export" class="blessing-export" type="button">Export keepsake PDF</button>
           </div>
 
+          <div class="keepsake-export-actions">
+            <button id="blessing-export-html" class="blessing-export" type="button">Export keepsake HTML</button>
+            <button id="blessing-export" class="blessing-export" type="button">Export keepsake PDF</button>
+          </div>
           <p id="keepsake-export-status" role="status" aria-live="polite"></p>
 
           <nav class="family-hub-tabs primary-hub-tabs" aria-label="Family activities">
@@ -181,6 +184,8 @@
               <textarea name="message" maxlength="500" rows="4" placeholder="Write something for future-you…" required></textarea>
               <button type="submit">Seal message 🔒</button>
             </form>
+            <p id="capsule-status" role="status" aria-live="polite"></p>
+            <button id="capsule-backup" type="button" hidden>Back up messages from this device</button>
             <div id="capsule-list" class="capsule-list"></div>
           </section>
 
@@ -249,5 +254,7 @@
   </main>
 
   <script type="module" src="/app.js"></script>
+<div id="family-toast" class="family-toast" role="status" aria-live="polite" hidden></div>
+  <p id="screen-awake-status" class="screen-awake-status" role="status" aria-live="polite"></p>
 </body>
 </html>

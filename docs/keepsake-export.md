@@ -2,7 +2,8 @@
 
 Branch: `feature/didi-full-keepsake-pdf`, reconciled with the shared notes and pins
 frontend in PR #20. This changes the Family Hub export button to **Export keepsake PDF**.
-It is not deployed automatically.
+Pages deploys the built site from `devel`. HTML export and private capsule download
+are documented in `docs/family-downloads.md`.
 
 The PDF includes wishes and reactions, wall photos, the latest server family photo,
 timeline moments and their photos, a world map with pins plus a complete people and
