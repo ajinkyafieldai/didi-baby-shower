@@ -1,8 +1,8 @@
 export async function onRequestPost({ request, env }) {
   const headers = { 'content-type': 'application/json', 'cache-control': 'no-store' };
   const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
-  if (!env.FAMILY_ADMIN_KEY || !env.DAILY_API_KEY || !env.REALTIME_URL || !env.REALTIME_SHARED_SECRET) return reply({ error: 'Hidden photobooth is not configured.' }, 503);
-  if (request.headers.get('authorization') !== `Bearer ${env.FAMILY_ADMIN_KEY}`) return reply({ error: 'Unauthorized' }, 401);
+  if (!env.BABYSHOWER_ADMIN_TOKEN || !env.DAILY_API_KEY || !env.REALTIME_URL || !env.REALTIME_SHARED_SECRET) return reply({ error: 'Hidden photobooth is not configured.' }, 503);
+  if (request.headers.get('authorization') !== `Bearer ${env.BABYSHOWER_ADMIN_TOKEN}`) return reply({ error: 'Unauthorized' }, 401);
   const response = await fetch(env.REALTIME_URL, { headers: { 'x-realtime-secret': env.REALTIME_SHARED_SECRET }, cache: 'no-store' });
   if (!response.ok) return reply({ error: 'Could not read active room.' }, 502);
   const { videoRoom: room } = await response.json();

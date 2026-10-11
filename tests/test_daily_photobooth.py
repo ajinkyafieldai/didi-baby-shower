@@ -33,7 +33,7 @@ class CaptureTests(unittest.TestCase):
         w = self.worker
         w.client = None
         room = {'roomUrl': 'https://test.daily.co/one'}
-        with patch.dict('os.environ', {'FAMILY_ADMIN_KEY': 'test-key'}), \
+        with patch.dict('os.environ', {'BABYSHOWER_ADMIN_TOKEN': 'test-key'}), \
                 patch.object(self.api, 'request', return_value={'token': 'hidden-token', 'roomUrl': room['roomUrl']}) as request, \
                 patch('server.daily_photobooth.CallClient') as clients:
             w.switch_room(room)

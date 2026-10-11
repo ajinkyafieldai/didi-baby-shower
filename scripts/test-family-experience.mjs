@@ -18,7 +18,7 @@ class Storage {
 const storage = new Storage();
 const makeRoom = () => new CelebrationRoom({ storage, blockConcurrencyWhile: fn => fn() });
 let room = makeRoom();
-const env = { REALTIME_SHARED_SECRET: 'internal-test-secret', FAMILY_ADMIN_KEY: 'family-test-key',
+const env = { REALTIME_SHARED_SECRET: 'internal-test-secret', BABYSHOWER_ADMIN_TOKEN: 'family-test-key',
   REALTIME_URL: 'https://worker.test/', DAILY_API_KEY: 'daily-test-key',
   CELEBRATION_ROOM: { idFromName: () => 'room', get: () => room } };
 const request = (path, options = {}) => worker.fetch(new Request('https://worker.test' + path, {
@@ -41,7 +41,7 @@ assert.equal(phone.list('capsules').length, 1);
 assert.equal(phone.list('capsules')[0].message, undefined);
 assert.equal(JSON.stringify(snap).includes(seal.message), false);
 assert.equal((await request('/capsules/export')).status, 401);
-assert.equal((await worker.fetch(new Request('https://worker.test/capsules/export', { headers: { 'x-realtime-secret': env.REALTIME_SHARED_SECRET } }), { ...env, FAMILY_ADMIN_KEY: '' })).status, 503);
+assert.equal((await worker.fetch(new Request('https://worker.test/capsules/export', { headers: { 'x-realtime-secret': env.REALTIME_SHARED_SECRET } }), { ...env, REALTIME_SHARED_SECRET: '' })).status, 503);
 await assert.rejects(pc.add('capsules', { ...seal, id: 'bad', openAt: '2' }));
 await assert.rejects(pc.add('capsules', { ...seal, id: 'bad', message: '' }));
 

@@ -23,16 +23,15 @@ Private download: open `/host.html`, enter the family download key and click
 **Download time capsules (JSON)**. It downloads all server-backed message bodies
 and opening ages. The key is cleared after the request and is never persisted in
 browser storage or URLs. The public host page itself grants no download access.
-`GET /api/capsule-export` requires `Authorization: Bearer <FAMILY_ADMIN_KEY>`.
+`GET /api/capsule-export` requires `Authorization: Bearer <BABYSHOWER_ADMIN_TOKEN>`.
 The realtime `/capsules/export` route additionally requires the internal realtime
-secret AND `x-family-admin-key`. Missing configuration returns 503; wrong keys 401.
+secret AND `x-family-admin` (the internal realtime secret). Missing configuration returns 503; wrong keys 401.
 
-Configure the SAME strong random `FAMILY_ADMIN_KEY` as a secret in both:
-
-1. Cloudflare Pages `didi-baby-shower` production environment.
-2. Cloudflare Worker `billowing-shadow-fa0a`.
-
-Redeploy Pages after changing its secret; the Worker needs its new secret too.
+Reuse the existing `BABYSHOWER_ADMIN_TOKEN` secret in Cloudflare Pages
+`didi-baby-shower` production (also used by the protected map-reset CLI).
+If it is not configured, add a strong random value as a Pages secret and redeploy
+Pages so the Function receives it. The Worker needs no additional secret; its
+existing `REALTIME_SHARED_SECRET` protects the internal download route.
 Do not use a `VITE_` variable, commit the key, or put it in a shared link.
 The downloaded JSON is the family's archive, not a public keepsake.
 
@@ -44,7 +43,7 @@ receive permission. `POST /api/photobooth-token`, protected by the family key,
 issues this token using the existing Pages `DAILY_API_KEY`. It only issues tokens
 for the currently stored, unexpired Daily room. Tokens expire with the room.
 
-Update the Python process and give it `FAMILY_ADMIN_KEY` in its server environment;
+Update the Python process and give it `BABYSHOWER_ADMIN_TOKEN` in its server environment;
 it fetches a new hidden token on each room change/rejoin. A failed or wrong-room
 token prevents that join and reports `hidden_token_failed`. No keys or tokens are
 logged. Alternatively supply a correctly scoped hidden `DAILY_MEETING_TOKEN`.

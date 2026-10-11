@@ -84,3 +84,23 @@ export async function mutateFamily(storage, body) {
   }
   return { status: 400, error: 'Invalid family mutation' };
 }
+
+export async function resetFamilyPins(storage, body) {
+  if (body.collection !== 'pins' || !Number.isSafeInteger(body.expectedRevision) || body.expectedRevision < 0 ||
+      !/^[a-zA-Z0-9_-]{1,100}$/.test(body.mutationId || '')) {
+    return { status: 400, error: 'Invalid pin reset' };
+  }
+  return storage.transaction(async tx => {
+    const family = await familySnapshot(tx);
+    const receipts = await tx.get('familyPinResetReceipts') || [];
+    const previous = receipts.find(receipt => receipt.id === body.mutationId);
+    if (previous) return { ok: true, duplicate: true, removed: previous.removed, family };
+    if (family.revision !== body.expectedRevision) return { status: 409, error: 'Family state changed. Preview the pins again before resetting.' };
+    const removed = family.pins.length;
+    family.pins = [];
+    family.revision += 1;
+    await tx.put(KEY, family);
+    await tx.put('familyPinResetReceipts', [...receipts, { id: body.mutationId, removed }].slice(-100));
+    return { ok: true, removed, family };
+  });
+}

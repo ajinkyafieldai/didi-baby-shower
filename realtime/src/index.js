@@ -1,5 +1,5 @@
 import { sanitizePilot, summarizePilot } from './pilot-metrics.js';
-import { familySnapshot, mutateFamily, sealCapsule } from "./family-state.js";
+import { familySnapshot, mutateFamily, sealCapsule, resetFamilyPins } from "./family-state.js";
 
 import { sanitizePhotobooth, photoboothSnapshot } from "./photobooth-telemetry.js";
 const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate", "photo"]);
@@ -69,7 +69,8 @@ async function gameSnapshot(ctx) {
 }
 
 export class CelebrationRoom {
-  constructor(ctx) {
+  constructor(ctx, env = {}) {
+    this.adminSecret = env.REALTIME_SHARED_SECRET;
     this.ctx = ctx;
     this.ctx.blockConcurrencyWhile(async () => {
       const startedAt = await this.ctx.storage.get("startedAt");
@@ -108,6 +109,14 @@ export class CelebrationRoom {
         body = await request.json();
       } catch {
         return json({ error: "Invalid JSON" }, 400);
+      }
+
+      if (body?.type === "family_reset") {
+        if (!this.adminSecret || request.headers.get("x-family-admin") !== this.adminSecret) {
+          return json({ error: "Unauthorized" }, 401);
+        }
+        const { status = 200, ...payload } = await resetFamilyPins(this.ctx.storage, body);
+        return json(payload, status);
       }
 
       if (body && (body.type === "family_add" || body.type === "family_react")) {
@@ -364,8 +373,7 @@ export default {
     }
 
     if (new URL(request.url).pathname === '/capsules/export') {
-      if (!env.FAMILY_ADMIN_KEY) return json({ error: 'Family download key is not configured' }, 503);
-      if (request.headers.get('x-family-admin-key') !== env.FAMILY_ADMIN_KEY) return json({ error: 'Unauthorized' }, 401);
+      if (request.headers.get('x-family-admin') !== env.REALTIME_SHARED_SECRET) return json({ error: 'Unauthorized' }, 401);
     }
 
     const id = env.CELEBRATION_ROOM.idFromName("didi-baby-shower");

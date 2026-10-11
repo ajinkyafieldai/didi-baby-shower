@@ -204,7 +204,7 @@ class Photobooth:
         self.join_started = now_ms()
         self.status = "joining"
         token = self.token
-        admin_key = os.getenv("FAMILY_ADMIN_KEY")
+        admin_key = os.getenv("BABYSHOWER_ADMIN_TOKEN")
         if admin_key:
             try:
                 issued = self.api.request('/api/photobooth-token', {},
