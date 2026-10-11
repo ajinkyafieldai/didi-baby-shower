@@ -46,6 +46,25 @@ export async function onRequestPost(context) {
     return json({ error: "DAILY_API_KEY is not configured." }, 503);
   }
 
+  let requested = {};
+  try {
+    requested = await context.request.json();
+  } catch {
+    requested = {};
+  }
+
+  const hours = Number(requested.hours ?? 8);
+  if (!Number.isFinite(hours) || hours <= 0 || hours > 24) {
+    return json({ error: "hours must be between 0 and 24." }, 400);
+  }
+
+  if (requested.recording !== undefined && requested.recording !== "cloud") {
+    return json({ error: 'recording must be "cloud" when provided.' }, 400);
+  }
+  if (requested.force !== undefined && typeof requested.force !== "boolean") {
+    return json({ error: "force must be a boolean." }, 400);
+  }
+
   let existing;
   try {
     const { response, data } = await realtime(context.env);
@@ -57,7 +76,10 @@ export async function onRequestPost(context) {
     return json({ error: error.message || "Unable to read event state." }, 503);
   }
 
-  if (existing) {
+  if (existing && requested.force !== true) {
+    if (requested.recording === "cloud") {
+      return json({ error: "An active room exists. Use force:true to create a new recording-capable room." }, 409);
+    }
     return json({
       ok: true,
       reused: true,
@@ -66,18 +88,6 @@ export async function onRequestPost(context) {
       roomId: existing.roomId || null,
       endDate: existing.endDate
     });
-  }
-
-  let requested = {};
-  try {
-    requested = await context.request.json();
-  } catch {
-    requested = {};
-  }
-
-  const hours = Number(requested.hours ?? 8);
-  if (!Number.isFinite(hours) || hours <= 0 || hours > 24) {
-    return json({ error: "hours must be between 0 and 24." }, 400);
   }
 
   const endDate = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
@@ -92,6 +102,7 @@ export async function onRequestPost(context) {
     body: JSON.stringify({
       privacy: "public",
       properties: {
+        ...(requested.recording === "cloud" ? { enable_recording: "cloud" } : {}),
         exp,
         eject_at_room_exp: true,
         enable_prejoin_ui: true,
@@ -136,6 +147,7 @@ export async function onRequestPost(context) {
     roomUrl: room.url,
     roomId: room.id || null,
     roomName: room.name || null,
+    recording: requested.recording || null,
     endDate
   });
 }

@@ -2,8 +2,9 @@
 
 The guest frontend now requests a server capture. It does not use tab capture,
 `getDisplayMedia`, canvas screenshots, automatic local downloads, or `photoHost=1`.
-This is frontend wiring; the Daily capture service still needs implementation and
-deployment by the backend owner. The existing `photobooth.js` defaults to a desktop
+The Daily capture worker is implemented in PR #19; see
+[server setup and run instructions](daily-photobooth-server.md). It must run on a
+separate Daily-connected server. The existing `photobooth.js` defaults to a desktop
 screenshot and must not be used as the Daily capture service.
 
 ## Existing API contract
