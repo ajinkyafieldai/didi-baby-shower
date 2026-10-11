@@ -98,22 +98,18 @@ The keyword matcher is intentionally tolerant of noisy ASR output and supports L
 
 ## Photo workflow
 
-The native photobooth captures the visible meeting surface and uploads the image to the event backend.
+The server photobooth receives participant camera frames from the active Daily room,
+composes a named family grid at the three-second countdown deadline, and uploads a JPEG.
+Its camera and microphone publishing stay disabled.
 
 ```sh
-node photobooth.js run
+python3 -m pip install -r requirements-photobooth.txt
+BABYSHOWER_URL=https://didi-baby-shower.pages.dev python3 server/daily_photobooth.py
 ```
 
-The shared flow is:
-
-```text
-photo.capture
-  -> native photobooth
-  -> upload
-  -> photo.captured(asset)
-  -> photo.show(asset)
-  -> guest/projector display
-```
+The shared flow is `photo.capture` → Daily camera grid → upload →
+`photo.captured(asset)` → `latestPhoto` → guest/projector display.
+See [server setup, telemetry and verification](docs/daily-photobooth-server.md).
 
 ## Development
 

@@ -1,4 +1,8 @@
+import { buildKeepsake, photoPath } from "./frontend/keepsake-data.js";
+import { createSharedFamily, sharedPhotoPath } from "./frontend/shared-family.js";
 import { setupCelebrationLayout } from "./frontend/celebration-layout.js";
+import { createSharedRecipes } from "./frontend/shared-recipes.js";
+import { clientEnvironment, createCallMetrics } from "./frontend/pilot-telemetry.js";
 import {
   FEATURES,
   featureEnabled,
@@ -65,7 +69,6 @@ const guestNameInput = document.getElementById("guest-name");
 const joinButton = document.getElementById("join-button");
 const callStatus = document.querySelector(".call-status");
 const photoButton = document.querySelector(".photo-button");
-const photoHost = new URLSearchParams(location.search).get("photoHost") === "1";
 const gamePanel = document.getElementById("game-panel");
 const gameContent = document.getElementById("game-content");
 const gameClose = document.getElementById("game-close");
@@ -77,6 +80,8 @@ const blessingMessage = document.getElementById("blessing-message");
 const blessingCount = document.getElementById("blessing-count");
 const blessingWall = document.getElementById("blessing-wall");
 const blessingExport = document.getElementById("blessing-export");
+const keepsakeExportStatus = document.getElementById("keepsake-export-status");
+let keepsakeSharedSnapshot = {};
 const wallPhotoInput = document.getElementById("wall-photo-input");
 const wallPhotoCaption = document.getElementById("wall-photo-caption");
 const wallPhotoStatus = document.getElementById("wall-photo-status");
@@ -89,6 +94,36 @@ const capsuleForm = document.getElementById("capsule-form");
 const capsuleList = document.getElementById("capsule-list");
 const recipeForm = document.getElementById("recipe-form");
 const recipeList = document.getElementById("recipe-list");
+const recipeStatus = document.getElementById("recipe-status");
+const sharedRecipes = createSharedRecipes({ changed: () => {
+  if (activeHubView === "recipes") renderRecipes();
+  if (activeHubView === "keepsake") renderKeepsakeSummary();
+} });
+let recipeDraft = null;
+const notesStatus = document.getElementById("notes-status");
+const mapStatus = document.getElementById("map-status");
+const guestStatus = document.getElementById("guest-status");
+const sharedFamily = createSharedFamily({ changed: () => {
+  if (activeHubView === 'wall') renderBlessings();
+  if (activeHubView === 'map') { renderMap(); renderGuests(); }
+  if (activeHubView === 'mosaic') renderMosaic();
+  if (activeHubView === 'keepsake') renderKeepsakeSummary();
+} });
+const familyDrafts = new WeakMap();
+const reactionDrafts = new Map();
+let wallPhotoDraft = null;
+function stableFamilyDraft(form, content) {
+  const fingerprint = JSON.stringify(content);
+  let draft = familyDrafts.get(form);
+  if (!draft || draft.fingerprint !== fingerprint) {
+    draft = { fingerprint, entry: { id: crypto.randomUUID(), ...content } };
+    familyDrafts.set(form, draft);
+  }
+  return draft.entry;
+}
+function wallItems() { return sharedFamily.list('blessings', blessingStore.list()); }
+function peopleItems(collection) { return sharedFamily.list(collection, familyStore.read()[collection]); }
+
 const photoMosaic = document.getElementById("photo-mosaic");
 const guestForm = document.getElementById("guest-form");
 const arrivalRibbon = document.getElementById("arrival-ribbon");
@@ -272,7 +307,9 @@ function coordinatesForCity(city) {
 let effectTimer = null;
 let groupEffectTimer = null;
 let audioContext = null;
-let photoCaptureStream = null;
+let photoResultTimer = null;
+let lastPhotoSeq = 0;
+let lastPhotoAt = 0;
 
 function showPhotoButton() {
   if (!featureEnabled("familyPhoto") || !photoButton) return;
@@ -284,121 +321,6 @@ function showPhotoButton() {
   photoButton.style.bottom = "14px";
 }
 
-async function saveFamilyPhotoBlob(blob) {
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filename = `baby-shower-${stamp}.jpg`;
-
-  const localUrl = URL.createObjectURL(blob);
-  const download = document.createElement("a");
-  download.href = localUrl;
-  download.download = filename;
-  download.style.display = "none";
-  document.body.appendChild(download);
-  download.click();
-  download.remove();
-  window.setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
-
-  const response = await fetch("/api/photos", {
-    method: "POST",
-    headers: {
-      "Content-Type": "image/jpeg",
-      "X-Photo-Name": filename
-    },
-    body: blob
-  });
-
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error("Cloud photo save failed" + (detail ? ": " + detail : ""));
-  }
-
-  return response.json();
-}
-
-async function ensurePhotoCapture() {
-  if (
-    photoCaptureStream &&
-    photoCaptureStream.getVideoTracks().some((track) => track.readyState === "live")
-  ) {
-    return photoCaptureStream;
-  }
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-    throw new Error("This browser cannot capture the family photo.");
-  }
-
-  // Prefer capturing this tab on Chromium. If a browser rejects these
-  // optional hints, retry with the standards-only request.
-  try {
-    photoCaptureStream = await navigator.mediaDevices.getDisplayMedia({
-      video: { displaySurface: "browser" },
-      audio: false,
-      preferCurrentTab: true,
-      selfBrowserSurface: "include",
-      surfaceSwitching: "include"
-    });
-  } catch (error) {
-    if (error && error.name === "TypeError") {
-      photoCaptureStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: false
-      });
-    } else {
-      throw error;
-    }
-  }
-
-  const [track] = photoCaptureStream.getVideoTracks();
-  if (track) {
-    track.addEventListener("ended", () => {
-      photoCaptureStream = null;
-    }, { once: true });
-  }
-
-  return photoCaptureStream;
-}
-
-async function captureFamilyPhoto() {
-  const stream = photoCaptureStream;
-  const track = stream && stream.getVideoTracks()[0];
-
-  if (!track || track.readyState !== "live") {
-    throw new Error("Photo capture is no longer active.");
-  }
-
-  const video = document.createElement("video");
-  video.muted = true;
-  video.playsInline = true;
-  video.srcObject = stream;
-
-  await new Promise((resolve, reject) => {
-    video.onloadedmetadata = resolve;
-    video.onerror = () => reject(new Error("Could not read the captured tab."));
-  });
-  await video.play();
-
-  const rect = stage.getBoundingClientRect();
-  const scaleX = video.videoWidth / window.innerWidth;
-  const scaleY = video.videoHeight / window.innerHeight;
-  const sx = Math.max(0, Math.round(rect.left * scaleX));
-  const sy = Math.max(0, Math.round(rect.top * scaleY));
-  const sw = Math.min(video.videoWidth - sx, Math.max(1, Math.round(rect.width * scaleX)));
-  const sh = Math.min(video.videoHeight - sy, Math.max(1, Math.round(rect.height * scaleY)));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = sw;
-  canvas.height = sh;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
-
-  video.pause();
-  video.srcObject = null;
-
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
-  if (!blob) throw new Error("Could not create the family photo.");
-
-  return saveFamilyPhotoBlob(blob);
-}
 
 function ensureAudioContext() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -455,6 +377,10 @@ const participantId = (() => {
 })();
 
 let latestRenderLatencyMs = null;
+const callMetrics = createCallMetrics();
+const telemetryId = crypto.randomUUID(); // A page session, not a unique person.
+const environment = clientEnvironment(navigator, window.innerWidth);
+let telemetryRevision = 0;
 
 async function sendTelemetry() {
   try {
@@ -463,11 +389,14 @@ async function sendTelemetry() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         type: "telemetry",
-        clientId: participantId,
+        clientId: telemetryId,
         role: "guest",
         latencyMs: latestRenderLatencyMs,
         lastEventSeq,
-        visible: document.visibilityState === "visible"
+        visible: document.visibilityState === "visible",
+        environment,
+        revision: ++telemetryRevision,
+        call: callMetrics.snapshot()
       }),
       cache: "no-store"
     });
@@ -501,6 +430,7 @@ joinForm.addEventListener("submit", async (event) => {
   statusText.textContent = "Connecting to video call…";
 
   frame.src = `/daily.html?name=${encodeURIComponent(guestName)}&event=${encodeURIComponent(EVENT_ID)}`;
+  callMetrics.signal('joining');
   stage.classList.add("in-call");
   fillLocationForms();
   if (featureEnabled("guestRibbon")) {
@@ -516,9 +446,14 @@ joinForm.addEventListener("submit", async (event) => {
 });
 
 window.addEventListener("message", (event) => {
-  if (event.origin !== window.location.origin) return;
+  if (event.origin !== window.location.origin || event.source !== frame.contentWindow) return;
 
   const message = event.data || {};
+  if (message.type === 'call-metric') {
+    callMetrics.signal(message.text);
+    sendTelemetry();
+    return;
+  }
 
   if (message.type === "video-status") {
     statusText.textContent = message.text || "Video call";
@@ -529,10 +464,13 @@ window.addEventListener("message", (event) => {
   }
 
   if (message.type === "video-config-error") {
+    callMetrics.signal('error');
     stage.classList.remove("in-call");
     joinMessage.textContent = message.text || "Video call is not configured yet.";
     statusText.textContent = "Video setup needed";
     callStatus.classList.remove("compact");
+    joinButton.disabled = !guestNameInput.value.trim();
+    joinButton.textContent = 'Join';
   }
 });
 
@@ -593,8 +531,25 @@ async function pollEvents() {
 
     const data = await response.json();
     const now = Date.now();
+    sharedRecipes.accept(data.family);
+    acceptKeepsakeSnapshot(data);
+    sharedFamily.accept(data.family);
     const resumedAfterGap = now - lastPollCompletedAt > RESUME_GAP_MS;
     const shouldResync = resyncOnNextPoll || resumedAfterGap;
+    // Snapshot recovery also catches a completed capture after a polling gap.
+    const photo = data.latestPhoto;
+    if (photo && Number(photo.seq) > lastPhotoSeq) {
+      if (eventsInitialized && now - Number(photo.at || 0) <= 60000) {
+        window.clearTimeout(photoResultTimer);
+        window.clearTimeout(effectTimer);
+        showCapturedPhoto(photo.asset);
+        eventLabel.textContent = "Family photo saved ✓";
+        eventLabel.classList.add("visible");
+        effectTimer = window.setTimeout(() => eventLabel.classList.remove("visible"), 5200);
+      }
+      lastPhotoSeq = Number(photo.seq);
+      lastPhotoAt = Number(photo.at || 0);
+    }
 
     if (data.games) {
       const previous = JSON.stringify(gameState);
@@ -631,7 +586,8 @@ async function pollEvents() {
       events
         .filter((event) =>
           event &&
-          event.type === "effect" &&
+          (event.type === "effect" ||
+            (event.type === "command" && event.command === "photo.capture")) &&
           Number(event.seq || 0) > lastEventSeq &&
           now - Number(event.at || 0) <= MAX_EFFECT_AGE_MS
         )
@@ -639,7 +595,7 @@ async function pollEvents() {
         .forEach((event, index) => {
           window.setTimeout(() => {
             latestRenderLatencyMs = Math.max(0, Date.now() - Number(event.at || Date.now()));
-            playEffect(event.effect, event.sender || "Someone", event.effect === "photo" && photoHost);
+            playEffect(event.effect || "photo", event.sender || "Someone", Number(event.at) || Date.now());
             if (event.groupCelebration) {
               playGroupCelebration(event.effect, event.groupCount || 2, Boolean(event.groupBurst));
             }
@@ -670,8 +626,9 @@ async function sendEffect(effect) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        type: "effect",
-        effect,
+        ...(effect === "photo"
+          ? { type: "command", command: "photo.capture" }
+          : { type: "effect", effect }),
         sender: guestName || "Someone",
         senderId: participantId
       }),
@@ -689,7 +646,7 @@ async function sendEffect(effect) {
       lastEventSeq = Math.max(lastEventSeq, data.seq);
     }
 
-    playEffect(effect, guestName || "Someone", effect === "photo" && photoHost);
+    playEffect(effect, guestName || "Someone", Number(data.event?.at) || Date.now());
     if (data.event && data.event.groupCelebration) {
       playGroupCelebration(
         data.event.effect,
@@ -700,7 +657,12 @@ async function sendEffect(effect) {
   } catch (error) {
     console.error("Celebration sync send failed", error);
     statusText.textContent = "Celebration sync offline (" + (error.message || "error") + ")";
-    playEffect(effect, guestName || "Someone", effect === "photo" && photoHost);
+    if (effect === "photo") {
+      eventLabel.textContent = "Photo request failed. Please try again.";
+      eventLabel.classList.add("visible");
+    } else {
+      playEffect(effect, guestName || "Someone");
+    }
   }
 }
 
@@ -872,6 +834,7 @@ function renderGame(game) {
 let activeHubView = "wall";
 let timelineObjectUrls = [];
 let recipeObjectUrls = [];
+let recipeRenderVersion = 0;
 let mosaicObjectUrls = [];
 
 function safeGuestName() {
@@ -1015,13 +978,13 @@ async function renderMap() {
   const version = ++mapRenderVersion;
   fillLocationForms();
   const data = familyStore.read();
-  const combined = [...data.pins];
-  data.guests.forEach(guest => {
+  const combined = peopleItems("pins");
+  peopleItems("guests").forEach(guest => {
     if (!combined.some(pin => pin.name === guest.name && pin.city === guest.city)) combined.push(guest);
   });
   const people = combined.map(person => ({ ...person, coords: person.coords || lookupCity(person.city) }));
   mapList.innerHTML = people.length
-    ? people.map(person => `<span>📍 <strong>${escapeHtml(person.name)}</strong> · ${escapeHtml(person.city || "Location unavailable")}</span>`).join("")
+    ? people.map(person => `<span>📍 <strong>${escapeHtml(person.name)}</strong> · ${escapeHtml(person.city || "Location unavailable")}${person.localOnly ? ' <small>(on this device)</small>' : ''}</span>`).join("")
     : '<p class="hub-empty">Join the call to appear here, or add your name and city above.</p>';
   try {
     const { renderFamilyMap } = await import("./frontend/family-map.js");
@@ -1055,10 +1018,12 @@ function renderCapsules() {
 }
 
 async function renderRecipes() {
-  recipeObjectUrls.forEach(URL.revokeObjectURL);
-  recipeObjectUrls = [];
-  const items = familyStore.read().recipes.slice().reverse();
+  const version = ++recipeRenderVersion;
+  const nextObjectUrls = [];
+  const items = sharedRecipes.list(familyStore.read().recipes);
   if (!items.length) {
+    recipeObjectUrls.forEach(URL.revokeObjectURL);
+    recipeObjectUrls = [];
     recipeList.innerHTML = '<p class="hub-empty">No recipes yet. Someone has to preserve the family food lore 🍲</p>';
     return;
   }
@@ -1066,12 +1031,15 @@ async function renderRecipes() {
   const rows = [];
   for (const item of items) {
     let photo = "";
+    if (typeof item.asset === "string" && /^\/api\/photos\?key=photos(?:%2[fF]|\/)[a-zA-Z0-9%._-]+$/.test(item.asset)) {
+      photo = `<img src="${escapeHtml(item.asset)}" alt="Dish photo">`;
+    }
     if (item.photoId) {
       try {
         const blob = await wallPhotoStore.get(item.photoId);
         if (blob) {
           const url = URL.createObjectURL(blob);
-          recipeObjectUrls.push(url);
+          nextObjectUrls.push(url);
           photo = `<img src="${url}" alt="">`;
         }
       } catch {}
@@ -1088,17 +1056,21 @@ async function renderRecipes() {
             <pre>${escapeHtml(item.recipe)}</pre>
           </details>
           <small>— ${escapeHtml(item.sender)}</small>
+          ${item.localOnly ? '<small>Saved on this device only</small>' : ''}
         </div>
       </article>
     `);
   }
+  if (version !== recipeRenderVersion) { nextObjectUrls.forEach(URL.revokeObjectURL); return; }
+  recipeObjectUrls.forEach(URL.revokeObjectURL);
+  recipeObjectUrls = nextObjectUrls;
   recipeList.innerHTML = rows.join("");
 }
 
 async function renderMosaic() {
   mosaicObjectUrls.forEach(URL.revokeObjectURL);
   mosaicObjectUrls = [];
-  const photos = blessingStore.list().filter((item) => item.kind === "photo" && item.photoId);
+  const photos = wallItems().filter((item) => item.kind === "photo" && (item.photoId || sharedPhotoPath(item.asset)));
 
   if (!photos.length) {
     photoMosaic.innerHTML = '<p class="hub-empty">Your family photos will appear here. Open Wishes and choose Share a photo to add the first one.</p>';
@@ -1107,6 +1079,10 @@ async function renderMosaic() {
 
   const tiles = [];
   for (const item of photos.slice(0, 40)) {
+    if (sharedPhotoPath(item.asset)) {
+      tiles.push(`<figure><img src="${escapeHtml(sharedPhotoPath(item.asset))}" alt="${escapeHtml(item.caption || 'Family photo')}"><figcaption>${escapeHtml(item.caption || item.sender || '')}</figcaption></figure>`);
+      continue;
+    }
     try {
       const blob = await wallPhotoStore.get(item.photoId);
       if (!blob) continue;
@@ -1119,14 +1095,14 @@ async function renderMosaic() {
 }
 
 function renderGuests() {
-  const items = familyStore.read().guests.slice().reverse();
+  const items = peopleItems("guests");
   arrivalRibbon.innerHTML = items.length
     ? items.map((item, index) => `
       <article class="arrival-card">
         <span class="arrival-number">${items.length - index}</span>
         <div>
           <strong>👋 ${escapeHtml(item.name)}</strong>
-          <small>${item.city ? "joined from " + escapeHtml(item.city) : "was here"} · ${new Date(item.at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}</small>
+          <small>${item.city ? "joined from " + escapeHtml(item.city) : "was here"} · ${new Date(item.at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}${item.localOnly ? ' · on this device' : ''}</small>
         </div>
       </article>
     `).join("")
@@ -1135,7 +1111,7 @@ function renderGuests() {
 
 function renderKeepsakeSummary() {
   const hub = familyStore.read();
-  const wall = blessingStore.list();
+  const wall = wallItems();
   const photoCount = wall.filter((item) => item.kind === "photo").length;
   const noteCount = wall.filter((item) => item.kind !== "photo").length;
 
@@ -1149,8 +1125,8 @@ function renderKeepsakeSummary() {
       <div><strong>${photoCount}</strong><span>photos</span></div>
       <div><strong>${hub.timeline.length}</strong><span>memories</span></div>
       <div><strong>${hub.capsules.length}</strong><span>time capsules</span></div>
-      <div><strong>${hub.recipes.length}</strong><span>recipes</span></div>
-      <div><strong>${hub.guests.length}</strong><span>people here</span></div>
+      <div><strong>${sharedRecipes.list(hub.recipes).length}</strong><span>recipes</span></div>
+      <div><strong>${peopleItems("guests").length}</strong><span>people here</span></div>
     </div>
     <div class="keepsake-callout">
       <strong>After the party</strong>
@@ -1199,22 +1175,39 @@ timelineForm.addEventListener("submit", async (event) => {
   renderTimeline();
 });
 
-mapForm.addEventListener("submit", (event) => {
+mapForm.addEventListener("submit", async (event) => {
   if (!featureEnabled("familyMap")) return;
   event.preventDefault();
-  const data = new FormData(event.currentTarget);
-  const name = String(data.get("name") || "").trim();
-  const city = String(data.get("city") || "").trim();
-  const entry = { id: crypto.randomUUID(), name, city, at: Date.now() };
-  const coords = coordinatesForCity(city);
-  if (coords) entry.coords = coords;
-  familyStore.add("pins", entry);
-  recordArrival(name, city, coords);
-  fillLocationForms();
-  playChime();
-  renderMap();
-  renderGuests();
+  await sharePeopleForm(mapForm, 'pins', mapStatus);
 });
+
+async function sharePeopleForm(form, collection, status) {
+  const submit = form.querySelector('[type="submit"]');
+  if (submit.disabled) return;
+  const data = new FormData(form);
+  const name = String(data.get('name') || '').trim();
+  const city = String(data.get('city') || '').trim();
+  if (!name) return;
+  const coords = coordinatesForCity(city);
+  const entry = stableFamilyDraft(form, { name, city, ...(coords ? { coords } : {}) });
+  const fields = [...form.elements].filter(element => element !== submit);
+  const disabled = fields.map(element => element.disabled);
+  fields.forEach(element => { element.disabled = true; });
+  setBusy(submit, true, 'Sharing…');
+  status.textContent = 'Sharing with the family…';
+  try {
+    await sharedFamily.add(collection, entry);
+    familyDrafts.delete(form);
+    form.reset();
+    status.textContent = 'Shared with everyone ✓';
+    renderMap(); renderGuests(); playChime();
+  } catch (error) {
+    status.textContent = error.message || 'Could not share. Your entry is still here; try again.';
+  } finally {
+    fields.forEach((element, i) => { element.disabled = disabled[i]; });
+    setBusy(submit, false);
+  }
+}
 
 capsuleForm.addEventListener("submit", (event) => {
   if (!featureEnabled("timeCapsule")) return;
@@ -1236,34 +1229,52 @@ capsuleForm.addEventListener("submit", (event) => {
 recipeForm.addEventListener("submit", async (event) => {
   if (!featureEnabled("recipeBook")) return;
   event.preventDefault();
-  const data = new FormData(event.currentTarget);
-  const photoId = await storeOptionalPhoto(event.currentTarget.elements.photo.files[0]);
-  familyStore.add("recipes", {
-    id: crypto.randomUUID(),
+  const form = event.currentTarget;
+  const submit = form.querySelector('[type="submit"]');
+  if (submit.disabled) return;
+  const data = new FormData(form);
+  const file = form.elements.photo.files[0];
+  const content = {
     name: String(data.get("name") || "").trim().slice(0, 80),
     why: String(data.get("why") || "").trim().slice(0, 180),
     recipe: String(data.get("recipe") || "").trim().slice(0, 900),
-    photoId,
-    sender: safeGuestName(),
-    at: Date.now()
-  });
-  event.currentTarget.reset();
-  setBusy(submit, false);
-  playChime("photo");
-  renderRecipes();
+    sender: safeGuestName()
+  };
+  const fingerprint = JSON.stringify(content);
+  if (!recipeDraft || recipeDraft.fingerprint !== fingerprint || recipeDraft.file !== file) {
+    recipeDraft = { fingerprint, file, entry: { id: crypto.randomUUID(), ...content } };
+  }
+  const fields = [...form.elements].filter(element => element !== submit);
+  const disabled = fields.map(element => element.disabled);
+  fields.forEach(element => { element.disabled = true; });
+  setBusy(submit, true, "Sharing…");
+  recipeStatus.textContent = "Sharing recipe…";
+  try {
+    if (file && !recipeDraft.entry.asset) {
+      const blob = await compressWallPhoto(file);
+      const response = await fetch('/api/photos', { method: 'POST', headers: { 'Content-Type': 'image/jpeg', 'X-Photo-Name': 'recipe.jpg' }, body: blob });
+      const uploaded = await response.json();
+      if (!response.ok || !uploaded.ok || !uploaded.key) throw new Error(uploaded.error || 'Could not upload dish photo. Try again.');
+      recipeDraft.entry.asset = '/api/photos?key=' + encodeURIComponent(uploaded.key);
+    }
+    await sharedRecipes.add(recipeDraft.entry);
+    form.reset();
+    recipeDraft = null;
+    recipeStatus.textContent = "Shared with everyone ✓";
+    playChime("photo");
+    renderRecipes();
+  } catch (error) {
+    recipeStatus.textContent = error.message || "Could not share recipe. Your recipe is still here; try again.";
+  } finally {
+    fields.forEach((element, index) => { element.disabled = disabled[index]; });
+    setBusy(submit, false);
+  }
 });
 
-guestForm.addEventListener("submit", (event) => {
+guestForm.addEventListener("submit", async (event) => {
   if (!featureEnabled("guestRibbon")) return;
   event.preventDefault();
-  const data = new FormData(event.currentTarget);
-  const city = String(data.get("city") || "").trim();
-  recordArrival(String(data.get("name") || "").trim(), city, coordinatesForCity(city));
-  event.currentTarget.reset();
-  fillLocationForms();
-  playChime();
-  renderGuests();
-  if (activeHubView === "map") renderMap();
+  await sharePeopleForm(guestForm, 'guests', guestStatus);
 });
 
 afterpartyPreview.addEventListener("click", () => {
@@ -1279,8 +1290,11 @@ function clearWallObjectUrls() {
   wallObjectUrls = [];
 }
 
+let wallRenderVersion = 0;
 async function renderBlessings() {
-  const items = blessingStore.list();
+  const version = ++wallRenderVersion;
+  const nextUrls = [];
+  const items = wallItems();
   clearWallObjectUrls();
 
   if (!items.length) {
@@ -1291,13 +1305,15 @@ async function renderBlessings() {
   const rows = await Promise.all(items.map(async (item) => {
     const reactions = item.reactions || {};
 
-    if (item.kind === "photo" && item.photoId) {
-      let imageHtml = '<div class="wall-photo-missing">Photo unavailable on this device</div>';
+    if (item.kind === "photo" && (item.photoId || sharedPhotoPath(item.asset))) {
+      let imageHtml = sharedPhotoPath(item.asset)
+        ? `<img class="wall-photo" src="${escapeHtml(sharedPhotoPath(item.asset))}" alt="${escapeHtml(item.caption || 'Shared family photo')}">`
+        : '<div class="wall-photo-missing">Photo unavailable on this device</div>';
       try {
-        const blob = await wallPhotoStore.get(item.photoId);
+        const blob = item.photoId ? await wallPhotoStore.get(item.photoId) : null;
         if (blob) {
           const url = URL.createObjectURL(blob);
-          wallObjectUrls.push(url);
+          nextUrls.push(url);
           imageHtml = `<img class="wall-photo" src="${url}" alt="${escapeHtml(item.caption || "Shared family photo")}">`;
         }
       } catch (error) {
@@ -1310,9 +1326,10 @@ async function renderBlessings() {
           ${item.caption ? `<p class="wall-photo-caption">${escapeHtml(item.caption)}</p>` : ""}
           <footer>
             <strong>📷 ${escapeHtml(item.sender || "Someone")}</strong>
+            ${item.localOnly ? '<small>Saved on this device only</small>' : ""}
             <div class="blessing-reactions">
-              ${["❤️","🥹","😂"].map((emoji) => `
-                <button type="button" data-blessing-react="${emoji}">
+              ${["❤️","🥰","😂"].map((emoji) => `
+                <button type="button" data-blessing-react="${emoji}" ${item.localOnly || reactionDrafts.get(`${item.id}|${emoji}`)?.pending ? "disabled" : ""}>
                   <span>${emoji}</span>
                   <small>${Number(reactions[emoji] || 0) || ""}</small>
                 </button>
@@ -1333,9 +1350,10 @@ async function renderBlessings() {
         <p>${escapeHtml(item.message || "")}</p>
         <footer>
           <strong>— ${escapeHtml(item.sender || "Someone")}</strong>
-          <div class="blessing-reactions">
-            ${["❤️","🥹","😂"].map((emoji) => `
-              <button type="button" data-blessing-react="${emoji}">
+          ${item.localOnly ? '<small>Saved on this device only</small>' : ""}
+            <div class="blessing-reactions">
+            ${["❤️","🥰","😂"].map((emoji) => `
+              <button type="button" data-blessing-react="${emoji}" ${item.localOnly || reactionDrafts.get(`${item.id}|${emoji}`)?.pending ? "disabled" : ""}>
                 <span>${emoji}</span>
                 <small>${Number(reactions[emoji] || 0) || ""}</small>
               </button>
@@ -1346,15 +1364,31 @@ async function renderBlessings() {
     `;
   }));
 
+  if (version !== wallRenderVersion) { nextUrls.forEach(URL.revokeObjectURL); return; }
+  wallObjectUrls = nextUrls;
   blessingWall.innerHTML = rows.join("");
 
   blessingWall.querySelectorAll("[data-blessing-react]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const note = button.closest("[data-blessing-id]");
-      if (!note) return;
-      blessingStore.react(note.dataset.blessingId, button.dataset.blessingReact);
-      renderBlessings();
-      playChime();
+      if (!note || button.disabled) return;
+      const key = `${note.dataset.blessingId}|${button.dataset.blessingReact}`;
+      const previous = reactionDrafts.get(key);
+      if (previous?.pending) return;
+      const mutationId = previous?.mutationId || crypto.randomUUID();
+      reactionDrafts.set(key, { mutationId, pending: true });
+      button.disabled = true;
+      try {
+        await sharedFamily.react(note.dataset.blessingId, button.dataset.blessingReact, mutationId);
+        reactionDrafts.delete(key);
+        renderBlessings();
+        notesStatus.textContent = 'Reaction shared ✓';
+        playChime();
+      } catch (error) {
+        reactionDrafts.set(key, { mutationId, pending: false });
+        notesStatus.textContent = error.message || 'Could not share reaction. Tap again to retry.';
+        renderBlessings();
+      } finally { button.disabled = false; }
     });
   });
 }
@@ -1413,84 +1447,78 @@ async function compressWallPhoto(file) {
   }
 }
 
+function acceptKeepsakeSnapshot(data) {
+  if (data.family && Number.isSafeInteger(data.family.revision) &&
+      data.family.revision >= (keepsakeSharedSnapshot.family?.revision ?? -1)) {
+    keepsakeSharedSnapshot.family = data.family;
+  }
+  if (data.latestPhoto && Number(data.latestPhoto.seq) > Number(keepsakeSharedSnapshot.latestPhoto?.seq || 0)) {
+    keepsakeSharedSnapshot.latestPhoto = data.latestPhoto;
+  }
+}
+
 async function exportBlessingsKeepsake() {
+  if (blessingExport.disabled) return;
   blessingExport.disabled = true;
-  blessingExport.textContent = "Preparing…";
-
+  blessingExport.textContent = "Preparing PDF…";
+  keepsakeExportStatus.textContent = "Collecting the family keepsake…";
+  const warnings = [];
   try {
-    const items = blessingStore.list().slice().reverse();
-    const rows = [];
-
-    for (const item of items) {
-      if (item.kind === "photo" && item.photoId) {
-        let photoHtml = "";
-        try {
-          const blob = await wallPhotoStore.get(item.photoId);
-          if (blob) {
-            const dataUrl = await blobToDataUrl(blob);
-            photoHtml = `<img src="${dataUrl}" alt="${escapeHtml(item.caption || "Family photo")}">`;
-          }
-        } catch (error) {
-          console.warn("Could not export wall photo", error);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch('/api/events', { cache: 'no-store', signal: controller.signal });
+      if (!response.ok) throw new Error('Shared content unavailable');
+      const snapshot = await response.json();
+      acceptKeepsakeSnapshot(snapshot);
+      if (!snapshot.family) warnings.push('Shared family content is not available from the server yet. This export includes entries available on this device.');
+    } catch {
+      warnings.push('Shared content could not be refreshed. This export includes the last available shared entries and entries saved on this device.');
+    } finally { window.clearTimeout(timer); }
+    const currentFamily = sharedFamily.snapshot();
+    const family = currentFamily.revision > (keepsakeSharedSnapshot.family?.revision ?? -1)
+      ? currentFamily : keepsakeSharedSnapshot.family;
+    const data = buildKeepsake({
+      title: EVENT_TITLE, honoree: HONOREE_NAME,
+      wall: blessingStore.list(), hub: familyStore.read(),
+      ...keepsakeSharedSnapshot, family, warnings
+    });
+    data.people = data.people.map(person => ({ ...person, coords: person.coords || lookupCity(person.city) }));
+    const { createKeepsakePdf } = await import('./frontend/keepsake-pdf.js');
+    const result = await createKeepsakePdf(data, {
+      progress: section => { keepsakeExportStatus.textContent = `Preparing ${section.toLowerCase()}…`; },
+      loadPhoto: async item => {
+        const path = photoPath(item.asset);
+        if (path) {
+          const controller = new AbortController();
+          const timer = window.setTimeout(() => controller.abort(), 10000);
+          try {
+            const response = await fetch(path, { cache: 'no-store', signal: controller.signal });
+            if (!response.ok) throw new Error('Photo unavailable');
+            return await response.blob();
+          } catch (error) { if (!item.photoId) throw error; }
+          finally { window.clearTimeout(timer); }
         }
-
-        rows.push(`
-          <article>
-            <div class="meta">Family photo · ${new Date(item.at).toLocaleString()}</div>
-            ${photoHtml}
-            ${item.caption ? `<blockquote>${escapeHtml(item.caption)}</blockquote>` : ""}
-            <div class="from">— ${escapeHtml(item.sender || "Someone")}</div>
-          </article>
-        `);
-        continue;
+        return item.photoId ? wallPhotoStore.get(item.photoId) : null;
       }
-
-      const title = item.audience === "didi" ? `${HONOREE_NAME ? "For " + HONOREE_NAME : "For the honoree"}` : "For the baby";
-      rows.push(`
-        <article>
-          <div class="meta">${title} · ${new Date(item.at).toLocaleString()}</div>
-          <blockquote>${escapeHtml(item.message || "")}</blockquote>
-          <div class="from">— ${escapeHtml(item.sender || "Someone")}</div>
-        </article>
-      `);
-    }
-
-    const html = `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>${EVENT_TITLE} — Family Wall</title>
-<style>
-  body{font-family:Georgia,serif;margin:0;padding:48px;background:#fffaf7;color:#422f35}
-  main{max-width:820px;margin:auto}
-  h1{font-size:42px;margin:0 0 8px}
-  .sub{color:#7a6970;margin-bottom:36px}
-  article{break-inside:avoid;margin:0 0 18px;padding:22px;border:1px solid #eadfdc;border-radius:18px;background:white}
-  article img{display:block;width:100%;max-height:620px;object-fit:contain;border-radius:14px;margin:10px 0}
-  .meta{font:700 12px system-ui;color:#a94762;text-transform:uppercase;letter-spacing:.06em}
-  blockquote{margin:12px 0;font-size:22px;line-height:1.45}
-  .from{text-align:right;font-weight:700}
-  @media print{body{padding:0}article{box-shadow:none}}
-</style>
-</head>
-<body><main>
-<h1>${EVENT_TITLE}</h1>
-<p class="sub">Family Wall — notes, memories and photos 💛</p>
-${rows.join("") || "<p>The wall is empty.</p>"}
-</main></body></html>`;
-
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
+    });
+    const url = URL.createObjectURL(result.blob);
+    const link = document.createElement('a');
     link.href = url;
-    link.download = `${EVENT_ID}-family-wall.html`;
+    link.download = `${EVENT_ID}-family-keepsake.pdf`;
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    keepsakeExportStatus.textContent = result.warnings.length
+      ? `PDF ready (${result.pages} pages). Some content was unavailable; see Export notes in the PDF.`
+      : `PDF ready (${result.pages} pages). Photos and map are included for offline sharing.`;
+  } catch (error) {
+    console.error('Keepsake PDF export failed', error);
+    keepsakeExportStatus.textContent = 'Could not prepare the PDF. Please try again.';
   } finally {
     blessingExport.disabled = false;
-    blessingExport.textContent = "Export keepsake";
+    blessingExport.textContent = 'Export keepsake PDF';
   }
 }
 
@@ -1519,73 +1547,78 @@ blessingMessage.addEventListener("input", () => {
   blessingCount.textContent = `${blessingMessage.value.length}/180`;
 });
 
-blessingForm.addEventListener("submit", (event) => {
+blessingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!featureEnabled("familyWall")) return;
+  const submit = blessingForm.querySelector('[type="submit"]');
+  if (submit.disabled) return;
   const data = new FormData(blessingForm);
-  const message = String(data.get("message") || "").trim();
+  const message = String(data.get('message') || '').trim();
   if (!message) return;
-
-  const entry = {
-    id: crypto.randomUUID(),
-    kind: "note",
-    sender: guestName || guestNameInput.value.trim() || "Someone",
-    audience: data.get("audience") === "didi" ? "didi" : "baby",
-    message,
-    at: Date.now(),
-    reactions: {}
-  };
-
-  blessingStore.add(entry);
-  blessingForm.reset();
-  blessingMessage.value = "";
-  blessingCount.textContent = "0/180";
-  showBlessingFloat(entry);
-  playChime("photo");
-  requestAnimationFrame(() => renderBlessings());
-});
-
-wallPhotoInput.addEventListener("change", async () => {
-  if (!featureEnabled("familyWall")) return;
-  const [file] = wallPhotoInput.files || [];
-  if (!file) return;
-
-  wallPhotoInput.disabled = true;
-  wallPhotoStatus.textContent = "Preparing photo…";
-  await nextFrame();
-
+  const entry = stableFamilyDraft(blessingForm, {
+    sender: guestName || guestNameInput.value.trim() || 'Someone',
+    audience: data.get('audience') === 'didi' ? 'didi' : 'baby', message
+  });
+  const fields = [...blessingForm.elements].filter(element => element !== submit);
+  const disabled = fields.map(element => element.disabled);
+  fields.forEach(element => { element.disabled = true; });
+  setBusy(submit, true, 'Sharing…'); notesStatus.textContent = 'Sharing note…';
   try {
-    const blob = await compressWallPhoto(file);
-    const photoId = crypto.randomUUID();
-    await wallPhotoStore.put(photoId, blob);
-
-    const entry = {
-      id: crypto.randomUUID(),
-      kind: "photo",
-      photoId,
-      sender: guestName || guestNameInput.value.trim() || "Someone",
-      caption: wallPhotoCaption.value.trim().slice(0, 80),
-      at: Date.now(),
-      reactions: {}
-    };
-
-    blessingStore.add(entry);
-    wallPhotoInput.value = "";
-    wallPhotoCaption.value = "";
-    wallPhotoStatus.textContent = "Added ✓";
-    await renderBlessings();
-    showBlessingFloat(entry);
-    playChime("photo");
-    window.setTimeout(() => {
-      wallPhotoStatus.textContent = "";
-    }, 2200);
+    await sharedFamily.add('blessings', entry);
+    familyDrafts.delete(blessingForm);
+    blessingForm.reset(); blessingMessage.value = ''; blessingCount.textContent = '0/180';
+    notesStatus.textContent = 'Shared with everyone ✓';
+    showBlessingFloat(entry); playChime('photo'); renderBlessings();
   } catch (error) {
-    console.error("Family wall photo failed", error);
-    wallPhotoStatus.textContent = error.message || "Could not add photo.";
+    notesStatus.textContent = error.message || 'Could not share. Your note is still here; try again.';
   } finally {
-    wallPhotoInput.disabled = false;
+    fields.forEach((element, i) => { element.disabled = disabled[i]; });
+    setBusy(submit, false);
   }
 });
+
+async function shareWallPhoto() {
+  if (!featureEnabled('familyWall') || wallPhotoInput.disabled) return;
+  const [file] = wallPhotoInput.files || [];
+  if (!file) return;
+  const content = {
+    sender: guestName || guestNameInput.value.trim() || 'Someone',
+    caption: wallPhotoCaption.value.trim().slice(0, 80)
+  };
+  const fingerprint = JSON.stringify(content);
+  if (!wallPhotoDraft || wallPhotoDraft.file !== file || wallPhotoDraft.fingerprint !== fingerprint) {
+    wallPhotoDraft = { file, fingerprint, entry: { id: crypto.randomUUID(), ...content } };
+  }
+  wallPhotoInput.disabled = true; wallPhotoCaption.disabled = true;
+  wallPhotoRetry.disabled = true;
+  wallPhotoStatus.textContent = 'Sharing photo…';
+  try {
+    if (!wallPhotoDraft.entry.asset) {
+      const blob = await compressWallPhoto(file);
+      const response = await fetch('/api/photos', { method: 'POST', headers: { 'Content-Type': 'image/jpeg', 'X-Photo-Name': 'family-wall.jpg' }, body: blob });
+      const uploaded = await response.json().catch(() => ({}));
+      if (!response.ok || !uploaded.ok || !uploaded.key) throw new Error(uploaded.error || 'Could not upload photo. Please retry.');
+      wallPhotoDraft.entry.asset = '/api/photos?key=' + encodeURIComponent(uploaded.key);
+    }
+    const entry = wallPhotoDraft.entry;
+    await sharedFamily.add('blessings', entry);
+    wallPhotoDraft = null;
+    wallPhotoInput.value = ''; wallPhotoCaption.value = '';
+    wallPhotoRetry.hidden = true;
+    wallPhotoStatus.textContent = 'Shared with everyone ✓';
+    renderBlessings();
+    showBlessingFloat({ ...entry, kind: 'photo' }); playChime('photo');
+  } catch (error) {
+    wallPhotoStatus.textContent = error.message || 'Could not share photo. Please retry.';
+    wallPhotoRetry.hidden = false;
+  } finally {
+    wallPhotoInput.disabled = false; wallPhotoCaption.disabled = false;
+    wallPhotoRetry.disabled = false;
+  }
+}
+const wallPhotoRetry = document.getElementById('wall-photo-retry');
+wallPhotoInput.addEventListener('change', shareWallPhoto);
+wallPhotoRetry.addEventListener('click', shareWallPhoto);
 
 blessingExport.addEventListener("click", exportBlessingsKeepsake);
 
@@ -1639,7 +1672,7 @@ function clearNormalEffects() {
   });
 }
 
-function playEffect(effect, sender, capturePhoto = false) {
+function playEffect(effect, sender, requestedAt = Date.now()) {
   clearTimeout(effectTimer);
   clearNormalEffects();
 
@@ -1781,29 +1814,14 @@ function playEffect(effect, sender, capturePhoto = false) {
         if (snap) {
           playChime("photo");
 
-          if (capturePhoto) {
-            // Only the designated desktop/laptop photo host stores the image.
-            // Everyone else just participates in the synchronized countdown.
-            Promise.resolve()
-              .then(async () => {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-                  throw new Error("Photo host browser does not support tab capture.");
-                }
-                statusText.textContent = "Photo host: select this tab once…";
-                await ensurePhotoCapture();
-                return captureFamilyPhoto();
-              })
-              .then(() => {
-                eventLabel.textContent = "Family photo saved ✓";
-                eventLabel.classList.add("visible");
-                statusText.textContent = stage.classList.contains("in-call") ? "Live" : "Ready to join";
-              })
-              .catch((error) => {
-                console.error("Family photo save failed", error);
-                eventLabel.textContent = "Photo host failed to save: " + (error.message || "unknown error");
-                eventLabel.classList.add("visible");
-                statusText.textContent = stage.classList.contains("in-call") ? "Live" : "Ready to join";
-              });
+          if (lastPhotoAt < requestedAt) {
+            eventLabel.textContent = "Saving family photo…";
+            eventLabel.classList.add("visible");
+            window.clearTimeout(photoResultTimer);
+            photoResultTimer = window.setTimeout(() => {
+              eventLabel.textContent = "Photo has not arrived yet — ask the host to check capture.";
+              eventLabel.classList.add("visible");
+            }, 30000);
           }
 
           const flash = document.createElement("div");
@@ -1813,10 +1831,10 @@ function playEffect(effect, sender, capturePhoto = false) {
         } else {
           playChime("ritual");
         }
-      }, delay);
+      }, Math.max(0, requestedAt + delay - Date.now()));
     });
 
-    window.setTimeout(() => photo.remove(), 4600);
+    window.setTimeout(() => photo.remove(), Math.max(0, requestedAt + 4600 - Date.now()));
   }
 
   if (effect === "celebrate") {
@@ -1828,7 +1846,7 @@ function playEffect(effect, sender, capturePhoto = false) {
 
   effectTimer = window.setTimeout(() => {
     clearNormalEffects();
-    eventLabel.classList.remove("visible");
+    if (effect !== "photo") eventLabel.classList.remove("visible");
   }, 5200);
 }
 
@@ -1886,11 +1904,11 @@ function playGroupCelebration(effect, count = 2, burst = false) {
         piece.style.setProperty("--distance", `${90 + Math.random() * 180}px`);
         piece.style.animationDelay = `${Math.random() * 0.12}s`;
         effectLayer.appendChild(piece);
-        window.setTimeout(() => piece.remove(), 1500);
+        window.setTimeout(() => piece.remove(), 2900);
       }
     }
 
-    window.setTimeout(() => group.remove(), 520);
+    window.setTimeout(() => group.remove(), 900);
     return;
   }
 
@@ -1932,7 +1950,7 @@ function playMeetCelebrationBurst() {
   }
 
   effectLayer.appendChild(celebration);
-  window.setTimeout(() => celebration.remove(), 3200);
+  window.setTimeout(() => celebration.remove(), 4600);
 }
 
 // Expose only the small event-rendering boundary that the realtime layer needs.
@@ -1942,9 +1960,6 @@ window.babyShower = { playEffect, playGroupCelebration };
 showPhotoButton();
 
 
-if (photoHost) {
-  console.info("Family photo host enabled for this browser.");
-}
 
 if (!afterpartyMode) {
   setupCelebrationLayout({

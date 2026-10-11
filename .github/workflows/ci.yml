@@ -67,6 +67,16 @@ jobs:
       - name: Event package runtime proof
         run: node scripts/test-event-package-runtime.mjs
 
+      - name: Pilot call telemetry
+        run: |
+          node scripts/test-pilot-telemetry.mjs
+          node scripts/test-call-pin-restoration.mjs
+          node scripts/test-shared-recipes.mjs
+          node scripts/test-server-photo-flow.mjs
+          node scripts/test-keepsake-export.mjs
+          node scripts/test-shared-family-frontend.mjs
+      - name: Shared family state contract
+        run: node scripts/test-family-state.mjs
       - name: Recording room contract
         run: node scripts/test-recording-room.mjs
 
@@ -75,3 +85,20 @@ jobs:
 
       - name: Build and verify
         run: npm run build
+
+  photobooth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install photobooth dependencies
+        run: python -m pip install -r requirements-photobooth.txt
+      - name: Family photo contract and countdown tests
+        run: python -m unittest discover -s tests -p 'test*photo*.py'
+      - name: Photobooth telemetry persistence
+        run: node scripts/test-photobooth-telemetry.mjs

@@ -1,3 +1,7 @@
+import { sanitizePilot, summarizePilot } from './pilot-metrics.js';
+import { familySnapshot, mutateFamily } from "./family-state.js";
+
+import { sanitizePhotobooth, photoboothSnapshot } from "./photobooth-telemetry.js";
 const EFFECTS = new Set(["ovalni", "flowers", "ashirwad", "supari", "haldi", "kunku", "oti", "tika", "celebrate", "photo"]);
 const COMMANDS = new Set(["photo.capture", "photo.show"]);
 const SYSTEM_EVENTS = new Set(["photo.captured"]);
@@ -25,13 +29,15 @@ async function telemetrySnapshot(ctx) {
   for (const entry of active) {
     const role = String(entry.role || "guest");
     byRole[role] = (byRole[role] || 0) + 1;
-    const latency = Number(entry.latencyMs);
+    const latency = entry.latencyMs;
     if (Number.isFinite(latency) && latency >= 0) latencies.push(latency);
   }
 
   const startedAt = Number(await ctx.storage.get("startedAt") || now);
   return {
     activeClients: active.length,
+    pilot: summarizePilot(clients, now, TELEMETRY_ACTIVE_MS),
+    photobooth: photoboothSnapshot(clients, now, TELEMETRY_ACTIVE_MS),
     byRole,
     latencyMs: {
       p50: percentile(latencies, 0.50),
@@ -85,6 +91,7 @@ export class CelebrationRoom {
         seq: latest && Number(latest.seq) ? Number(latest.seq) : 0,
         events,
         games: await gameSnapshot(this.ctx),
+        family: await familySnapshot(this.ctx.storage),
         telemetry: await telemetrySnapshot(this.ctx),
         latestPhoto: await this.ctx.storage.get("latestPhoto") || null,
         videoRoom: await this.ctx.storage.get("videoRoom") || null
@@ -98,6 +105,12 @@ export class CelebrationRoom {
         body = await request.json();
       } catch {
         return json({ error: "Invalid JSON" }, 400);
+      }
+
+      if (body && (body.type === "family_add" || body.type === "family_react")) {
+        const result = await mutateFamily(this.ctx.storage, body);
+        const { status = 200, ...payload } = result;
+        return json(payload, status);
       }
 
       if (body && body.type === "video_room_set") {
@@ -137,10 +150,16 @@ export class CelebrationRoom {
 
         const stored = await this.ctx.storage.get("telemetryClients");
         const clients = stored && typeof stored === "object" ? stored : {};
+        const pilot = sanitizePilot(body);
+        const previous = clients[clientId];
+        const currentPilot = previous?.call && (!pilot.call || pilot.revision <= previous.revision)
+          ? { call: previous.call, revision: previous.revision, environment: previous.environment } : pilot;
         clients[clientId] = {
+          ...currentPilot,
+          ...sanitizePhotobooth(body),
           role: String(body.role || "guest").trim().slice(0, 30) || "guest",
           lastSeen: Date.now(),
-          latencyMs: Number.isFinite(Number(body.latencyMs)) ? Math.max(0, Math.min(60_000, Number(body.latencyMs))) : null,
+          latencyMs: typeof body.latencyMs === 'number' && Number.isFinite(body.latencyMs) ? Math.max(0, Math.min(60_000, body.latencyMs)) : null,
           lastEventSeq: Math.max(0, Number(body.lastEventSeq || 0)),
           visible: body.visible !== false
         };

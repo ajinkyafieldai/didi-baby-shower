@@ -76,15 +76,17 @@
               <h2 id="blessing-title" data-event-family-hub-title>With the family</h2>
               <p>Everything the family leaves behind for Didi and the baby.</p>
             </div>
-            <button id="blessing-export" class="blessing-export" type="button">Export keepsake</button>
+            <button id="blessing-export" class="blessing-export" type="button">Export keepsake PDF</button>
           </div>
+
+          <p id="keepsake-export-status" role="status" aria-live="polite"></p>
 
           <nav class="family-hub-tabs primary-hub-tabs" aria-label="Family activities">
             <button type="button" data-feature="familyWall" data-hub-tab="wall" class="active">💬 Wishes</button>
             <button type="button" data-feature="photoMosaic" data-hub-tab="mosaic">🖼️ Moments</button>
             <button type="button" data-feature="familyMap" data-hub-tab="map">👥 People</button>
           </nav>
-          <details class="more-family">
+          <details class="more-family" open>
             <summary>More for the family</summary>
             <nav class="family-hub-tabs" aria-label="More family keepsakes">
               <button type="button" data-feature="familyTimeline" data-hub-tab="timeline">🕰️ Timeline</button>
@@ -107,12 +109,14 @@
               </div>
             </form>
 
+            <p id="notes-status" role="status" aria-live="polite"></p>
             <div class="wall-photo-form">
               <label class="wall-photo-pick">
                 <input id="wall-photo-input" type="file" accept="image/*">
                 <span>📷 Share a photo</span>
               </label>
               <input id="wall-photo-caption" type="text" maxlength="80" placeholder="Optional caption">
+              <button id="wall-photo-retry" type="button" hidden>Retry sharing photo</button>
               <span id="wall-photo-status" class="wall-photo-status" aria-live="polite"></span>
             </div>
 
@@ -143,6 +147,7 @@
               </div>
               <button type="submit">Add a family pin</button>
             </form>
+            <p id="map-status" role="status" aria-live="polite"></p>
             <div id="family-map" class="family-map" aria-label="Family locations map"></div>
             <div id="map-list" class="map-list"></div>
           <section class="people-arrivals" data-feature="guestRibbon" aria-label="Who was here">
@@ -154,6 +159,7 @@
               </div>
               <button type="submit">Add arrival 👋</button>
             </form>
+            <p id="guest-status" role="status" aria-live="polite"></p>
             <div id="arrival-ribbon" class="arrival-ribbon"></div>
           </section>
 
@@ -186,6 +192,7 @@
               <textarea name="recipe" maxlength="900" rows="5" placeholder="Ingredients + rough method" required></textarea>
               <label class="hub-file"><input name="photo" type="file" accept="image/*"> 📷 Optional dish photo</label>
               <button type="submit">Add recipe</button>
+              <p id="recipe-status" role="status" aria-live="polite"></p>
             </form>
             <div id="recipe-list" class="recipe-list"></div>
           </section>

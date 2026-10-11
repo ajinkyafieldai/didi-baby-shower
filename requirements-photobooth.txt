@@ -1,0 +1,2 @@
+daily-python==0.34.0
+Pillow==12.3.0
