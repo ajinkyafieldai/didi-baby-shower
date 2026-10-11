@@ -45,7 +45,9 @@ for the currently stored, unexpired Daily room. Tokens expire with the room.
 
 Update the Python process and give it `BABYSHOWER_ADMIN_TOKEN` in its server environment;
 it fetches a new hidden token on each room change/rejoin. A failed or wrong-room
-token prevents that join and reports `hidden_token_failed`. No keys or tokens are
+token prevents that join and reports `hidden_token_failed`. HTTP failures now
+include the safe server/Daily error detail in the Python log, with credentials
+redacted; provider rejection remains HTTP 502 to the client. No keys or tokens are
 logged. Alternatively supply a correctly scoped hidden `DAILY_MEETING_TOKEN`.
 A legacy keyless process can still capture, but has ordinary Daily presence.
 The custom frontend excludes that legacy bot's reserved name/user ID from tiles,

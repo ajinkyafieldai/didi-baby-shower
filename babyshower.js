@@ -22,8 +22,8 @@ function usage(){
   console.log(`Usage:
   babyshower trigger <name> [--force] [--dry-run]
   babyshower room create [--hours <n>] [--recording cloud] [--force] [--dry-run]
-  babyshower recording [run|start|stop|status] [--room <name>] [--id <recording-id>]
-  babyshower reset <pins|all> [--confirm] [--backup <file>]
+  babyshower recording [run|start|stop|status] [--room <name>] [--id <recording-id>] [--notes <file>]
+  babyshower reset [pins|all] [--confirm] [--backup <file>]
   babyshower photobooth [run|capture|health]
 
 Allowed triggers:
@@ -132,7 +132,8 @@ try{
   }else if(args[0]==="room"&&args[1]==="create"){
     await createRoom(args.includes("--dry-run"));
   }else if(args[0]==="recording"){
-    await recordingCommand(args[1] && !args[1].startsWith("--") ? args[1] : "run", {room:parseOption("--room"),id:parseOption("--id")});
+    if(args.includes("--notes")&&!parseOption("--notes")) throw new Error('--notes requires a filename.');
+    await recordingCommand(args[1] && !args[1].startsWith("--") ? args[1] : "run", {room:parseOption("--room"),id:parseOption("--id"),notes:parseOption("--notes")});
   }else if(args[0]==="reset"){
     if(!["pins","all"].includes(args[1])) throw new Error("Use reset <pins|all> [--confirm] [--backup <file>].");
     if(args.includes("--backup")&&!parseOption("--backup")) throw new Error("--backup requires a filename.");

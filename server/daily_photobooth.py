@@ -17,6 +17,7 @@ import threading
 import time
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 
 from daily import CallClient, Daily, EventHandler
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -81,8 +82,20 @@ class SiteAPI:
             data = json.dumps(data).encode()
             headers = {"Content-Type": "application/json", **(headers or {})}
         req = Request(self.base + path, data=data, headers={"User-Agent": "Didi-Photobooth/1.0", **(headers or {})})
-        with urlopen(req, timeout=8) as response:
-            result = json.load(response)
+        try:
+            with urlopen(req, timeout=8) as response:
+                result = json.load(response)
+        except HTTPError as error:
+            try:
+                detail = str(json.load(error).get('error') or 'Site API rejected request')
+            except (ValueError, AttributeError):
+                detail = 'Site API rejected request'
+            for secret in [os.getenv('BABYSHOWER_ADMIN_TOKEN'), os.getenv('DAILY_API_KEY'),
+                           os.getenv('DAILY_MEETING_TOKEN'), (headers or {}).get('Authorization')]:
+                if secret:
+                    detail = detail.replace(secret, '[redacted]')
+            detail = ''.join(c if c.isprintable() else ' ' for c in detail)[:400]
+            raise RuntimeError(f'HTTP {error.code}: {detail}') from None
         if result.get("ok") is False or result.get("error"):
             raise RuntimeError("Site API rejected request")
         return result
@@ -214,8 +227,9 @@ class Photobooth:
                 if issued.get('roomUrl') != room['roomUrl'] or not issued.get('token'):
                     raise RuntimeError('Room changed while issuing token')
                 token = issued['token']
-            except Exception:
+            except Exception as error:
                 self.failure('hidden_token_failed')
+                LOG.error('Hidden token request failed: %s', error)
                 return
         client = CallClient(event_handler=RoomEvents(self, generation))
         with self.lock:

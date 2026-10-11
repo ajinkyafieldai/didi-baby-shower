@@ -82,7 +82,10 @@ jobs:
         run: node scripts/test-recording-room.mjs
 
       - name: Recording CLI lifecycle
-        run: node scripts/test-recording-cli.mjs
+        run: |
+          node scripts/test-recording-cli.mjs
+          node scripts/test-recording-notes.mjs
+          python3 scripts/test-recording-notes-tty.py
 
       - name: Admin map pin reset
         run: |

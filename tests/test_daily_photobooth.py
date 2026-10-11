@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 from PIL import Image
-from server.daily_photobooth import Photobooth, SAFE_SETTINGS, compose_grid, now_ms
+from server.daily_photobooth import Photobooth, SAFE_SETTINGS, compose_grid, now_ms, SiteAPI
 
 
 class API:
@@ -29,6 +29,17 @@ def person(pid, name, state='playable', local=False):
 
 
 class CaptureTests(unittest.TestCase):
+    def test_http_error_reports_reason_without_admin_token(self):
+        import io
+        from urllib.error import HTTPError
+        error = HTTPError('https://site.test/api/photobooth-token', 502, 'Bad Gateway', {},
+                          io.BytesIO(b'{"error":"Daily token request failed (HTTP 400): invalid setting test-secret"}'))
+        with patch.dict('os.environ', {'BABYSHOWER_ADMIN_TOKEN': 'test-secret'}), \
+                patch('server.daily_photobooth.urlopen', side_effect=error):
+            with self.assertRaisesRegex(RuntimeError, 'HTTP 502: Daily token request failed.*HTTP 400') as raised:
+                SiteAPI('https://site.test').request('/api/photobooth-token', {}, {'Authorization': 'Bearer test-secret'})
+            self.assertNotIn('test-secret', str(raised.exception))
+
     def test_fetches_room_scoped_hidden_token(self):
         w = self.worker
         w.client = None
