@@ -7,7 +7,7 @@ const COMMANDS = new Set(["photo.capture", "photo.show"]);
 const SYSTEM_EVENTS = new Set(["photo.captured"]);
 const GROUP_WINDOW_MS = 10_000;
 const GROUP_THRESHOLD = 2;
-const GROUP_BURST_THRESHOLD = 2;
+const GROUP_BURST_THRESHOLD = 4;
 const TELEMETRY_ACTIVE_MS = 15_000;
 const TELEMETRY_MAX_CLIENTS = 200;
 
