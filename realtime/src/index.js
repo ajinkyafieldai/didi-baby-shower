@@ -377,6 +377,9 @@ export class CelebrationRoom {
 
 export default {
   async fetch(request, env) {
+    // Retired Didi pilot: deny every public Worker request. Do not delete
+    // Durable Object state; preserve backups and access-controlled records.
+    return json({ error: "Didi live-event service retired." }, 410);
     if (!env.REALTIME_SHARED_SECRET) {
       return json({ error: "Worker secret not configured" }, 503);
     }

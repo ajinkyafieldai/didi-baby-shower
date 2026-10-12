@@ -75,7 +75,8 @@ jobs:
           node scripts/test-server-photo-flow.mjs
           node scripts/test-keepsake-export.mjs
           node scripts/test-shared-family-frontend.mjs
-          node scripts/test-family-experience.mjs
+          # Retired deployment: public Worker no longer accepts family mutations.
+          # Its deny-all contract is checked by the dedicated retirement test.
       - name: Shared family state contract
         run: node scripts/test-family-state.mjs
       - name: Recording room contract
@@ -92,6 +93,9 @@ jobs:
           node scripts/test-pin-reset.mjs
           node scripts/test-reset-all.mjs
           node scripts/test-reset-backup.mjs
+
+      - name: Retired Worker must deny all requests
+        run: node --test tests/worker-retired.test.mjs
 
       - name: Build and verify
         run: npm run build
