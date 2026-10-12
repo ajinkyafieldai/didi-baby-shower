@@ -93,6 +93,9 @@ jobs:
           node scripts/test-reset-all.mjs
           node scripts/test-reset-backup.mjs
 
+      - name: Retired Worker must deny all requests
+        run: node --test tests/worker-retired.test.mjs
+
       - name: Build and verify
         run: npm run build
 
