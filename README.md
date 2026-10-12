@@ -1,3 +1,5 @@
+> **RETIRED EVENT (12 October 2026):** Didi's live ceremony infrastructure is no longer an authorized service. Only the existing keepsake page is intended to remain online. Do not redeploy the old frontend, Pages Functions, Daily room, realtime Worker or photo capture. The live keepsake was updated outside this repository; this source tree is **not** an authoritative copy of the keepsake and must not be used to redeploy the Pages site. See [retirement runbook](docs/retirement-2026-10-12.md).
+
 # didi-baby-shower
 
 A phone-first remote baby-shower experience and Apsila prototype.
