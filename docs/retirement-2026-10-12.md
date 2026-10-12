@@ -16,6 +16,16 @@ The final Pages keepsake was updated directly after the event and is **not captu
 6. **Verify externally:** from an unauthenticated session verify the keepsake still renders, no call can join, no uploads or mutations can occur, no photo/private export is reachable, and the old Worker no longer serves responses. Record access tests as HTTP status and endpoint only, never guest content.
 7. **Preserve history:** retain Git, retrospective, incident disposition and any required backups/retention evidence. Remove unused Didi deployments and resources only after preserving non-reconstructable user records under the applicable retention policy.
 
+## Execution record — 12 October 2026
+
+- **Completed:** PR #32 removed automatic Pages deployment; existing keepsake was not redeployed.
+- **Completed in source:** PR #33 changed the Didi Worker public entry point to return HTTP 410 for all calls. CI succeeded after removing an obsolete public-interaction test.
+- **Failed deployment:** GitHub Actions [Worker deploy run #38246961329](https://github.com/ajinkyafieldai/didi-baby-shower/actions/runs/38246961329) failed: Cloudflare returned `No access to the specified service` for `billowing-shadow-fa0a`. **The production Worker is not confirmed disabled.** Do not infer that a merge or passing CI shut it down.
+- **Inaccessible verification:** An external unauthenticated read-only probe could not resolve the Pages and Worker hostnames from the execution environment. This does not establish downtime.
+- **Not completed:** disabling the Worker in Cloudflare, neutralizing public Pages Functions, preserving an authoritative deployed keepsake copy, revoking unused credentials and verifying external lockdown.
+- **Required operator action:** use Cloudflare account access that owns the Worker to disable its public `workers.dev` route or delete the Worker **only after required data is retained**; separately replace the live Pages deployment with an exact static-only keepsake artifact, ensuring `/api/*` cannot reach handlers. Verify both from an independent network, then remove the obsolete Worker deployment workflow and retire Didi-only credentials.
+- **Scope warning:** changing Pages DNS alone or disabling the Durable Object does not eliminate the existing Pages Functions that independently reach R2 and Daily. Do not destroy event evidence simply to stop API access.
+
 ## Current state and limitations
 
 The repository transition blocks future **automatic Pages deployment**, but does **not itself** remove the Pages site's existing Functions or turn off already deployed Workers. Cloudflare account-side verification/action is required. Static keepsake capture and live platform access remain unverified until separate evidence is recorded.
