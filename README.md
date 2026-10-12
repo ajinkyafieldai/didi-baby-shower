@@ -27,7 +27,7 @@ node babyshower.js room create --hours 8
 node babyshower.js room create --hours 8 --recording cloud --force
 ```
 
-The CLI calls `/api/video-provision`. The Pages Function uses the server-side `DAILY_API_KEY`, creates or reuses a Daily meeting, and stores the current room in the existing realtime Durable Object.
+The CLI calls `/api/video-provision` with the operator-only `BABYSHOWER_ADMIN_TOKEN` from its environment. The Pages Function requires that token (fail-closed when absent) before using the server-side `DAILY_API_KEY`, creates or reuses a Daily meeting, and stores the current room in the existing realtime Durable Object.
 
 Cloud recording capability does not start recording automatically. Start recording separately through Daily after participants join. `--force` stores the new room for future joins; existing participants remain in the previous room until they leave/rejoin.
 
