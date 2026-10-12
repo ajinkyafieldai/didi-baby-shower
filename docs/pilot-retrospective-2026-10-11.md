@@ -47,7 +47,7 @@ The pilot reportedly needed little real-time operational intervention relative t
 
 ### Reported device / media behaviors
 
-Pre-event testing reported successful Android and desktop join paths, permission recovery on Android, pin/grid/fullscreen/rotation behavior, and iPhone Bluetooth audio. Android Bluetooth failed in testing. These outcomes belong to the device acceptance notes, not automatically to live usage.
+Pre-event testing reported successful Android and desktop join paths, permission recovery on Android, pin/grid/fullscreen/rotation behavior, and iPhone Bluetooth audio. The apparent Android Bluetooth failure was subsequently explained by the operator wearing one functional pair of earbuds while the phone was connected to another. These outcomes belong to the device acceptance notes, not automatically to live usage.
 
 ## What did not work or was underused
 
@@ -56,7 +56,7 @@ Pre-event testing reported successful Android and desktop join paths, permission
 | Questions UI did not function as intended | Operator report; cousin switched to collaborative verbal game | A game needs reliable fallback and clear host controls |
 | Two elderly guests struggled with mute/navigation recovery | Operator observation | Assisted participation and clearer recovery are important |
 | Notes, recipes and people-map pins did not synchronize between participants | Pre-event testing: browser-local state; operator reported unsynced content | Shared state must be durable and visible across guests before promising collaborative use |
-| Android Bluetooth audio failed | Device acceptance test, not asserted as universal Android failure | Real-device audio-routing verification and troubleshooting |
+| Android Bluetooth appeared to fail | Operator subsequently confirmed the phone was connected to a working pair of earbuds other than the pair being worn | Operator oversight; check the selected Bluetooth device before attributing a failure to Android or the application |
 | Reactions initially fired excessively | Observed exploration and timing behavior | Tunable pacing; don't suppress authentic celebration |
 | Message wall saw little use | Participants were mostly on open microphones | Optional asynchronous features need stronger event-context rationale |
 | Maps, uploads and recipes saw little use | Operator observations; mobile discoverability was limited | Test placement, timing and pre-event prompts before judging demand |
@@ -64,6 +64,14 @@ Pre-event testing reported successful Android and desktop join paths, permission
 | Family photo omitted a participant | Captured photo observation; recording included the participant | Photo capture should communicate participation/capture completeness, not silently imply everyone was captured |
 
 Underuse does not prove a feature is unwanted: invitations, timing, discoverability, and suitability to this event were not controlled.
+
+## Bluetooth finding — revised classification
+
+**Classification:** Operator oversight, not a confirmed software defect or architectural drift. The Android device was connected to a different, functional pair of Bluetooth earbuds than the pair being worn. No evidence establishes a WebRTC or Daily routing defect from this observation.
+
+**Operator's preferred explanation (humorous):** His elevated intellect was temporarily operating above the level of mere mortals and overlooked the mundane task of checking which earbuds were connected.
+
+**Practical preventive action:** Confirm the selected Bluetooth device and perform a brief audio check before escalating an apparent routing failure.
 
 ## Lessons and hypotheses
 
@@ -88,7 +96,7 @@ Underuse does not prove a feature is unwanted: invitations, timing, discoverabil
 | High | Fix and test live questions/game flow with host fallback | APSILA event UI / runtime |
 | High | Replace browser-local notes, recipes and pins with durable shared state, stable IDs and conflict-safe updates | Dugong realtime / event experience |
 | High | Improve assisted join, mute/navigation recovery and mobile discoverability | APSILA frontend / host controls |
-| High | Validate Android Bluetooth routing and provide recovery instructions | Media UI and device test plan |
+| Low | Add a preflight reminder to verify which paired Bluetooth earbuds are actually connected | Event operator checklist |
 | Medium | Add pre-event prompts, staging for performances, and permission-aware contribution uploads | Event setup / storefront / runtime |
 | Medium | Prototype lineup, private rooms, host assistance and optional exit feedback | Dugong / event UX |
 | Medium | Verify family-photo capture completeness indicators and keepsake permissions | Photo/keepsake flow |
