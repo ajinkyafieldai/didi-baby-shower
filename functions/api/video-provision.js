@@ -41,6 +41,14 @@ function currentDailyRoom(snapshot) {
 }
 
 export async function onRequestPost(context) {
+  // Privileged provider operations require an independently provisioned operator secret.
+  // Fail closed before reading the request or calling the Daily API.
+  const operatorToken = context.env.BABYSHOWER_ADMIN_TOKEN;
+  if (!operatorToken) return json({ error: "Room provisioning is not configured." }, 503);
+  if (context.request.headers.get("authorization") !== `Bearer ${operatorToken}`) {
+    return json({ error: "Unauthorized" }, 401);
+  }
+
   const apiKey = String(context.env.DAILY_API_KEY || "").trim();
   if (!apiKey) {
     return json({ error: "DAILY_API_KEY is not configured." }, 503);
