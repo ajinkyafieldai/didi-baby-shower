@@ -61,7 +61,7 @@ async function trigger(name,force=false,dryRun=false){
 
   const response=await fetch(baseUrl+"/api/events",{
     method:"POST",
-    headers:{"Content-Type":"application/json"},
+    headers:{"Content-Type":"application/json","Authorization":`Bearer ${operatorToken}`},
     body:JSON.stringify(payload),
     cache:"no-store"
   });
@@ -100,6 +100,9 @@ async function createRoom(dryRun=false){
   }
 
   requireUrl();
+
+  const operatorToken=process.env.BABYSHOWER_ADMIN_TOKEN;
+  if(!operatorToken) throw new Error("BABYSHOWER_ADMIN_TOKEN is required for room provisioning.");
 
   const response=await fetch(baseUrl+"/api/video-provision",{
     method:"POST",
